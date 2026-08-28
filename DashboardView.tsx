@@ -1,4 +1,4 @@
-import { getDailyLimit } from '../../constants';
+import { getDailyLimit } from '@/constants';
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -6,10 +6,10 @@ import {
   ArrowRight, ShieldCheck, Activity, BarChart2, CheckCircle, 
   AlertTriangle, Clock, HelpCircle, Key, Gift, Tag, Ticket, Copy, Check, Star
 } from 'lucide-react';
-import { ToolType, FileItem } from '../../types';
-import { db, collection, query, limit, onSnapshot, supabase } from '../supabase';
+import { ToolType, FileItem } from '@/types';
+import { db, collection, query, limit, onSnapshot, supabase } from '@/src/supabase';
 
-import { FeatureGuideButton } from './FeatureGuideModal';
+import { FeatureGuideButton } from './src/components/FeatureGuideModal';
 
 export interface DashboardPromoCode {
   id: string;
@@ -245,6 +245,50 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       console.warn("Error setting up promo subscription:", error);
     }
   }, [initialPromoCodes]);
+
+  // Real Reviews Live Loader
+  const [realReviews, setRealReviews] = React.useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('mz_community_reviews_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((r: any) => !r.id?.startsWith('rev-seed-'));
+        }
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  React.useEffect(() => {
+    let active = true;
+    try {
+      const unsub = onSnapshot(query(collection(db, 'reviews'), limit(10)), (snapshot) => {
+        if (!active) return;
+        const list: any[] = [];
+        if (snapshot && typeof snapshot.forEach === 'function') {
+          snapshot.forEach((d: any) => {
+            const data = d.data();
+            list.push({ id: d.id, ...data });
+          });
+        }
+        setRealReviews(list);
+      }, () => {});
+      return () => {
+        active = false;
+        unsub?.();
+      };
+    } catch (e) {}
+  }, []);
+
+  const reviewsSummary = React.useMemo(() => {
+    if (realReviews.length === 0) return { avg: '0.0', count: 0 };
+    const sum = realReviews.reduce((acc, curr) => acc + (Number(curr.rating) || 5), 0);
+    return {
+      avg: (sum / realReviews.length).toFixed(1),
+      count: realReviews.length
+    };
+  }, [realReviews]);
 
   const handleCopy = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -761,29 +805,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* 4. PLAY STORE REVIEWS & RATINGS SHOWCASE */}
-      <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/70 border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xl text-white">
+      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm relative overflow-hidden">
         <div className="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute left-10 bottom-0 -ml-16 -mb-16 w-56 h-56 bg-violet-500/10 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative z-10 space-y-6">
           {/* Header Row */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-5">
             <div className="flex items-center space-x-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/20 shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 via-amber-500 to-amber-600 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/20 shrink-0">
                 <Star size={24} className="fill-slate-950" />
               </div>
               <div>
                 <div className="flex items-center space-x-2">
-                  <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-white">
+                  <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-slate-900 dark:text-white">
                     Ulasan & Rating Komunitas
                   </h3>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[9px] font-black uppercase">
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase">
                     Play Store Rating
                   </span>
                 </div>
                 <div className="flex items-center space-x-2 mt-0.5">
-                  <span className="text-sm font-black text-amber-300">4.9 ★★★★★</span>
-                  <span className="text-xs text-slate-400">• Berdasarkan 100+ Kreator Terverifikasi</span>
+                  <span className="text-sm font-black text-amber-500 dark:text-amber-400">
+                    {realReviews.length > 0 ? `${reviewsSummary.avg} ★★★★★` : 'Belum Ada Rating'}
+                  </span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    • {realReviews.length} Ulasan Kreator
+                  </span>
                 </div>
               </div>
             </div>
@@ -791,14 +839,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center space-x-2.5 w-full sm:w-auto">
               <button
                 onClick={() => setActiveTool(ToolType.REVIEWS)}
-                className="flex-1 sm:flex-initial px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md shadow-amber-500/20 flex items-center justify-center space-x-1.5 cursor-pointer"
+                className="flex-1 sm:flex-initial px-4 py-2 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md shadow-amber-500/20 flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <Star size={13} className="fill-slate-950" />
                 <span>Beri Rating</span>
               </button>
               <button
                 onClick={() => setActiveTool(ToolType.REVIEWS)}
-                className="flex-1 sm:flex-initial px-4 py-2 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-xl border border-white/10 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                className="flex-1 sm:flex-initial px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>Lihat Semua</span>
                 <ArrowRight size={13} />
@@ -806,83 +854,102 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          {/* Quick 3 Featured Reviews Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Card 1 */}
-            <div className="bg-slate-950/60 border border-white/10 hover:border-amber-400/40 rounded-2xl p-4 transition-all flex flex-col justify-between space-y-3">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-7 h-7 rounded-full bg-violet-600 font-black text-[11px] flex items-center justify-center text-white">B</div>
-                    <div className="leading-tight">
-                      <h5 className="text-[11px] font-black text-white truncate max-w-[130px]">Budi Santoso</h5>
-                      <span className="text-[8.5px] text-emerald-400 font-bold">PRO Verified</span>
-                    </div>
-                  </div>
-                  <div className="flex text-amber-400 text-xs">
-                    {'★★★★★'}
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-300 font-medium line-clamp-3 leading-relaxed">
-                  "500+ Aset lolos submit Adobe Stock tanpa ditolak. Dulu butuh seharian bikin 50 keyword, sekarang 100 gambar beres dalam 5 menit!"
-                </p>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] text-slate-400">
-                <span className="bg-white/5 px-2 py-0.5 rounded text-amber-300">✅ 100% Lolos QC</span>
-                <span>👍 42 Membantu</span>
-              </div>
+          {/* Dynamic Real Reviews Display (Smooth Marquee Ticker) */}
+          {realReviews.length === 0 ? (
+            <div className="bg-slate-50/60 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 text-center space-y-2">
+              <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                Belum ada ulasan yang dipublikasikan. Jadilah kreator pertama yang membagikan rating dan pengalaman Anda!
+              </p>
+              <button
+                onClick={() => setActiveTool(ToolType.REVIEWS)}
+                className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-xs font-black rounded-xl cursor-pointer hover:brightness-110 active:scale-95 transition-all shadow-sm"
+              >
+                Tulis Ulasan & Beri Rating Bintang
+              </button>
             </div>
+          ) : (
+            <div className="relative w-full overflow-hidden py-1">
+              <style>{`
+                @keyframes mzReviewMarquee {
+                  0% { transform: translateX(0); }
+                  100% { transform: translateX(-50%); }
+                }
+                .mz-marquee-track {
+                  display: flex;
+                  width: max-content;
+                  animation: mzReviewMarquee 45s linear infinite;
+                }
+                .mz-marquee-track:hover {
+                  animation-play-state: paused;
+                }
+              `}</style>
 
-            {/* Card 2 */}
-            <div className="bg-slate-950/60 border border-white/10 hover:border-amber-400/40 rounded-2xl p-4 transition-all flex flex-col justify-between space-y-3">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-7 h-7 rounded-full bg-indigo-600 font-black text-[11px] flex items-center justify-center text-white">D</div>
-                    <div className="leading-tight">
-                      <h5 className="text-[11px] font-black text-white truncate max-w-[130px]">Devi Anggraini</h5>
-                      <span className="text-[8.5px] text-emerald-400 font-bold">PRO Verified</span>
-                    </div>
-                  </div>
-                  <div className="flex text-amber-400 text-xs">
-                    {'★★★★★'}
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-300 font-medium line-clamp-3 leading-relaxed">
-                  "Fitur Quality Check dan Vector Converter-nya sangat akurat. Deteksi watermark dan deskripsinya sangat SEO-friendly."
-                </p>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] text-slate-400">
-                <span className="bg-white/5 px-2 py-0.5 rounded text-indigo-300">🎯 Keyword Akurat</span>
-                <span>👍 29 Membantu</span>
-              </div>
-            </div>
+              {/* Side Gradient Fade Masks */}
+              <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-r from-white/95 dark:from-slate-900/95 via-white/50 dark:via-slate-900/50 to-transparent z-10" />
+              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-l from-white/95 dark:from-slate-900/95 via-white/50 dark:via-slate-900/50 to-transparent z-10" />
 
-            {/* Card 3 */}
-            <div className="bg-slate-950/60 border border-white/10 hover:border-amber-400/40 rounded-2xl p-4 transition-all flex flex-col justify-between space-y-3">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-7 h-7 rounded-full bg-emerald-600 font-black text-[11px] flex items-center justify-center text-white">R</div>
-                    <div className="leading-tight">
-                      <h5 className="text-[11px] font-black text-white truncate max-w-[130px]">Rian Pratama</h5>
-                      <span className="text-[8.5px] text-emerald-400 font-bold">PRO Verified</span>
-                    </div>
-                  </div>
-                  <div className="flex text-amber-400 text-xs">
-                    {'★★★★★'}
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-300 font-medium line-clamp-3 leading-relaxed">
-                  "Video Keyword Analyzer & Motion Gen sangat menghemat waktu produksi. Portofolio footage saya naik drastis penjualannya."
-                </p>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] text-slate-400">
-                <span className="bg-white/5 px-2 py-0.5 rounded text-emerald-300">🚀 AI Super Cepat</span>
-                <span>👍 18 Membantu</span>
+              {/* Marquee Content Track */}
+              <div className="mz-marquee-track flex items-stretch space-x-4">
+                {(() => {
+                  let repeatedList = [...realReviews];
+                  while (repeatedList.length < 6) {
+                    repeatedList = [...repeatedList, ...realReviews];
+                  }
+                  const displayList = [...repeatedList, ...repeatedList];
+
+                  return displayList.map((rev, index) => {
+                    const initial = (rev.userName || 'U').charAt(0).toUpperCase();
+                    const starCount = Math.min(5, Math.max(1, Number(rev.rating) || 5));
+                    return (
+                      <div 
+                        key={`${rev.id}-${index}`} 
+                        onClick={() => setActiveTool(ToolType.REVIEWS)}
+                        className="w-72 sm:w-80 shrink-0 bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 hover:border-amber-400/50 dark:hover:border-amber-400/50 rounded-2xl p-4 transition-all flex flex-col justify-between space-y-3 cursor-pointer shadow-sm hover:shadow-md hover:scale-[1.02] duration-200 select-none"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              {rev.userAvatar ? (
+                                <img src={rev.userAvatar} alt={rev.userName} className="w-7 h-7 rounded-xl object-cover border border-slate-200 dark:border-slate-700" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 font-black text-[11px] flex items-center justify-center text-white shadow-sm shrink-0">
+                                  {initial}
+                                </div>
+                              )}
+                              <div className="leading-tight truncate max-w-[130px]">
+                                <h5 className="text-[11px] font-black text-slate-900 dark:text-white truncate">{rev.userName}</h5>
+                                <span className="text-[8.5px] text-emerald-600 dark:text-emerald-400 font-bold">{rev.isPro ? 'PRO Verified' : 'Community User'}</span>
+                              </div>
+                            </div>
+                            <div className="flex text-amber-400 text-xs shrink-0">
+                              {'★'.repeat(starCount)}
+                            </div>
+                          </div>
+                          
+                          {rev.title && (
+                            <h6 className="text-[10.5px] font-black text-slate-800 dark:text-slate-200 truncate">
+                              {rev.title}
+                            </h6>
+                          )}
+
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium line-clamp-2 leading-relaxed">
+                            "{rev.comment}"
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800 text-[9px] text-slate-500 dark:text-slate-400">
+                          <span className="bg-slate-200/60 dark:bg-slate-800/80 px-2 py-0.5 rounded text-amber-600 dark:text-amber-300 truncate max-w-[140px] font-bold">
+                            {rev.tags && rev.tags[0] ? rev.tags[0] : (rev.photos && rev.photos.length > 0 ? '📸 Ada Foto' : '⭐ Rating')}
+                          </span>
+                          <span>👍 {rev.helpfulCount || 0} Membantu</span>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

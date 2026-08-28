@@ -29,6 +29,7 @@ import { MuteVideoView } from './src/components/MuteVideoView';
 import { MotionGenView } from './src/components/MotionGenView';
 import { RemovalGenView } from './src/components/RemovalGenView';
 import { ReviewsView } from './src/components/ReviewsView';
+import { AutoReviewPromptModal } from './src/components/AutoReviewPromptModal';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { FAQAccordion } from './src/components/FAQAccordion';
 import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
@@ -7074,6 +7075,14 @@ const App: React.FC = () => {
         onClose={() => setShowAboutModal(false)} 
         theme={theme} 
         t={t} 
+      />
+
+      {/* In-App Automatic Play Store Review & Rating Dialog */}
+      <AutoReviewPromptModal 
+        user={user} 
+        isLicensed={isLicensed} 
+        successfulFilesCount={successfulFilesCount} 
+        appName={appName} 
       />
       
       </div>

@@ -5,10 +5,10 @@ import {
   ArrowRight, ShieldCheck, HelpCircle, Sun, Moon, Globe, Loader2, AlertCircle, Mail, Lock, X,
   Calendar, VolumeX
 } from 'lucide-react';
-import { signInWithPopup, GoogleAuthProvider, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, auth, runSandboxGoogleSignIn, signInWithTokens } from '../supabase';
-import LogoImage from '../assets/images/mz_pro_logo_1780923659277.png';
-import { AppLanguage } from '../../constants';
-import { Meteors } from './Meteors';
+import { signInWithPopup, GoogleAuthProvider, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, auth, runSandboxGoogleSignIn, signInWithTokens } from './src/supabase';
+import LogoImage from '@/src/assets/images/mz_pro_logo_1780923659277.png';
+import { AppLanguage } from './constants';
+import { Meteors } from './src/components/Meteors';
 
 const AnimatedAppName: React.FC<{ name: string; fontSizeClass?: string }> = ({ name, fontSizeClass = "text-lg" }) => {
   const chars = name.split('');
