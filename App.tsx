@@ -7091,9 +7091,9 @@ const App: React.FC = () => {
       {/* In-App Automatic Play Store Review & Rating Dialog */}
       <AutoReviewPromptModal 
         user={user} 
-        isLicensed={isLicensed} 
+        isLicensed={isMzLicensed} 
         successfulFilesCount={successfulFilesCount} 
-        appName={appName} 
+        appName={mzAppName} 
       />
       
       </div>
