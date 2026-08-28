@@ -53,8 +53,7 @@ export const AntiSpamView: React.FC<{
   incrementDailyCount,
   setShowLimitModal,
   setShowActivationModal
-}) => {
-  const isIndo = t.language === 'Bahasa';
+  const isIndo = t?.language === 'Bahasa' || !t?.language;
   const [items, setItems] = useState<ImageFingerprint[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, step: '' });
@@ -441,6 +440,7 @@ export const AntiSpamView: React.FC<{
             description={isIndo 
               ? 'Fitur ini menganalisis ratusan gambar dalam satu batch menggunakan visual fingerprinting (dHash + pHash + RGB histogram) untuk mengelompokkan variasi yang terlalu mirip.\n\n📌 Mengapa Ini Penting?\n• Kurator Adobe Stock & Shutterstock secara rutin menolak batch foto/AI yang sudutnya hanya bergeser sedikit dengan alasan "Similar Content / Spam".\n• Fitur ini otomatis menyarankan 1 foto tertajam (Best Pick) dan merekomendasikan untuk menyingkirkan duplikat berlebih sebelum di-upload.'
               : 'This feature analyzes batch images using visual fingerprinting (dHash + pHash + color histograms) to cluster excessive duplicate variations.\n\n📌 Why is this crucial?\n• Adobe Stock & Shutterstock curators strictly reject submissions with minor angle shifts under "Similar Content / Spam".\n• This tool automatically picks the sharpest shot (Best Pick) and prunes redundant variations before submission.'}
+            t={t}
           />
           {items.length > 0 && (
             <button
