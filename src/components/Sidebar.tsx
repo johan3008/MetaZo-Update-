@@ -732,15 +732,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span>{t.sidebar_motion_gen || "Motion Gen"}</span></button>
 
                     <button 
-                      onClick={() => { setActiveTool(ToolType.REMOVAL_GEN); setSidebarOpen(false); }}
+                      onClick={() => { setActiveTool(ToolType.ANTI_SPAM); setSidebarOpen(false); }}
                       className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
-                        activeTool === ToolType.REMOVAL_GEN 
-                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-fuchsia-500" 
+                        activeTool === ToolType.ANTI_SPAM 
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-amber-500" 
                           : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                       }`}
                     >
-                      <Eraser size={14} className={activeTool === ToolType.REMOVAL_GEN ? "text-fuchsia-400" : "text-slate-400"} />
-                      <span>{t.sidebar_removal_gen || "Removal Gen"}</span></button>
+                      <CopyCheck size={14} className={activeTool === ToolType.ANTI_SPAM ? "text-amber-400" : "text-slate-400"} />
+                      <span>{t.sidebar_anti_spam || "Anti-Spam Similar Checker"}</span></button>
                   </nav>
                 </div>
 
