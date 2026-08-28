@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, ImageIcon, Film, FileCode, Zap, BookOpen, 
   ArrowRight, ShieldCheck, Activity, BarChart2, CheckCircle, 
-  AlertTriangle, Clock, HelpCircle, Key, Gift, Tag, Ticket, Copy, Check
+  AlertTriangle, Clock, HelpCircle, Key, Gift, Tag, Ticket, Copy, Check, Star
 } from 'lucide-react';
 import { ToolType, FileItem } from '../../types';
 import { db, collection, query, limit, onSnapshot, supabase } from '../supabase';
@@ -758,6 +758,132 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
+      </div>
+
+      {/* 4. PLAY STORE REVIEWS & RATINGS SHOWCASE */}
+      <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/70 border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xl text-white">
+        <div className="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute left-10 bottom-0 -ml-16 -mb-16 w-56 h-56 bg-violet-500/10 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 space-y-6">
+          {/* Header Row */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
+            <div className="flex items-center space-x-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/20 shrink-0">
+                <Star size={24} className="fill-slate-950" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-white">
+                    Ulasan & Rating Komunitas
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[9px] font-black uppercase">
+                    Play Store Rating
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2 mt-0.5">
+                  <span className="text-sm font-black text-amber-300">4.9 ★★★★★</span>
+                  <span className="text-xs text-slate-400">• Berdasarkan 100+ Kreator Terverifikasi</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2.5 w-full sm:w-auto">
+              <button
+                onClick={() => setActiveTool(ToolType.REVIEWS)}
+                className="flex-1 sm:flex-initial px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md shadow-amber-500/20 flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <Star size={13} className="fill-slate-950" />
+                <span>Beri Rating</span>
+              </button>
+              <button
+                onClick={() => setActiveTool(ToolType.REVIEWS)}
+                className="flex-1 sm:flex-initial px-4 py-2 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-xl border border-white/10 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <span>Lihat Semua</span>
+                <ArrowRight size={13} />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick 3 Featured Reviews Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Card 1 */}
+            <div className="bg-slate-950/60 border border-white/10 hover:border-amber-400/40 rounded-2xl p-4 transition-all flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-full bg-violet-600 font-black text-[11px] flex items-center justify-center text-white">B</div>
+                    <div className="leading-tight">
+                      <h5 className="text-[11px] font-black text-white truncate max-w-[130px]">Budi Santoso</h5>
+                      <span className="text-[8.5px] text-emerald-400 font-bold">PRO Verified</span>
+                    </div>
+                  </div>
+                  <div className="flex text-amber-400 text-xs">
+                    {'★★★★★'}
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-300 font-medium line-clamp-3 leading-relaxed">
+                  "500+ Aset lolos submit Adobe Stock tanpa ditolak. Dulu butuh seharian bikin 50 keyword, sekarang 100 gambar beres dalam 5 menit!"
+                </p>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] text-slate-400">
+                <span className="bg-white/5 px-2 py-0.5 rounded text-amber-300">✅ 100% Lolos QC</span>
+                <span>👍 42 Membantu</span>
+              </div>
+            </div>
+
+            {/* Card 2 */}
+            <div className="bg-slate-950/60 border border-white/10 hover:border-amber-400/40 rounded-2xl p-4 transition-all flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-full bg-indigo-600 font-black text-[11px] flex items-center justify-center text-white">D</div>
+                    <div className="leading-tight">
+                      <h5 className="text-[11px] font-black text-white truncate max-w-[130px]">Devi Anggraini</h5>
+                      <span className="text-[8.5px] text-emerald-400 font-bold">PRO Verified</span>
+                    </div>
+                  </div>
+                  <div className="flex text-amber-400 text-xs">
+                    {'★★★★★'}
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-300 font-medium line-clamp-3 leading-relaxed">
+                  "Fitur Quality Check dan Vector Converter-nya sangat akurat. Deteksi watermark dan deskripsinya sangat SEO-friendly."
+                </p>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] text-slate-400">
+                <span className="bg-white/5 px-2 py-0.5 rounded text-indigo-300">🎯 Keyword Akurat</span>
+                <span>👍 29 Membantu</span>
+              </div>
+            </div>
+
+            {/* Card 3 */}
+            <div className="bg-slate-950/60 border border-white/10 hover:border-amber-400/40 rounded-2xl p-4 transition-all flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-full bg-emerald-600 font-black text-[11px] flex items-center justify-center text-white">R</div>
+                    <div className="leading-tight">
+                      <h5 className="text-[11px] font-black text-white truncate max-w-[130px]">Rian Pratama</h5>
+                      <span className="text-[8.5px] text-emerald-400 font-bold">PRO Verified</span>
+                    </div>
+                  </div>
+                  <div className="flex text-amber-400 text-xs">
+                    {'★★★★★'}
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-300 font-medium line-clamp-3 leading-relaxed">
+                  "Video Keyword Analyzer & Motion Gen sangat menghemat waktu produksi. Portofolio footage saya naik drastis penjualannya."
+                </p>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] text-slate-400">
+                <span className="bg-white/5 px-2 py-0.5 rounded text-emerald-300">🚀 AI Super Cepat</span>
+                <span>👍 18 Membantu</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>

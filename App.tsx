@@ -28,6 +28,7 @@ import { CalendarGenView } from './src/components/CalendarGenView';
 import { MuteVideoView } from './src/components/MuteVideoView';
 import { MotionGenView } from './src/components/MotionGenView';
 import { RemovalGenView } from './src/components/RemovalGenView';
+import { ReviewsView } from './src/components/ReviewsView';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { FAQAccordion } from './src/components/FAQAccordion';
 import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
@@ -1117,119 +1118,132 @@ const App: React.FC = () => {
   const [activeAccountsCount, setActiveAccountsCount] = useState<number>(0);
   const [activeUsers, setActiveUsers] = useState<string[]>([]);
 
-  // 1. Mark current user as online
+  // 1. Mark current user as online with frequent heartbeat & activity updates
   useEffect(() => {
-    if (!auth.currentUser) return;
+    const activeUser = user || auth.currentUser;
+    if (!activeUser?.uid) return;
     
-    const userRef = doc(db, 'users', auth.currentUser.uid);
+    const userRef = doc(db, 'users', activeUser.uid);
     
     const markOnline = async () => {
-        try {
-            await setDoc(userRef, { 
-              lastSeen: new Date().getTime(),
-              email: auth.currentUser?.email || '',
-              displayName: auth.currentUser?.displayName || ''
-            }, { merge: true });
-        } catch (e) {
-            console.info('Error marking online:', e);
-        }
+      try {
+        const u = user || auth.currentUser;
+        if (!u?.uid) return;
+        const name = u.displayName || (u.email ? u.email.split('@')[0] : 'User');
+        await setDoc(userRef, { 
+          lastSeen: Date.now(),
+          email: u.email || '',
+          displayName: name,
+          isOnline: true
+        }, { merge: true });
+      } catch (e) {
+        console.info('Error marking online:', e);
+      }
     };
     
     markOnline();
-    const interval = setInterval(markOnline, 60000); // 1 minute
+    const interval = setInterval(markOnline, 25000); // 25s heartbeat
     
     const handleBeforeUnload = () => {
-        setDoc(userRef, { lastSeen: 0 }, { merge: true }).catch(() => {});
+      try {
+        setDoc(userRef, { lastSeen: 0, isOnline: false }, { merge: true }).catch(() => {});
+      } catch (e) {}
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     
     return () => {
-        clearInterval(interval);
-        window.removeEventListener('beforeunload', handleBeforeUnload);
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [auth.currentUser]);
+  }, [user]);
 
   // 2. Fetch truly active (online) users REALTIME
   useEffect(() => {
     const usersRef = collection(db, 'users');
     
-    // We use a periodic timer to force re-evaluation of the 5-minute timeout locally,
-    // so we don't rely only on database updates to remove inactive users.
-    let currentUsersList = [];
-    
-    const evaluateSnapshot = (snapshot) => {
-        const uniqueUsers = new Set<string>();
-        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-        
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            let isUserOnline = false;
-            
-            if (data.lastSeen !== undefined && data.lastSeen !== null) {
-                let lastSeenTime = 0;
-                if (typeof data.lastSeen === 'number') {
-                    lastSeenTime = data.lastSeen;
-                } else if (data.lastSeen.toMillis) {
-                    lastSeenTime = data.lastSeen.toMillis();
-                } else if (typeof data.lastSeen === 'string') {
-                    lastSeenTime = new Date(data.lastSeen).getTime();
-                } else if (data.lastSeen.seconds) {
-                    lastSeenTime = data.lastSeen.seconds * 1000;
-                }
-                
-                if (lastSeenTime === 0) {
-                    isUserOnline = false;
-                } else if (lastSeenTime > fiveMinutesAgo) {
-                    isUserOnline = true;
-                } else if (lastSeenTime <= fiveMinutesAgo) {
-                    isUserOnline = false;
-                }
+    const evaluateSnapshot = (snapshot: any) => {
+      const uniqueUsers = new Set<string>();
+      // Active window threshold: 3 minutes (180,000 ms)
+      const timeoutThreshold = Date.now() - 3 * 60 * 1000;
+      
+      if (snapshot && typeof snapshot.forEach === 'function') {
+        snapshot.forEach((docSnap: any) => {
+          const data = docSnap.data();
+          let isUserOnline = false;
+          
+          if (data && data.lastSeen !== undefined && data.lastSeen !== null) {
+            let lastSeenTime = 0;
+            if (typeof data.lastSeen === 'number') {
+              lastSeenTime = data.lastSeen;
+            } else if (data.lastSeen.toMillis) {
+              lastSeenTime = data.lastSeen.toMillis();
+            } else if (typeof data.lastSeen === 'string') {
+              lastSeenTime = new Date(data.lastSeen).getTime();
+            } else if (data.lastSeen.seconds) {
+              lastSeenTime = data.lastSeen.seconds * 1000;
             }
             
-            if (isUserOnline) {
-                const nameToShow = data.displayName || (data.email ? data.email.split('@')[0] : 'Unknown');
-                if (nameToShow !== 'Unknown' && nameToShow !== 'sandbox.google.user') {
-                    uniqueUsers.add(nameToShow);
-                }
+            if (lastSeenTime > timeoutThreshold) {
+              isUserOnline = true;
             }
+          }
+          
+          if (isUserOnline) {
+            let nameToShow = data.displayName || (data.email ? data.email.split('@')[0] : '');
+            if (!nameToShow && data.email) nameToShow = data.email;
+            if (nameToShow && nameToShow !== 'Unknown') {
+              uniqueUsers.add(nameToShow);
+            }
+          }
         });
-        
-        const usersList = Array.from(uniqueUsers);
-        
-        if (auth.currentUser) {
-            const myName = auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : 'Unknown');
-            if (myName !== 'Unknown' && myName !== 'sandbox.google.user' && !usersList.includes(myName)) {
-                usersList.push(myName);
-            }
+      }
+      
+      const currentActiveUser = user || auth.currentUser;
+      if (currentActiveUser) {
+        const myName = currentActiveUser.displayName || (currentActiveUser.email ? currentActiveUser.email.split('@')[0] : 'User');
+        if (myName && myName !== 'Unknown') {
+          uniqueUsers.add(myName);
         }
-        
-        currentUsersList = usersList;
-        setActiveUsers(prev => {
-            if (JSON.stringify(prev) === JSON.stringify(usersList)) return prev;
-            return usersList;
-        });
-        setActiveAccountsCount(usersList.length);
+      }
+      
+      const usersList = Array.from(uniqueUsers);
+      const finalCount = Math.max(usersList.length, currentActiveUser ? 1 : 0);
+      
+      setActiveUsers(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(usersList)) return prev;
+        return usersList;
+      });
+      setActiveAccountsCount(finalCount);
     };
 
-    let lastSnapshot = null;
-    const unsubscribe = onSnapshot(usersRef, (snapshot) => {
+    let lastSnapshot: any = null;
+    let unsubSnapshot: (() => void) | null = null;
+    try {
+      unsubSnapshot = onSnapshot(usersRef, (snapshot) => {
         lastSnapshot = snapshot;
         evaluateSnapshot(snapshot);
-    }, (error) => {
-        console.error("Active accounts realtime error:", error);
-    });
+      }, (error) => {
+        console.warn("Active accounts realtime error:", error);
+        evaluateSnapshot(null);
+      });
+    } catch (e) {
+      console.warn("Error subscribing to users collection:", e);
+      evaluateSnapshot(null);
+    }
     
     const forceUpdateInterval = setInterval(() => {
-        if (lastSnapshot) {
-            evaluateSnapshot(lastSnapshot);
-        }
-    }, 30000);
+      if (lastSnapshot) {
+        evaluateSnapshot(lastSnapshot);
+      } else {
+        evaluateSnapshot(null);
+      }
+    }, 15000);
 
     return () => {
-        unsubscribe();
-        clearInterval(forceUpdateInterval);
+      unsubSnapshot?.();
+      clearInterval(forceUpdateInterval);
     };
-  }, [auth.currentUser]);
+  }, [user]);
 
   const [uiLanguage, setUiLanguage] = useState<AppLanguage>(() => {
     try {
@@ -4861,6 +4875,14 @@ const App: React.FC = () => {
               setShowLimitModal={setShowLimitModal}
               setShowActivationModal={setShowActivationModal}
               aiOptions={commonAiOptions}
+            />
+          ) : activeTool === ToolType.REVIEWS ? (
+            <ReviewsView 
+              t={t}
+              user={user}
+              isLicensed={isMzLicensed}
+              appName={mzAppName}
+              onOpenDashboard={() => handleSetActiveTool(ToolType.DASHBOARD)}
             />
           ) : (
             <>
