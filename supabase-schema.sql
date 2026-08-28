@@ -81,6 +81,23 @@ CREATE TABLE IF NOT EXISTS public.backups (
     "createdAt" text
 );
 
+CREATE TABLE IF NOT EXISTS public.reviews (
+    id text PRIMARY KEY,
+    "userName" text,
+    "userEmail" text,
+    "userAvatar" text,
+    "isPro" boolean,
+    rating numeric,
+    title text,
+    comment text,
+    tags jsonb,
+    photos jsonb,
+    "createdAt" text,
+    "helpfulCount" numeric,
+    "verifiedBuyer" boolean,
+    "appVersion" text
+);
+
 ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.keys DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.promos DISABLE ROW LEVEL SECURITY;
@@ -89,3 +106,4 @@ ALTER TABLE public.global_messages DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feedback DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.backups DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reviews DISABLE ROW LEVEL SECURITY;
