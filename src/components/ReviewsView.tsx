@@ -5,7 +5,7 @@ import {
   Sparkles, Filter, Search, Award, MessageSquare, 
   ShieldCheck, Camera, Trash2, Maximize2, User, 
   TrendingUp, Check, Heart, ExternalLink, RefreshCw,
-  Sliders, Shield, Image as ImageIcon, MessageCircle
+  Edit3, Shield
 } from 'lucide-react';
 import { CommunityReview } from '@/types';
 import { db, collection, query, limit, onSnapshot, setDoc, doc, updateDoc } from '@/src/supabase';
@@ -77,6 +77,15 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
   const [submitSuccessMsg, setSubmitSuccessMsg] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 1 User = 1 Review Rule Checker
+  const userIdentifier = user?.uid || (user?.email ? user.email.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_') : 'local_user');
+  const existingUserReview = useMemo(() => {
+    return reviews.find(r => 
+      (user?.email && r.userEmail && r.userEmail.toLowerCase() === user.email.toLowerCase()) ||
+      r.id === `rev-user-${userIdentifier}`
+    );
+  }, [reviews, user, userIdentifier]);
+
   // Real-time synchronization directly from database
   useEffect(() => {
     let active = true;
@@ -108,8 +117,21 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
           });
         }
 
-        setReviews(list);
-        localStorage.setItem('mz_community_reviews_cache', JSON.stringify(list));
+        // Deduplicate list by user email / ID to guarantee 1 user = 1 review strictly
+        const uniqueMap = new Map<string, CommunityReview>();
+        list.forEach(item => {
+          const key = item.userEmail ? item.userEmail.toLowerCase() : item.id;
+          uniqueMap.set(key, item);
+        });
+        const deduplicatedList = Array.from(uniqueMap.values());
+
+        setReviews(deduplicatedList);
+        localStorage.setItem('mz_community_reviews_cache', JSON.stringify(deduplicatedList));
+
+        // Sync review flag if current user exists
+        if (user?.email && deduplicatedList.some(r => r.userEmail && r.userEmail.toLowerCase() === user.email.toLowerCase())) {
+          localStorage.setItem('mz_has_submitted_review', 'true');
+        }
       }, (err) => {
         if (!active) return;
         setIsLoadingReviews(false);
@@ -123,7 +145,25 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
     } catch (e) {
       if (active) setIsLoadingReviews(false);
     }
-  }, []);
+  }, [user]);
+
+  // Open Write / Edit Review Modal
+  const handleOpenWriteModal = () => {
+    if (existingUserReview) {
+      setFormRating(existingUserReview.rating || 5);
+      setFormTitle(existingUserReview.title || '');
+      setFormComment(existingUserReview.comment || '');
+      setFormSelectedTags(existingUserReview.tags || ['✅ 100% Lolos Adobe Stock']);
+      setFormPhotos(existingUserReview.photos || []);
+    } else {
+      setFormRating(5);
+      setFormTitle('');
+      setFormComment('');
+      setFormSelectedTags(['✅ 100% Lolos Adobe Stock']);
+      setFormPhotos([]);
+    }
+    setShowWriteModal(true);
+  };
 
   // Compression helper for uploaded screenshots/photos
   const compressImage = (file: File): Promise<string> => {
@@ -210,7 +250,8 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
     }
 
     setIsSubmitting(true);
-    const reviewId = 'rev-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+    // Use consistent 1-user-1-doc ID to guarantee single review per user
+    const reviewId = existingUserReview?.id || (`rev-user-${userIdentifier}`);
     const authorName = user?.displayName || (user?.email ? user.email.split('@')[0] : 'Kontributor Kreatif');
     
     const newReview: CommunityReview = {
@@ -224,37 +265,39 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
       comment: formComment.trim(),
       tags: formSelectedTags,
       photos: formPhotos,
-      createdAt: new Date().toISOString(),
-      helpfulCount: 1,
+      createdAt: existingUserReview?.createdAt || new Date().toISOString(),
+      helpfulCount: existingUserReview?.helpfulCount || 1,
       verifiedBuyer: isLicensed,
       appVersion: isLicensed ? 'v4.2 PRO' : 'v4.2 Trial'
     };
 
     try {
-      // 1. Save to Database
+      // 1. Save / Upsert to Database
       await setDoc(doc(db, 'reviews', reviewId), newReview);
 
-      // 2. Update local state & cache immediately
-      setReviews(prev => [newReview, ...prev]);
-      const cached = localStorage.getItem('mz_community_reviews_cache');
-      const list = cached ? JSON.parse(cached) : [];
-      localStorage.setItem('mz_community_reviews_cache', JSON.stringify([newReview, ...list]));
+      // 2. Update local state & cache immediately (Replace existing, avoid duplicates)
+      setReviews(prev => {
+        const filtered = prev.filter(r => r.id !== reviewId && (!user?.email || r.userEmail?.toLowerCase() !== user.email.toLowerCase()));
+        const updated = [newReview, ...filtered];
+        localStorage.setItem('mz_community_reviews_cache', JSON.stringify(updated));
+        return updated;
+      });
+      localStorage.setItem('mz_has_submitted_review', 'true');
 
       setSubmitSuccessMsg(true);
       setTimeout(() => {
         setSubmitSuccessMsg(false);
         setShowWriteModal(false);
-        // Reset form
-        setFormComment('');
-        setFormTitle('');
-        setFormPhotos([]);
-        setFormRating(5);
       }, 1500);
     } catch (error) {
       console.warn('Error saving review to database, saving locally:', error);
-      setReviews(prev => [newReview, ...prev]);
+      setReviews(prev => {
+        const filtered = prev.filter(r => r.id !== reviewId && (!user?.email || r.userEmail?.toLowerCase() !== user.email.toLowerCase()));
+        return [newReview, ...filtered];
+      });
+      localStorage.setItem('mz_has_submitted_review', 'true');
       setShowWriteModal(false);
-      alert('Ulasan Anda berhasil dikirim dan tersimpan di perangkat!');
+      alert('Ulasan Anda berhasil disimpan!');
     } finally {
       setIsSubmitting(false);
     }
@@ -374,7 +417,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                 <span>Ulasan & Rating Komunitas</span>
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-400 text-[10px] font-black uppercase tracking-wider">
-                Realtime Cloud
+                1 Pengguna = 1 Ulasan
               </span>
             </div>
 
@@ -394,13 +437,29 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
 
             <div className="pt-2 flex flex-wrap items-center gap-3">
               <button
-                onClick={() => setShowWriteModal(true)}
+                onClick={handleOpenWriteModal}
                 className="px-5 py-2.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center space-x-2 cursor-pointer"
               >
-                <Plus size={16} />
-                <span>Tulis Ulasan & Beri Rating</span>
+                {existingUserReview ? (
+                  <>
+                    <Edit3 size={16} />
+                    <span>Perbarui Ulasan Anda</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} />
+                    <span>Tulis Ulasan & Beri Rating</span>
+                  </>
+                )}
               </button>
               
+              {existingUserReview && (
+                <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
+                  <CheckCircle2 size={14} />
+                  <span>Ulasan Anda Aktif ({existingUserReview.rating}★)</span>
+                </span>
+              )}
+
               {onOpenDashboard && (
                 <button
                   onClick={onOpenDashboard}
@@ -429,7 +488,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                 ))}
               </div>
               <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                {stats.totalCount} Total Ulasan
+                {stats.totalCount} Total Ulasan Unik
               </span>
               {stats.totalCount > 0 && (
                 <span className="inline-flex items-center space-x-1 mt-1 text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
@@ -551,7 +610,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
               : 'Tidak menemukan ulasan untuk filter yang Anda pilih. Coba pilih filter bintang lain.'}
           </p>
           <button
-            onClick={() => setShowWriteModal(true)}
+            onClick={handleOpenWriteModal}
             className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl shadow-lg shadow-amber-500/20 cursor-pointer transition-all inline-flex items-center space-x-2 active:scale-95"
           >
             <Plus size={14} />
@@ -563,11 +622,12 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
           {filteredReviews.map((review) => {
             const isLiked = likedReviewIds[review.id];
             const initial = (review.userName || 'U').charAt(0).toUpperCase();
+            const isMine = user?.email && review.userEmail && review.userEmail.toLowerCase() === user.email.toLowerCase();
 
             return (
               <div 
                 key={review.id}
-                className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 hover:border-violet-500/40 dark:hover:border-violet-500/40 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 group/card"
+                className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border ${isMine ? 'border-amber-400/50 dark:border-amber-400/50 shadow-amber-500/10' : 'border-slate-200/80 dark:border-slate-800 hover:border-violet-500/40 dark:hover:border-violet-500/40'} rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 group/card`}
               >
                 <div className="space-y-3">
                   {/* Top Row: User Avatar & Badge & Date */}
@@ -589,6 +649,11 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                           <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white tracking-tight">
                             {review.userName}
                           </h4>
+                          {isMine && (
+                            <span className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[8px] font-black uppercase tracking-wider border border-amber-300 dark:border-amber-500/30">
+                              <span>Ulasan Anda</span>
+                            </span>
+                          )}
                           {review.isPro && (
                             <span className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-[8px] font-black uppercase tracking-wider border border-emerald-200 dark:border-emerald-500/20">
                               <ShieldCheck size={9} />
@@ -668,11 +733,21 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                   )}
                 </div>
 
-                {/* Footer Helpful Button */}
+                {/* Footer Helpful Button & Edit trigger */}
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-[9px] text-slate-400 font-semibold">
-                    Apakah ulasan ini membantu?
-                  </span>
+                  {isMine ? (
+                    <button
+                      onClick={handleOpenWriteModal}
+                      className="inline-flex items-center space-x-1 text-[10px] font-extrabold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                    >
+                      <Edit3 size={11} />
+                      <span>Edit Ulasan Saya</span>
+                    </button>
+                  ) : (
+                    <span className="text-[9px] text-slate-400 font-semibold">
+                      Apakah ulasan ini membantu?
+                    </span>
+                  )}
                   
                   <button
                     onClick={() => handleHelpfulUpvote(review.id)}
@@ -692,7 +767,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
         </div>
       )}
 
-      {/* 4. MODAL WRITE A REVIEW (TULIS ULASAN & UNGGAH FOTO) */}
+      {/* 4. MODAL WRITE / EDIT REVIEW (TULIS / EDIT ULASAN) */}
       <AnimatePresence>
         {showWriteModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in">
@@ -713,13 +788,15 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                 <div>
                   <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[9px] font-black uppercase tracking-widest mb-1.5">
                     <Star size={10} className="fill-current" />
-                    <span>Ulasan Pengguna MetaZo</span>
+                    <span>{existingUserReview ? 'Edit Ulasan Anda (1 Pengguna = 1 Ulasan)' : 'Tulis Ulasan Pengguna MetaZo'}</span>
                   </div>
                   <h3 className="text-xl font-black text-slate-900 dark:text-white">
-                    Tulis Ulasan & Pengalaman Anda
+                    {existingUserReview ? 'Perbarui Ulasan & Rating Anda' : 'Tulis Ulasan & Pengalaman Anda'}
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                    Bagikan rating dan screenshot bukti kemudahan metadata Anda kepada sesama kreator!
+                    {existingUserReview 
+                      ? 'Setiap pengguna memiliki 1 ulasan unik. Anda dapat memperbarui rating dan ulasan Anda kapan saja.' 
+                      : 'Bagikan rating dan screenshot bukti kemudahan metadata Anda kepada sesama kreator!'}
                   </p>
                 </div>
 
@@ -864,7 +941,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                   {submitSuccessMsg && (
                     <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center space-x-2">
                       <CheckCircle2 size={16} />
-                      <span>Terima kasih! Ulasan Anda berhasil diterbitkan.</span>
+                      <span>{existingUserReview ? 'Ulasan Anda berhasil diperbarui!' : 'Terima kasih! Ulasan Anda berhasil diterbitkan.'}</span>
                     </div>
                   )}
 
@@ -885,12 +962,12 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                       {isSubmitting ? (
                         <>
                           <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                          <span>Menerbitkan...</span>
+                          <span>Menyimpan...</span>
                         </>
                       ) : (
                         <>
                           <Check size={14} />
-                          <span>Kirim Ulasan</span>
+                          <span>{existingUserReview ? 'Simpan Perubahan' : 'Kirim Ulasan'}</span>
                         </>
                       )}
                     </button>
