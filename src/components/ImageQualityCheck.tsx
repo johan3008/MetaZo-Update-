@@ -4,7 +4,7 @@ import { getHeaders } from '../../services/geminiService';
 import { 
   Upload, ShieldCheck, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, 
   ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info, Download, 
-  Copy, Check, Play, Pause, RefreshCw, Layers, Filter, CheckCircle2, Clock
+  Copy, Check, Play, Pause, RefreshCw, Layers, Filter, CheckCircle2, Clock, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { FeatureGuideButton } from './FeatureGuideModal';
@@ -1870,26 +1870,84 @@ export const ImageQualityCheck: React.FC<{
                                                       </span>
                                                     </div>
                                                     <p className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-normal">
-                                                      {c.val?.note || "Normal, tidak mendeteksi pelanggaran kekayaan intelektual."}
+                                            {c.val?.note || "Normal, tidak mendeteksi pelanggaran kekayaan intelektual."}
                                                     </p>
                                                   </div>
                                                 );
                                               })}
-                                            </div>
+                                             </div>
 
-                                            <div className="bg-slate-100/30 dark:bg-white/[0.01] border border-slate-200/50 dark:border-white/5 p-4 rounded-2xl space-y-2">
-                                              <h5 className="text-[9px] font-black uppercase text-rose-500 tracking-wider">Known Restrictions Check List</h5>
-                                              <ul className="text-[9px] font-medium text-slate-500 dark:text-slate-400 space-y-1.5 list-disc pl-4">
-                                                <li><strong>Merek Dagang:</strong> Deteksi visual terhadap logo khas, siluet iPhone/Macbook, logo Converse Chuck Taylor, or Beats by Dre.</li>
-                                                <li><strong>Landmark Berbayar:</strong> Menara Eiffel (malam hari), Sydney Opera House, Burj Khalifa, Louvre Pyramid, & Atomium dilarang tanpa rilis komersial.</li>
-                                                <li><strong>Karya Seni Lain:</strong> Mural jalanan, patung kontemporer, grafiti, tato tubuh yang terekspos jelas membutuhkan Property Release.</li>
-                                              </ul>
-                                            </div>
-                                          </div>
-                                        )}
+                                             <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/10 p-4 rounded-2xl space-y-3">
+                                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/50 dark:border-white/5 pb-2.5">
+                                                 <div className="flex items-center gap-2">
+                                                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                                                   <h5 className="text-[10px] font-black uppercase text-rose-600 dark:text-rose-400 tracking-wider">
+                                                     {t.language === 'Bahasa' ? 'Katalog Restriksi Resmi Adobe Stock' : 'Adobe Stock Known Restrictions Catalog'}
+                                                   </h5>
+                                                 </div>
+                                                 <a
+                                                   href="https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html"
+                                                   target="_blank"
+                                                   rel="noopener noreferrer"
+                                                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[9px] font-black tracking-wide border border-rose-500/20 transition-all shrink-0"
+                                                 >
+                                                   <span>{t.language === 'Bahasa' ? 'Panduan Resmi Adobe' : 'Official Policy Guide'}</span>
+                                                   <ExternalLink size={10} />
+                                                 </a>
+                                               </div>
 
-                                        {currentTab === 'ai' && (
-                                          <div className="space-y-4 animate-fadeIn">
+                                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[9px]">
+                                                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 space-y-1">
+                                                   <span className="font-black uppercase text-slate-700 dark:text-slate-200 block">
+                                                     1. {t.language === 'Bahasa' ? 'Merek & Desain Produk' : 'Brands & Product Shapes'}
+                                                   </span>
+                                                   <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                                                     Apple, Nike (Swoosh/Jordan), Adidas (3 garis), Louboutin (sol merah), Barbie, Lego, Funko Pop, Rubik's Cube, Tiffany Blue, Zippo, Chemex, Kikkoman, Duracell, UPS brown.
+                                                   </p>
+                                                 </div>
+
+                                                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 space-y-1">
+                                                   <span className="font-black uppercase text-slate-700 dark:text-slate-200 block">
+                                                     2. {t.language === 'Bahasa' ? 'Landmark & Arsitektur' : 'Landmarks & Architecture'}
+                                                   </span>
+                                                   <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                                                     Menara Eiffel (malam hari), Sydney Opera House, Burj Khalifa, Atomium, Grand Central clocks, Vessel NYC, Piramida Louvre, interior Sagrada Familia / Colosseum.
+                                                   </p>
+                                                 </div>
+
+                                                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 space-y-1">
+                                                   <span className="font-black uppercase text-slate-700 dark:text-slate-200 block">
+                                                     3. {t.language === 'Bahasa' ? 'Patung & Seni Publik' : 'Statues & Public Art'}
+                                                   </span>
+                                                   <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                                                     Patung Kristus Penebus, Little Mermaid, Cloud Gate "The Bean", Charging Bull Wall St, Non-Violence gun, Bruce Lee statue, Hollywood Sign, Route 66.
+                                                   </p>
+                                                 </div>
+
+                                                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 space-y-1">
+                                                   <span className="font-black uppercase text-slate-700 dark:text-slate-200 block">
+                                                     4. {t.language === 'Bahasa' ? 'Simbol, Transit & NASA' : 'Symbols, Transit & NASA'}
+                                                   </span>
+                                                   <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                                                     NASA (logo/misi/astronot - Dilarang AI), Palang Merah/Bulan Sabit, PBB, Cincin Olimpiade, Shinkansen, TGV, ICE DB, London Underground, NYC Subway (MTA).
+                                                   </p>
+                                                 </div>
+                                               </div>
+
+                                               <div className="p-2 rounded-xl bg-amber-500/5 border border-amber-500/20 text-[8.5px] text-amber-700 dark:text-amber-300 font-medium leading-relaxed flex items-center gap-1.5">
+                                                 <Info size={12} className="shrink-0 text-amber-500" />
+                                                 <span>
+                                                   {t.language === 'Bahasa'
+                                                     ? 'Aset yang memuat subjek di atas wajib ditolak (FAIL/VIOLATION) untuk kepatuhan komersial Adobe Stock.'
+                                                     : 'Assets containing the subjects above are strictly flagged (FAIL/VIOLATION) for commercial Adobe Stock compliance.'}
+                                                 </span>
+                                               </div>
+                                             </div>
+                                           </div>
+                                         )}
+
+                                         {currentTab === 'ai' && (
+                                           <div className="space-y-4 animate-fadeIn">
                                             {r.visual_scan_analysis && (
                                               <div className="bg-slate-950 p-4 rounded-2xl border border-white/10 font-mono text-xs text-slate-300 space-y-2">
                                                 <div className="flex items-center gap-2 border-b border-white/5 pb-2">

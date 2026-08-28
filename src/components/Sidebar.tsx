@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
-  Calendar, CreditCard, Info, Receipt, VolumeX, Video, Eraser, Star
+  Calendar, CreditCard, Info, Receipt, VolumeX, Video, Star, CopyCheck
 } from 'lucide-react';
 import { ToolType, GenerationMode, toolToPath } from '@/types';
 
@@ -331,15 +331,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {!sidebarCollapsed && <span>{t.sidebar_motion_gen || "Motion Gen"}</span>}
             </a>
 
-            <a href={toolToPath[ToolType.REMOVAL_GEN]} onClick={(e) => handleNavClick(e, ToolType.REMOVAL_GEN)}
+            <a href={toolToPath[ToolType.ANTI_SPAM]} onClick={(e) => handleNavClick(e, ToolType.ANTI_SPAM)}
               className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
-                activeTool === ToolType.REMOVAL_GEN 
-                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-fuchsia-500" 
+                activeTool === ToolType.ANTI_SPAM 
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-amber-500" 
                   : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              <Eraser size={16} className={activeTool === ToolType.REMOVAL_GEN ? "text-fuchsia-400" : "text-slate-400"} />
-              {!sidebarCollapsed && <span>{t.sidebar_removal_gen || "Removal Gen"}</span>}
+              <CopyCheck size={16} className={activeTool === ToolType.ANTI_SPAM ? "text-amber-400" : "text-slate-400"} />
+              {!sidebarCollapsed && <span>{t.sidebar_anti_spam || "Anti-Spam Similar Checker"}</span>}
             </a>
           </nav>
         </div>

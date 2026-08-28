@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, CheckCircle, AlertCircle, Loader2, FileVideo, Zap, Info, Download, Trash2 } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Loader2, FileVideo, Zap, Info, Download, Trash2, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TechnicalMetricsView } from './TechnicalMetricsView';
 import { getDailyLimit } from '../../constants';
@@ -92,6 +92,7 @@ const CHECK_ITEMS = [
   { key: 'frozen_frame', label: 'Frozen frame', desc: 'Mendeteksi frame yang membeku.' },
   { key: 'watermark', label: 'Watermark', desc: 'Mendeteksi tanda air, hak cipta.' },
   { key: 'logo', label: 'Logo', desc: 'Mendeteksi logo merek atau hak cipta.' },
+  { key: 'ip_risk', label: 'Risiko IP & Trademark', desc: 'Mendeteksi pelanggaran merek, landmark, patung, atau Adobe Known Restrictions.' },
   { key: 'text', label: 'Text', desc: 'Mendeteksi teks atau tulisan yang mengganggu.' },
   { key: 'ai_artifact', label: 'AI artifact', desc: 'Mendeteksi cacat turunan atau distorsi generatif AI.' },
   { key: 'deformed_object', label: 'Deformed object', desc: 'Mendeteksi bentuk objek yang tidak wajar atau cacat.' },
@@ -159,6 +160,7 @@ export const VideoQualityCheck: React.FC<{
         frozen_frame: { label: 'Frozen Frames', desc: 'Detects frozen or stuck frames.' },
         watermark: { label: 'Watermark', desc: 'Detects watermarks or copyright overlays.' },
         logo: { label: 'Logo', desc: 'Detects brand logos or copyrighted trademarks.' },
+        ip_risk: { label: 'IP & Trademark Risk', desc: 'Detects trademark, landmark, public art, or Adobe Known Restrictions violations.' },
         text: { label: 'Text', desc: 'Detects distracting overlay text or writings.' },
         ai_artifact: { label: 'AI Artifacts', desc: 'Detects generative AI inconsistencies or distortions.' },
         deformed_object: { label: 'Deformed Objects', desc: 'Detects unnatural or deformed geometries.' },
@@ -635,7 +637,7 @@ export const VideoQualityCheck: React.FC<{
                          const cats = {
                             visual: ['blur', 'noise', 'compression_artifacts', 'blocking', 'banding', 'overexposure', 'underexposure', 'white_balance', 'motion_blur', 'camera_shake', 'out_of_focus', 'flickering', 'duplicate_frame', 'empty_frame', 'black_frame', 'frozen_frame', 'low_framerate', 'visible_transitions', 'log_profile', 'upscaled_video'],
                             ai: ['ai_artifact', 'deformed_object', 'bad_anatomy', 'cropped_subject', 'cut_off_object', 'wrong_perspective'],
-                            legal: ['watermark', 'logo', 'text', 'low_aesthetic_quality']
+                            legal: ['watermark', 'logo', 'ip_risk', 'text', 'low_aesthetic_quality']
                          };
                          return cats[activeCategory as 'visual' | 'ai' | 'legal'].includes(item.key);
                       })
@@ -680,6 +682,66 @@ export const VideoQualityCheck: React.FC<{
                         </div>
                       );
                     })}
+                  </div>
+                )}
+                
+                {activeCategory === 'legal' && (
+                  <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/10 p-5 rounded-2xl space-y-3 mt-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/50 dark:border-white/5 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                        <h5 className="text-xs font-black uppercase text-rose-600 dark:text-rose-400 tracking-wider">
+                          {isIndo ? 'Katalog Restriksi Hak Cipta & IP Resmi Adobe Stock' : 'Adobe Stock Known Restrictions Catalog'}
+                        </h5>
+                      </div>
+                      <a
+                        href="https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[10px] font-black tracking-wide border border-rose-500/20 transition-all shrink-0"
+                      >
+                        <span>{isIndo ? 'Panduan Resmi Adobe' : 'Official Policy Guide'}</span>
+                        <ExternalLink size={11} />
+                      </a>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-[10px]">
+                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 space-y-1">
+                        <span className="font-black uppercase text-slate-700 dark:text-slate-200 block">
+                          1. {isIndo ? 'Merek & Desain Produk' : 'Brands & Product Shapes'}
+                        </span>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                          Apple, Nike, Adidas, Louboutin (sol merah), Barbie, Lego, Funko Pop, Rubik's Cube, Tiffany, Zippo, Chemex, Kikkoman, Duracell, UPS brown.
+                        </p>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 space-y-1">
+                        <span className="font-black uppercase text-slate-700 dark:text-slate-200 block">
+                          2. {isIndo ? 'Landmark & Arsitektur' : 'Landmarks & Architecture'}
+                        </span>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                          Menara Eiffel (malam hari), Sydney Opera House, Burj Khalifa, Atomium, Grand Central clocks, Vessel NYC, Piramida Louvre, interior Sagrada Familia.
+                        </p>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 space-y-1">
+                        <span className="font-black uppercase text-slate-700 dark:text-slate-200 block">
+                          3. {isIndo ? 'Patung & Seni Publik' : 'Statues & Public Art'}
+                        </span>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                          Patung Kristus Penebus, Little Mermaid, Cloud Gate "The Bean", Charging Bull, Non-Violence gun, Bruce Lee, Hollywood Sign, Route 66.
+                        </p>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 space-y-1">
+                        <span className="font-black uppercase text-slate-700 dark:text-slate-200 block">
+                          4. {isIndo ? 'Simbol, Transit & NASA' : 'Symbols, Transit & NASA'}
+                        </span>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                          NASA (logo/misi/astronot - Dilarang AI), Palang Merah/Bulan Sabit, PBB, Cincin Olimpiade, Shinkansen, TGV, ICE DB, London Underground, NYC Subway.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
