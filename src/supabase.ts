@@ -439,9 +439,33 @@ export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merg
     return;
   }
   
-  const { error } = await supabase.from(docRef.table).upsert(processedData);
+  try {
+    const { error } = await supabase.from(docRef.table).upsert(processedData);
+    if (error) {
+      console.warn(`[Supabase] setDoc to ${docRef.table} failed, falling back to local:`, error.message);
+      const list = getEmulatedTable(docRef.table);
+      const keyField = docRef.table === 'keys' ? 'key' : 'id';
+      const idx = list.findIndex(item => item[keyField] === docRef.id);
+      if (idx >= 0) {
+        list[idx] = options?.merge ? { ...list[idx], ...processedData } : processedData;
+      } else {
+        list.push(processedData);
+      }
+      saveEmulatedTable(docRef.table, list);
+    }
+  } catch (err: any) {
+    console.warn(`[Supabase] setDoc exception on ${docRef.table}, falling back to local:`, err);
+    const list = getEmulatedTable(docRef.table);
+    const keyField = docRef.table === 'keys' ? 'key' : 'id';
+    const idx = list.findIndex(item => item[keyField] === docRef.id);
+    if (idx >= 0) {
+      list[idx] = options?.merge ? { ...list[idx], ...processedData } : processedData;
+    } else {
+      list.push(processedData);
+    }
+    saveEmulatedTable(docRef.table, list);
+  }
   notifyTableMutation(docRef.table);
-  if (error) throw error;
 }
 
 export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void> {
@@ -577,11 +601,29 @@ export async function getDocs(refOrQuery: any): Promise<QuerySnapshot> {
       q = q.limit(c.value);
     }
   }
-  const { data, error } = await q;
-  if (error) throw error;
-  
-  const docs = (data || []).map((row: any) => new DocumentSnapshot(row.key || row.id || '', row));
-  return new QuerySnapshot(docs);
+  try {
+    const { data, error } = await q;
+    if (error) {
+      console.warn(`[Supabase] getDocs on ${table} failed, falling back to local:`, error.message);
+      let list = getEmulatedTable(table);
+      if (parentId) {
+        list = list.filter(item => item.uid === parentId);
+      }
+      const docs = list.map((row: any) => new DocumentSnapshot(row.key || row.id || '', row));
+      return new QuerySnapshot(docs);
+    }
+    
+    const docs = (data || []).map((row: any) => new DocumentSnapshot(row.key || row.id || '', row));
+    return new QuerySnapshot(docs);
+  } catch (err: any) {
+    console.warn(`[Supabase] getDocs exception on ${table}, falling back to local:`, err);
+    let list = getEmulatedTable(table);
+    if (parentId) {
+      list = list.filter(item => item.uid === parentId);
+    }
+    const docs = list.map((row: any) => new DocumentSnapshot(row.key || row.id || '', row));
+    return new QuerySnapshot(docs);
+  }
 }
 
 export function onSnapshot(
