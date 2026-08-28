@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import LogoImage from './src/assets/images/mz_pro_logo_1780923659277.png';
+import LogoImage from '@/src/assets/images/mz_pro_logo_1780923659277.png';
 import { motion } from 'motion/react';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
