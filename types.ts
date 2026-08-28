@@ -13,7 +13,7 @@ export enum ToolType {
   CALENDAR_GEN = 'calendar_gen',
   MUTE_VIDEO = 'mute_video',
   MOTION_GEN = 'motion_gen',
-  REMOVAL_GEN = 'removal_gen',
+  ANTI_SPAM = 'anti_spam',
   REVIEWS = 'reviews'
 }
 
@@ -31,7 +31,7 @@ export const toolToPath: Record<ToolType, string> = {
   [ToolType.CALENDAR_GEN]: '/NicheCalendar',
   [ToolType.MUTE_VIDEO]: '/MuteVideoGen',
   [ToolType.MOTION_GEN]: '/MotionGen',
-  [ToolType.REMOVAL_GEN]: '/RemovalGen',
+  [ToolType.ANTI_SPAM]: '/SimilarContentChecker',
   [ToolType.REVIEWS]: '/CommunityReviews'
 };
 

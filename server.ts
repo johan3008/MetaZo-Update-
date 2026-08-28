@@ -24,7 +24,7 @@ import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
-import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode, removeWatermark } from './server/gemini.ts';
+import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
 try { _require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); _require.resolve('@ffprobe-installer/linux-x64/ffprobe'); } catch(e) {}
@@ -3138,21 +3138,6 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
             } else {
                 res.status(500).json({ error: e.message || 'Error generating motion code' });
             }
-        }
-    });
-
-    app.post('/api/remove-watermark', async (req, res) => {
-        try {
-            const { image, mask, preset } = req.body;
-            if (!image) {
-                return res.status(400).json({ error: 'Missing image field' });
-            }
-            console.log('[remove-watermark] Processing with preset:', preset);
-            const result = await removeWatermark(image, mask || '', preset || 'bottom-right');
-            res.json(result);
-        } catch (e: any) {
-            console.warn('Server remove-watermark error:', e);
-            res.status(500).json({ error: e.message || 'Error removing watermark' });
         }
     });
 
