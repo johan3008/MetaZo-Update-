@@ -6062,8 +6062,36 @@ PANDUAN PEMERIKSAAN SETIAP KATEGORI:
     - WAJIB PASS: Teks fiksi ilmiah / HUD futuristik generik, atau huruf timbul produk asli (misal: S, C, T pada alat tes).
     - WAJIB FAIL: Teks tiruan acak yang bergelombang (wobbly letters) atau teks gibberish/alien yang tidak terbaca pada poster, buku, plang nama jalan, atau pakaian di dunia nyata.
 
-11. HAK CIPTA & MEREK DAGANG (ip_risk, logo, watermark):
-    - WAJIB FAIL jika terlihat logo merek komersial terkenal (Nike, Apple, Starbucks, dll.), watermark agensi foto, atau karakter berhak cipta.
+11. HAK CIPTA, MEREK DAGANG & RESTRIKSI RESMI ADOBE STOCK (ip_risk, logo, watermark, legal_status):
+    - WAJIB FAIL dan tetapkan legal_status = "VIOLATION" jika terdapat logo merek komersial, watermark agensi foto, atau subjek yang dilarang sesuai standar resmi Adobe Stock Known Restrictions (https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
+      a. MEREK DAGANG & DESAIN PRODUK KHAS (Trademarks & Distinctive Product Designs):
+         * Brand & Gadget: Apple (logo Apple, siluet/desain khas iPhone, iPad, MacBook, Apple Watch, AirPods), Google (logo, Nest, Google Home), Amazon, Microsoft, Beats by Dre, bingkai foto Polaroid klasik, kristal Swarovski, Rolex, botol Absolut Vodka, botol tengkorak Crystal Head Vodka, alat seduh Chemex (hour-glass wood collar), bentuk spidol Stabilo Boss, pohon pengharum mobil Little Trees, baterai Duracell (copper-top design), krayon Crayola (pola serpentine & box chevron), botol kecap & tutup dispenser Kikkoman, pemantik Zippo (terbuka/tertutup), panggangan Weber, Thermomix / Vorwerk, kain motif Vlisco, truk & seragam kurir UPS warna cokelat.
+         * Fashion, Sepatu & Motif: Christian Louboutin (sepatu sol merah / red-lacquered soles dengan atau tanpa logo), Burberry (motif kotak "haymarket check" / classic check), Louis Vuitton (monogram LV & motif damier checkerboard), Tiffany & Co. (kotak warna Tiffany blue / robin-egg blue), Nike (Swoosh, siluet Jordan Jumpman, slogan "Just Do It"), Adidas (desain 3 garis / three stripes & trefoil), Converse (bintang Chuck Taylor ankle patch), Vans (side stripe / Jazz stripe, motif catur checkerboard slip-on, Old Skool).
+         * Mainan, Karakter & Game: Barbie / Mattel (logo, boneka, kemasan, estetika film Barbie), Lego & Duplo (minifigur & balok bata), Playmobil, Funko Pop (figurine kepala kotak besar / oversized square head), Hello Kitty & karakter Sanrio, Totoro & anime Studio Ghibli, karakter & properti Disney & taman hiburan Disney, Build-A-Bear (boneka dengan logo BAB / hati merah), Minecraft (balok piksel dan lanskap tak hingga), monopoli Monopoly, Pac-Man, Rubik's Cube (desain warna & kubus 3x3), Slinky, Twister, Elf on the Shelf (boneka baju & topi merah), Devil Duckie, Tatty Teddy (beruang abu-abu hidung biru), miniatur wargame Warhammer.
+         * Kendaraan & Mesin: VW Beetle / Bug klasik, VW Camper Bus, Batmobile / bat-vehicles, trailer Airstream ("silver bullet" rounded aluminum contour), mesin pertanian Claas (hijau cerah aksen merah), mesin John Deere (hijau & kuning), pistol Glock (desain dua pelatuk bertingkat & garis vertikal slide).
+      b. LANDMARK, ARSITEKTUR & PROPERTI TERLINDUNGI (Protected Architecture & Landmarks):
+         * Landmark Terkenal: Menara Eiffel malam hari (iluminasi & desain tata cahaya malam / night lighting), Atomium (Brussels), Sydney Opera House, Burj Al Arab, Burj Khalifa, Taipei 101, Tokyo Tower, Tokyo Skytree, Shanghai Tower, The Shard (London), London Eye, CN Tower (Toronto), Empire State Building, Chrysler Building, Flatiron Building, One World Trade Center, Willis Tower (Sears Tower), Wrigley Building, John Hancock Tower, Grand Central Terminal (bangunan, signage, jam concourse & 42nd St clock), Rockefeller Center (bangunan & dek observasi Top of the Rock), Radio City Music Hall, Madison Square Garden, Guggenheim Museums, Getty Center & The J. Paul Getty Museum, Frank Gehry IAC Building, Walt Disney Concert Hall, Vessel (Hudson Yards NYC), Millau Viaduct, BP Pedestrian Bridge (Chicago), Space Needle (Seattle), Spinnaker Tower, Canton Tower, Beijing National Stadium (Bird's Nest), National Center for the Performing Arts (Beijing).
+         * Interior Terlarang: Interior Sagrada Familia, interior Colosseum Roma, interior Hagia Sophia, interior Kapel Sistina (Sistine Chapel), interior Notre Dame de Paris, interior Berliner Dom, interior Masjid Sheikh Zayed Grand Mosque, interior Basilica of the National Shrine.
+         * Properti Swasta & Kastil: Casa Batllo, Casa Mila, La Muralla Roja, Castel Meur, Chateau de Chillon, Schloss Lichtenstein, Burg Eltz, Nymphenburg Palace, Schonbrunn Palace, Peterhof Palace, Winter Palace / Hermitage, Louvre Palace & Piramida I.M. Pei, Graceland, Hearst Castle, Monticello Estate, Newport Mansions, Oak Alley Plantation, Biltmore Estate, Iolani Palace, Edo Wonderland, hotel Las Vegas sebagai fokus utama, San Diego Zoo, Monterey Bay Aquarium, SeaWorld, Tierpark Hagenbeck.
+      c. PATUNG & KARYA SENI PUBLIK (Protected Statues & Public Artworks):
+         * Patung & Monumen: Christ the Redeemer (Paul Landowski, Rio de Janeiro), Little Mermaid (Edvard Eriksen, Kopenhagen), Mannekin Pis (Brussels), Merlion Statue (Singapura), Cloud Gate "The Bean" / Crown Fountain / Jay Pritzker Pavilion (Millennium Park Chicago), Charging Bull (Wall Street), Patung Pistol Terikat / Non-Violence Knotted Gun (Carl Fredrik Reutersward), Patung Bruce Lee (Hong Kong), Patung Peter the Great (Zurab Tsereteli), Worker and Kolkhoz Woman (Vera Mukhina), Cupid's Span (Oldenburg & van Bruggen), Spoonbridge and Cherry (Minneapolis), Chris Burden Urban Light / LACMA Lampposts, Fremont Troll (Seattle), Holocaust Memorial (Peter Eisenman, Berlin), Marine Corps War Memorial (Iwo Jima), Martin Luther King Jr. Memorial, Kobe Luminarie, Kuidaore Taro Clown, papan Glico Running Man (Osaka), plang Hollywood Sign & bintang Hollywood Walk of Fame, rambu Route 66.
+      d. TRANSPORTASI PUBLIK, KERETA & MASKAPAI (Public Transit & Mass Transit):
+         * Kereta Cepat & Transit: Shinkansen bullet trains (JR Group long/wide nose design), TGV (Prancis), ICE Deutsche Bahn (kereta putih garis merah khas), Eurostar, Renfe (Spanyol), FEVE, RATP Paris Metro signage & trains, London Underground (roundel & corak merah/biru kereta), New York City Subway (MTA signage, logos, rute & peta subway), BART (San Francisco), CTA (Chicago), MBTA (Boston), SEPTA (Philadelphia), PATH, PATCO, LA Metro, Metro Bilbao, Miami Metrorail, Stockholm Tunnelbana, kapal pesiar Aida (lukisan wajah lambung), kapal pesiar Carnival Cruise (corong bersayap merah-biru), kapal uap Belle of Louisville / Natchez / Delta Queen / Spirit of Peoria, Boston Swan Boats, Takasebune.
+      e. ACARA OLAHRAGA, LIGA & TROFI (Sports, Events & Awards):
+         * Cincin Olimpiade (Olympic rings), obor Olimpiade, maskot Olimpiade, medali Olimpiade, FIFA & trofi Piala Dunia / World Cup, UEFA & Euro Cup, NFL / Super Bowl & trofi Lombardi, Rugby World Cup, patung piala Oscar / Academy Awards statuette, piala Emmy Awards statuette, CrossFit, Tour de France.
+      f. SIMBOL PEMERINTAH, LAMBANG RESMI, UANG KERTAS & NASA (Protected Symbols, Currency & NASA):
+         * Simbol Palang Merah (Red Cross) & Bulan Sabit Merah (Red Crescent) pada latar putih.
+         * Emblem PBB / United Nations (peta dunia dikelilingi ranting zaitun), UNESCO.
+         * NASA: Logo biru "meatball", logo merah "worm", stempel/seal resmi NASA, astronot bertanda pengenal NASA, nama misi luar angkasa NASA. Khusus Generative AI: nama NASA, logo, simbol, astronot, atau misi NASA DILARANG KERAS untuk lisensi komersial dan editorial.
+         * Lencana polisi, perisai penegak hukum, seragam resmi kepolisian/militer, lambang militer resmi (USMC Semper Fi, lambang RCMP, dsb.).
+         * Uang kertas utuh (complete piece of paper money / banknotes) yang menjadi subjek utama.
+         * Prangko AS yang diterbitkan setelah 1971 atau prangko yang memuat selebriti/karya seni berhak cipta/organisasi non-profit (WWF, Greenpeace).
+         * Bendera suku Aborigin Australia, bendera Juneteenth.
+         * Fairtrade logo, Greenpeace, lambang panda WWF.
+      g. SLOGAN & FRASA TERLINDUNGI (Protected Slogans & Phrases):
+         * Teks atau tulisan pada baju/poster yang memuat frasa komersial terdaftar: "Keep Calm and Carry On", "I ❤️ NY", "May the Fourth Be with You", "Just Do It", "Fight Like a Girl", "Never Stop Exploring", "No Bad Days", "Movember", "Allez les Bleus".
+      h. TOKOH TERKENAL & SELEBRITI (Celebrity Likenesses):
+         * Kemiripan nyata wajah figur publik/selebriti (Albert Einstein, artis, musisi, atlet, politisi) tanpa Model Release resmi. Impersonator wajib disertai model release dan kata "impersonator" pada metadata.
 
 PANDUAN TOLERANSI:
 - STRICT: Ada cacat apa pun pada subjek atau teknis -> FAIL (Skor 35-55).
@@ -6158,7 +6186,7 @@ PERIKSA DENGAN TELITI:
 3. Apakah ada cacat mekanis/struktural pada objek atau halusinasi generatif AI?
 4. Apakah ada teks cacat/wobbly/gibberish pada rambu, poster, buku, atau baju?
 5. Apakah ada noise parah, JPEG blocking, atau kulit lilin (waxy skin)?
-6. Apakah ada logo merek terkenal atau watermark?
+6. Apakah ada logo merek terkenal, watermark, atau pelanggaran Adobe Stock Known Restrictions (Merek/Produk Apple/Nike/Lego/Barbie, Landmark Eiffel malam/Burj Khalifa/Sydney Opera House, Patung/Karya Seni, Transportasi Publik Shinkansen/MTA, Simbol NASA/PBB/Palang Merah, Slogan Terlindungi, atau Wajah Selebriti)?
 
 Tingkat toleransi yang diminta: ${tolerance}.
 Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
@@ -7280,7 +7308,15 @@ EVALUATION PRINCIPLES:
    - Natural motion blur from normal shutter speed is PASS.
    - Silent video tracks or clean ambient audio are 100% acceptable.
 2. FATAL DEFECTS = FAIL (Score < 65):
-   - Severe out-of-focus blur, black/frozen frames, commercial logos/trademarks, heavy temporal warping/melting AI artifacts.
+   - Severe out-of-focus blur, black/frozen frames, heavy temporal warping/melting AI artifacts.
+   - COMMERCIAL LOGOS, TRADEMARKS & ADOBE STOCK KNOWN RESTRICTIONS (https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
+     * Brand logos (Apple, Nike, Adidas, Starbucks, etc.) and distinctive product designs (Louboutin red soles, Lego bricks/figures, Funko Pop square heads, Rubik's cube, Barbie, Zippo, Chemex, Kikkoman, Duracell copper-top).
+     * Protected Architecture/Landmarks (Eiffel Tower night lighting, Sydney Opera House, Burj Khalifa, Atomium, Sagrada Familia interior, Colosseum interior, Sistine Chapel interior, Grand Central clocks, Louvre Pyramid, Vessel NYC).
+     * Protected Public Statues/Artworks (Christ the Redeemer, Little Mermaid, Cloud Gate "The Bean", Wall Street Charging Bull, Non-Violence knotted gun, Bruce Lee statue).
+     * Public Transit livery/trains (Shinkansen bullet trains, TGV, ICE Deutsche Bahn red stripe, London Underground, NYC MTA subway).
+     * Protected Symbols & Emblems (Red Cross/Red Crescent, UN emblem, Olympic rings/torch, NASA logos/astronauts/missions, police badges, full banknotes).
+     * Protected Slogans ("I ❤️ NY", "Just Do It", "Keep Calm and Carry On", "May the Fourth Be with You").
+     * Living Celebrities/Public Figures without model release.
 
 Language: ${targetLanguageName}. Return pure JSON.`;
 

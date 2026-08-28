@@ -27,7 +27,7 @@ import { VideoQualityCheck } from './src/components/VideoQualityCheck';
 import { CalendarGenView } from './src/components/CalendarGenView';
 import { MuteVideoView } from './src/components/MuteVideoView';
 import { MotionGenView } from './src/components/MotionGenView';
-import { RemovalGenView } from './src/components/RemovalGenView';
+import { AntiSpamView } from './src/components/AntiSpamView';
 import { ReviewsView } from './src/components/ReviewsView';
 import { AutoReviewPromptModal } from './src/components/AutoReviewPromptModal';
 import { SaaSPortal } from './src/components/SaaSPortal';
@@ -4879,15 +4879,14 @@ const App: React.FC = () => {
               setShowActivationModal={setShowActivationModal}
               aiOptions={commonAiOptions}
             />
-          ) : activeTool === ToolType.REMOVAL_GEN ? (
-            <RemovalGenView 
+          ) : activeTool === ToolType.ANTI_SPAM ? (
+            <AntiSpamView 
               t={t}
               isLicensed={isMzLicensed}
-              dailyGenCount={dailyGenCounts[ToolType.REMOVAL_GEN] || 0}
-              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.REMOVAL_GEN, amount)}
+              dailyGenCount={dailyGenCounts[ToolType.ANTI_SPAM] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.ANTI_SPAM, amount)}
               setShowLimitModal={setShowLimitModal}
               setShowActivationModal={setShowActivationModal}
-              aiOptions={commonAiOptions}
             />
           ) : activeTool === ToolType.REVIEWS ? (
             <ReviewsView 
