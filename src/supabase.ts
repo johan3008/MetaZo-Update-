@@ -398,6 +398,25 @@ export async function getDoc(docRef: SupabaseDocRef): Promise<DocumentSnapshot> 
   return new DocumentSnapshot(docRef.id, data || null);
 }
 
+// --- LIGHTWEIGHT PUBSUB SUBSCRIPTION FOR REALTIME SYNC ---
+const dbListeners = new Set<{
+  table: string;
+  id?: string;
+  callback: (snap?: any) => void;
+}>();
+
+export function notifyTableMutation(table: string) {
+  setTimeout(() => {
+    dbListeners.forEach(listener => {
+      if (listener.table === table) {
+        try {
+          listener.callback();
+        } catch (e) {}
+      }
+    });
+  }, 10);
+}
+
 export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merge?: boolean }): Promise<void> {
   const processedData = { ...(data || {}) };
   if (docRef.table === 'keys') {
@@ -416,10 +435,12 @@ export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merg
       list.push(processedData);
     }
     saveEmulatedTable(docRef.table, list);
+    notifyTableMutation(docRef.table);
     return;
   }
   
   const { error } = await supabase.from(docRef.table).upsert(processedData);
+  notifyTableMutation(docRef.table);
   if (error) throw error;
 }
 
@@ -472,6 +493,7 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
       list[idx] = { ...list[idx], ...topLevelUpdates };
       saveEmulatedTable(docRef.table, list);
     }
+    notifyTableMutation(docRef.table);
     return;
   }
 
@@ -480,6 +502,7 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
     .update(topLevelUpdates)
     .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id);
     
+  notifyTableMutation(docRef.table);
   if (error) throw error;
 }
 
@@ -489,12 +512,14 @@ export async function deleteDoc(docRef: SupabaseDocRef): Promise<void> {
     const keyField = docRef.table === 'keys' ? 'key' : 'id';
     const filtered = list.filter(item => item[keyField] !== docRef.id);
     saveEmulatedTable(docRef.table, filtered);
+    notifyTableMutation(docRef.table);
     return;
   }
   const { error } = await supabase
     .from(docRef.table)
     .delete()
     .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id);
+  notifyTableMutation(docRef.table);
   if (error) throw error;
 }
 
@@ -509,10 +534,12 @@ export async function addDoc(collectionRef: SupabaseCollectionRef, data: any): P
     const list = getEmulatedTable(collectionRef.table);
     list.push(processedData);
     saveEmulatedTable(collectionRef.table, list);
+    notifyTableMutation(collectionRef.table);
     return new SupabaseDocRef(collectionRef.table, generatedId);
   }
 
   const { error } = await supabase.from(collectionRef.table).insert(processedData);
+  notifyTableMutation(collectionRef.table);
   if (error) throw error;
   return new SupabaseDocRef(collectionRef.table, generatedId);
 }
@@ -557,13 +584,6 @@ export async function getDocs(refOrQuery: any): Promise<QuerySnapshot> {
   return new QuerySnapshot(docs);
 }
 
-// --- LIGHTWEIGHT PUBSUB SUBSCRIPTION FOR REALTIME SYNC ---
-const dbListeners = new Set<{
-  table: string;
-  id?: string;
-  callback: (snap: any) => void;
-}>();
-
 export function onSnapshot(
   refOrQuery: any,
   onNext: (snapshot: any) => void,
@@ -596,10 +616,10 @@ export function onSnapshot(
   // Initial trigger
   listenerObj.callback();
 
-  // Supabase Realtime fallback - we poll every 4 seconds or trigger on mutations
+  // Supabase Realtime fallback - we poll every 10 seconds or trigger on mutations
   const intervalId = setInterval(() => {
     listenerObj.callback();
-  }, 15000);
+  }, 10000);
 
   return () => {
     dbListeners.delete(listenerObj);

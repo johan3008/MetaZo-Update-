@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
-  Calendar, CreditCard, Info, Receipt, VolumeX, Video, Eraser
+  Calendar, CreditCard, Info, Receipt, VolumeX, Video, Eraser, Star
 } from 'lucide-react';
 import { ToolType, GenerationMode, toolToPath } from '../../types';
 
@@ -442,6 +442,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Receipt size={14} className="text-blue-400" />
               {!sidebarCollapsed && <span>{t.language === 'id' ? 'Tagihan (Billing)' : 'Billing'}</span>}
             </button>
+
+            {/* Community Reviews Menu Item */}
+            <a 
+              href={toolToPath[ToolType.REVIEWS] || '/CommunityReviews'} 
+              onClick={(e) => handleNavClick(e, ToolType.REVIEWS)}
+              className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 mb-1.5 ${
+                activeTool === ToolType.REVIEWS 
+                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-md border-l-4 border-amber-400" 
+                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Star size={14} className={activeTool === ToolType.REVIEWS ? "text-amber-400 fill-amber-400" : "text-amber-400"} />
+              {!sidebarCollapsed && <span>{t.language === 'Bahasa' ? '⭐ Ulasan & Rating' : '⭐ Reviews & Ratings'}</span>}
+            </a>
 
             <button 
               type="button"
