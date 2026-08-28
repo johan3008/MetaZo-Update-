@@ -1015,6 +1015,8 @@ const getToolFromPath = (path: string): ToolType | null => {
     case 'mutevideogen': return ToolType.MUTE_VIDEO;
     case 'motiongen': return ToolType.MOTION_GEN;
     case 'removalgen': return ToolType.REMOVAL_GEN;
+    case 'communityreviews': return ToolType.REVIEWS;
+    case 'reviews': return ToolType.REVIEWS;
     default: return null;
   }
 };
