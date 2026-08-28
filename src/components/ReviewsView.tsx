@@ -6,8 +6,8 @@ import {
   ShieldCheck, Camera, Trash2, Maximize2, User, 
   TrendingUp, Check, Heart, ExternalLink, RefreshCw
 } from 'lucide-react';
-import { CommunityReview } from './types';
-import { db, collection, query, limit, onSnapshot, setDoc, doc } from './src/supabase';
+import { CommunityReview } from '@/types';
+import { db, collection, query, limit, onSnapshot, setDoc, doc } from '@/src/supabase';
 
 interface ReviewsViewProps {
   t: any;

@@ -1,4 +1,4 @@
-import { getDailyLimit } from './constants';
+import { getDailyLimit } from '@/constants';
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -6,10 +6,10 @@ import {
   ArrowRight, ShieldCheck, Activity, BarChart2, CheckCircle, 
   AlertTriangle, Clock, HelpCircle, Key, Gift, Tag, Ticket, Copy, Check, Star
 } from 'lucide-react';
-import { ToolType, FileItem } from './types';
-import { db, collection, query, limit, onSnapshot, supabase } from './src/supabase';
+import { ToolType, FileItem } from '@/types';
+import { db, collection, query, limit, onSnapshot, supabase } from '@/src/supabase';
 
-import { FeatureGuideButton } from './src/components/FeatureGuideModal';
+import { FeatureGuideButton } from './FeatureGuideModal';
 
 export interface DashboardPromoCode {
   id: string;

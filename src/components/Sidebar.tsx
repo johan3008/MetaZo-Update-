@@ -6,7 +6,7 @@ import {
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
   Calendar, CreditCard, Info, Receipt, VolumeX, Video, Eraser, Star
 } from 'lucide-react';
-import { ToolType, GenerationMode, toolToPath } from './types';
+import { ToolType, GenerationMode, toolToPath } from '@/types';
 
 const AnimatedAppName: React.FC<{ name: string; fontSizeClass?: string }> = ({ name, fontSizeClass = "text-base" }) => {
   const chars = name.split('');

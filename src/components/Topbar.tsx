@@ -1,6 +1,6 @@
 import React from 'react';
 import { Menu, Search, Sun, Moon, Info, Heart, ShieldAlert, Settings, Globe, LogOut, Plus } from 'lucide-react';
-import { AppLanguage } from '../../constants';
+import { AppLanguage } from '@/constants';
 
 interface TopbarProps {
   searchQuery: string;

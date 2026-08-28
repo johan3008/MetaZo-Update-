@@ -5,10 +5,10 @@ import {
   ArrowRight, ShieldCheck, HelpCircle, Sun, Moon, Globe, Loader2, AlertCircle, Mail, Lock, X,
   Calendar, VolumeX
 } from 'lucide-react';
-import { signInWithPopup, GoogleAuthProvider, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, auth, runSandboxGoogleSignIn, signInWithTokens } from './src/supabase';
+import { signInWithPopup, GoogleAuthProvider, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, auth, runSandboxGoogleSignIn, signInWithTokens } from '@/src/supabase';
 import LogoImage from '@/src/assets/images/mz_pro_logo_1780923659277.png';
-import { AppLanguage } from './constants';
-import { Meteors } from './src/components/Meteors';
+import { AppLanguage } from '@/constants';
+import { Meteors } from './Meteors';
 
 const AnimatedAppName: React.FC<{ name: string; fontSizeClass?: string }> = ({ name, fontSizeClass = "text-lg" }) => {
   const chars = name.split('');
@@ -39,7 +39,6 @@ interface LoginScreenProps {
   language: AppLanguage;
   setLanguage: (lang: AppLanguage) => void;
   t: any;
-  promoCodes?: any[];
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
@@ -48,8 +47,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   setTheme,
   language,
   setLanguage,
-  t,
-  promoCodes = []
+  t
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorHeader, setErrorHeader] = useState('');
@@ -600,42 +598,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <ShieldCheck size={13} className="text-emerald-500" />
                   <span className="text-[9px] font-extrabold uppercase tracking-widest">{tc.secure_badge}</span>
                 </div>
-
-                {/* Promo codes list for free trial users */}
-                {promoCodes.length > 0 && (
-                  <div className="w-full mt-2 pt-4 border-t border-slate-200 dark:border-slate-800 text-left space-y-2">
-                    <span className="text-[8.5px] font-black uppercase tracking-widest text-[#7c3aed] dark:text-[#a78bfa] block">
-                      {language === 'id' ? '🎟️ KODE VOUCHER AKTIF:' : '🎟️ ACTIVE VOUCHERS:'}
-                    </span>
-                    <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1">
-                      {promoCodes.map((p: any) => (
-                        <div 
-                          key={p.id}
-                          className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 rounded-xl"
-                        >
-                          <div className="flex flex-col min-w-0 flex-1 pr-2">
-                            <span className="text-[10px] font-black text-[#7c3aed] dark:text-amber-300 uppercase tracking-wider">
-                              {p.code}
-                            </span>
-                            <span className="text-[8px] text-slate-500 dark:text-slate-400 font-bold truncate">
-                              {p.description || `${p.value} Days Premium`}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(p.code);
-                              alert(language === 'id' ? `Kupon ${p.code} tersalin!` : `Coupon ${p.code} copied!`);
-                            }}
-                            className="px-2 py-1 bg-violet-105/10 hover:bg-violet-600 hover:text-white dark:bg-violet-500/20 text-[#7c3aed] dark:text-violet-300 font-black text-[8px] uppercase tracking-wider rounded-lg transition-all"
-                          >
-                            Copy
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
               </div>
             </motion.div>
