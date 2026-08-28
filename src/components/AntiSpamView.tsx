@@ -53,6 +53,7 @@ export const AntiSpamView: React.FC<{
   incrementDailyCount,
   setShowLimitModal,
   setShowActivationModal
+}) => {
   const isIndo = t?.language === 'Bahasa' || !t?.language;
   const [items, setItems] = useState<ImageFingerprint[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
