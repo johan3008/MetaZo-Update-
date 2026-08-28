@@ -4,10 +4,11 @@ import {
   Star, ThumbsUp, Plus, UploadCloud, X, CheckCircle2, 
   Sparkles, Filter, Search, Award, MessageSquare, 
   ShieldCheck, Camera, Trash2, Maximize2, User, 
-  TrendingUp, Check, Heart, ExternalLink, RefreshCw
+  TrendingUp, Check, Heart, ExternalLink, RefreshCw,
+  Sliders, Shield, Image as ImageIcon, MessageCircle
 } from 'lucide-react';
 import { CommunityReview } from '@/types';
-import { db, collection, query, limit, onSnapshot, setDoc, doc } from '@/src/supabase';
+import { db, collection, query, limit, onSnapshot, setDoc, doc, updateDoc } from '@/src/supabase';
 
 interface ReviewsViewProps {
   t: any;
@@ -28,72 +29,6 @@ const DEFAULT_EXPERIENCE_TAGS = [
   '⚡ Workflow Otomatis'
 ];
 
-const INITIAL_SEED_REVIEWS: CommunityReview[] = [
-  {
-    id: 'rev-seed-1',
-    userName: 'Budi Santoso (Microstocker PRO)',
-    userEmail: 'budi.creator@gmail.com',
-    isPro: true,
-    rating: 5,
-    title: 'Gokil! 500+ Aset Lolos Adobe Stock Tanpa Ditolak',
-    comment: 'Aplikasi metadata AI terbaik yang pernah saya pakai. Dulu ngetik deskripsi dan 50 keyword butuh seharian, sekarang 100 gambar beres dalam 5 menit. Batch processing-nya sangat stabil dan metadata-nya langsung terbaca di Adobe Stock & Freepik.',
-    tags: ['✅ 100% Lolos Adobe Stock', '🔥 Hemat Waktu 10x', '🚀 AI Super Cepat'],
-    createdAt: '2026-08-27T10:15:00Z',
-    helpfulCount: 42,
-    verifiedBuyer: true,
-    appVersion: 'v4.2 PRO',
-    photos: [
-      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=600&auto=format&fit=crop&q=80'
-    ]
-  },
-  {
-    id: 'rev-seed-2',
-    userName: 'Devi Anggraini',
-    userEmail: 'devi.visuals@gmail.com',
-    isPro: true,
-    rating: 5,
-    title: 'Fitur Vector Converter & AI Prompt-nya Juara!',
-    comment: 'Sangat recommended buat kontributor vektor & foto. AI-nya paham banget kategori komersial dan editorial. Ditambah fitur Quality Check yang bikin kita tahu kalau ada watermark/noise sebelum submit ke agensi. Mantap banget!',
-    tags: ['💎 Fitur PRO Sangat Berguna', '🎯 Keyword SEO Akurat', '🏆 Sangat Direkomendasikan'],
-    createdAt: '2026-08-25T14:30:00Z',
-    helpfulCount: 29,
-    verifiedBuyer: true,
-    appVersion: 'v4.2 PRO',
-    photos: [
-      'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'
-    ]
-  },
-  {
-    id: 'rev-seed-3',
-    userName: 'Rian Pratama (Motion Designer)',
-    userEmail: 'rian.motion@gmail.com',
-    isPro: true,
-    rating: 5,
-    title: 'Video Keyword Analyzer & Motion Gen Super Smooth',
-    comment: 'Penyelamat portofolio video 4K saya. AI bisa mengekstrak pergerakan kamera, lighting, dan tema visual secara mendetail. Penjualan video footage saya di Shutterstock naik signifikan bulan ini.',
-    tags: ['⚡ Workflow Otomatis', '🚀 AI Super Cepat'],
-    createdAt: '2026-08-23T08:45:00Z',
-    helpfulCount: 18,
-    verifiedBuyer: true,
-    appVersion: 'v4.1 PRO'
-  },
-  {
-    id: 'rev-seed-4',
-    userName: 'Fajar Nugroho',
-    userEmail: 'fajar.vectorking@gmail.com',
-    isPro: false,
-    rating: 5,
-    title: 'Trial-nya Sangat Royal, Langsung Upgrade PRO!',
-    comment: 'Awalnya coba free trial untuk batch 10 gambar, hasilnya akurat banget. Kupon promonya juga bekerja mulus saat aktivasi. Wajib punya untuk semua kontributor stock Indonesia!',
-    tags: ['🏆 Sangat Direkomendasikan', '🔥 Hemat Waktu 10x'],
-    createdAt: '2026-08-20T16:10:00Z',
-    helpfulCount: 14,
-    verifiedBuyer: true,
-    appVersion: 'v4.0'
-  }
-];
-
 export const ReviewsView: React.FC<ReviewsViewProps> = ({
   t,
   user,
@@ -106,10 +41,12 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
       const cached = localStorage.getItem('mz_community_reviews_cache');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((r: any) => !r.id?.startsWith('rev-seed-'));
+        }
       }
     } catch (e) {}
-    return INITIAL_SEED_REVIEWS;
+    return [];
   });
 
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
@@ -140,12 +77,12 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
   const [submitSuccessMsg, setSubmitSuccessMsg] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Real-time synchronization
+  // Real-time synchronization directly from database
   useEffect(() => {
     let active = true;
     try {
       setIsLoadingReviews(true);
-      const unsub = onSnapshot(query(collection(db, 'reviews'), limit(50)), (snapshot) => {
+      const unsub = onSnapshot(query(collection(db, 'reviews'), limit(100)), (snapshot) => {
         if (!active) return;
         setIsLoadingReviews(false);
         const list: CommunityReview[] = [];
@@ -171,19 +108,12 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
           });
         }
 
-        if (list.length > 0) {
-          // Merge with initial seed reviews so we always have a rich presentation
-          const existingIds = new Set(list.map(r => r.id));
-          const merged = [...list, ...INITIAL_SEED_REVIEWS.filter(s => !existingIds.has(s.id))];
-          setReviews(merged);
-          localStorage.setItem('mz_community_reviews_cache', JSON.stringify(merged));
-        } else {
-          setReviews(INITIAL_SEED_REVIEWS);
-        }
+        setReviews(list);
+        localStorage.setItem('mz_community_reviews_cache', JSON.stringify(list));
       }, (err) => {
         if (!active) return;
         setIsLoadingReviews(false);
-        console.warn('Realtime reviews error, using cache/seeds:', err);
+        console.warn('Realtime reviews error, using cache:', err);
       });
 
       return () => {
@@ -330,27 +260,42 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
     }
   };
 
-  const handleHelpfulUpvote = (reviewId: string) => {
+  const handleHelpfulUpvote = async (reviewId: string) => {
     const isAlreadyLiked = likedReviewIds[reviewId];
     const newLiked = { ...likedReviewIds, [reviewId]: !isAlreadyLiked };
     setLikedReviewIds(newLiked);
     localStorage.setItem('mz_liked_reviews', JSON.stringify(newLiked));
 
+    let updatedCount = 0;
     setReviews(prev => prev.map(r => {
       if (r.id === reviewId) {
+        updatedCount = Math.max(0, (r.helpfulCount || 0) + (isAlreadyLiked ? -1 : 1));
         return {
           ...r,
-          helpfulCount: (r.helpfulCount || 0) + (isAlreadyLiked ? -1 : 1)
+          helpfulCount: updatedCount
         };
       }
       return r;
     }));
+
+    try {
+      await updateDoc(doc(db, 'reviews', reviewId), { helpfulCount: updatedCount });
+    } catch (e) {
+      console.warn('Error updating helpfulCount to database:', e);
+    }
   };
 
-  // Compute Statistics for Play Store Scorecard
+  // Compute Statistics based strictly on real reviews
   const stats = useMemo(() => {
     const total = reviews.length;
-    if (total === 0) return { avgRating: '5.0', totalCount: 0, breakdown: { 5: 100, 4: 0, 3: 0, 2: 0, 1: 0 }, countByStar: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
+    if (total === 0) {
+      return { 
+        avgRating: '0.0', 
+        totalCount: 0, 
+        breakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }, 
+        countByStar: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } 
+      };
+    }
 
     let sum = 0;
     const countByStar: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
@@ -411,32 +356,46 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-8 pb-16 animate-in fade-in duration-300">
+    <div className="w-full max-w-7xl mx-auto space-y-6 pb-16 animate-in fade-in duration-300">
       
-      {/* 1. HERO HEADER WITH PLAYSTORE STYLE SCORECARD */}
-      <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 border border-slate-800 text-white p-6 sm:p-10 shadow-2xl shadow-violet-950/20">
-        <div className="absolute right-0 top-0 -mr-24 -mt-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute left-1/3 bottom-0 -ml-24 -mb-24 w-80 h-80 bg-violet-600/15 rounded-full blur-3xl pointer-events-none" />
+      {/* 1. HEADER CARD (STANDAR DESAIN METAZO APP) */}
+      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm relative overflow-hidden">
+        {/* Glow Ambient Orbs */}
+        <div className="absolute top-0 right-0 -mt-12 -mr-12 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 -mb-12 -ml-12 w-72 h-72 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
+        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           
-          {/* Left Title & Intro */}
-          <div className="space-y-3 max-w-xl">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-300 text-[10px] font-black uppercase tracking-widest">
-              <Sparkles size={12} className="text-amber-400" />
-              <span>Verified Creator Community</span>
+          {/* Left Title & Description */}
+          <div className="space-y-3 max-w-2xl">
+            <div className="flex items-center space-x-2">
+              <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 text-[10px] font-black uppercase tracking-widest flex items-center space-x-1.5 shadow-sm">
+                <Sparkles size={12} className="text-amber-500" />
+                <span>Ulasan & Rating Komunitas</span>
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-400 text-[10px] font-black uppercase tracking-wider">
+                Realtime Cloud
+              </span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
-              Ulasan & Testimonial <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-emerald-300 to-indigo-300">Pengguna Asli</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              Dengarkan langsung cerita sukses para kontributor microstock, ilustrator, dan kreator visual dalam mengotomatisasi metadata dan meningkatkan penjualan di agensi global.
-            </p>
+
+            <div className="flex items-center space-x-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 via-amber-500 to-amber-600 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/20 shrink-0">
+                <Star size={24} className="fill-slate-950" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                  Ulasan & Testimonial <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 via-orange-500 to-violet-600">Pengguna</span>
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
+                  Pengalaman nyata kontributor microstock dan kreator visual menggunakan ekosistem MetaZo AI.
+                </p>
+              </div>
+            </div>
 
             <div className="pt-2 flex flex-wrap items-center gap-3">
               <button
                 onClick={() => setShowWriteModal(true)}
-                className="px-5 py-3 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-amber-500/25 transition-all flex items-center space-x-2 cursor-pointer"
+                className="px-5 py-2.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center space-x-2 cursor-pointer"
               >
                 <Plus size={16} />
                 <span>Tulis Ulasan & Beri Rating</span>
@@ -445,7 +404,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
               {onOpenDashboard && (
                 <button
                   onClick={onOpenDashboard}
-                  className="px-4 py-3 bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-2xl border border-white/10 transition-all cursor-pointer"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
                 >
                   Kembali ke Dashboard
                 </button>
@@ -454,45 +413,47 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
           </div>
 
           {/* Right Play Store Scorecard */}
-          <div className="w-full lg:w-auto bg-slate-900/80 backdrop-blur-md p-6 rounded-3xl border border-white/10 flex flex-col sm:flex-row items-center gap-6 sm:gap-8 shrink-0">
+          <div className="w-full lg:w-auto bg-slate-50/80 dark:bg-slate-950/60 backdrop-blur-md p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-center gap-6 shrink-0 shadow-sm">
             {/* Big Rating Number */}
             <div className="flex flex-col items-center justify-center text-center shrink-0">
-              <span className="text-5xl sm:text-6xl font-black text-white tracking-tighter leading-none">
-                {stats.avgRating}
+              <span className="text-5xl sm:text-6xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
+                {stats.totalCount > 0 ? stats.avgRating : '0.0'}
               </span>
               <div className="flex items-center space-x-1 my-2">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star 
                     key={star} 
                     size={16} 
-                    className="text-amber-400 fill-amber-400" 
+                    className={stats.totalCount > 0 && Number(stats.avgRating) >= star ? "text-amber-400 fill-amber-400" : "text-slate-300 dark:text-slate-700"} 
                   />
                 ))}
               </div>
-              <span className="text-[11px] font-bold text-slate-400">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
                 {stats.totalCount} Total Ulasan
               </span>
-              <span className="inline-flex items-center space-x-1 mt-1 text-[9px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                <CheckCircle2 size={10} />
-                <span>99.4% Kepuasan</span>
-              </span>
+              {stats.totalCount > 0 && (
+                <span className="inline-flex items-center space-x-1 mt-1 text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <CheckCircle2 size={10} />
+                  <span>Komunitas Terverifikasi</span>
+                </span>
+              )}
             </div>
 
             {/* 5-Star Breakdown Bars */}
-            <div className="w-full sm:w-48 space-y-1.5 shrink-0">
+            <div className="w-full sm:w-44 space-y-1.5 shrink-0 border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-slate-800 pt-4 sm:pt-0 sm:pl-5">
               {[5, 4, 3, 2, 1].map((starLevel) => {
                 const pct = stats.breakdown[starLevel] || 0;
                 return (
                   <button
                     key={starLevel}
                     onClick={() => setSelectedStarFilter(selectedStarFilter === starLevel ? 'all' : starLevel)}
-                    className={`w-full flex items-center space-x-2 text-[10px] font-bold transition-all group/star cursor-pointer ${selectedStarFilter === starLevel ? 'opacity-100 text-amber-300' : 'text-slate-400 hover:text-white'}`}
+                    className={`w-full flex items-center space-x-2 text-[10px] font-bold transition-all group/star cursor-pointer ${selectedStarFilter === starLevel ? 'opacity-100 text-amber-600 dark:text-amber-300' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
                   >
                     <span className="w-2.5 text-right shrink-0">{starLevel}</span>
-                    <Star size={10} className={selectedStarFilter === starLevel ? "text-amber-400 fill-amber-400" : "text-slate-500 group-hover/star:text-amber-400"} />
-                    <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <Star size={10} className={selectedStarFilter === starLevel ? "text-amber-400 fill-amber-400" : "text-slate-400 group-hover/star:text-amber-400"} />
+                    <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                       <div 
-                        className={`h-full rounded-full transition-all duration-500 ${selectedStarFilter === starLevel ? 'bg-amber-400' : 'bg-gradient-to-r from-amber-500 to-emerald-400'}`}
+                        className={`h-full rounded-full transition-all duration-500 ${selectedStarFilter === starLevel ? 'bg-amber-500' : 'bg-gradient-to-r from-amber-400 to-orange-400'}`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -508,7 +469,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
       </div>
 
       {/* 2. FILTER & SEARCH TOOLBAR */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Rating Filter Chips */}
         <div className="flex items-center space-x-2 flex-wrap gap-y-2 w-full md:w-auto">
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1 flex items-center space-x-1">
@@ -518,7 +479,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
 
           <button
             onClick={() => setSelectedStarFilter('all')}
-            className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
               selectedStarFilter === 'all'
                 ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -527,11 +488,11 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
             Semua Bintang ({reviews.length})
           </button>
 
-          {[5, 4, 3].map((star) => (
+          {[5, 4, 3, 2, 1].map((star) => (
             <button
               key={star}
               onClick={() => setSelectedStarFilter(selectedStarFilter === star ? 'all' : star)}
-              className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition-all flex items-center space-x-1 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all flex items-center space-x-1 cursor-pointer ${
                 selectedStarFilter === star
                   ? 'bg-amber-500 text-slate-950 shadow-md'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -545,7 +506,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
 
           <button
             onClick={() => setOnlyWithPhotos(!onlyWithPhotos)}
-            className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition-all flex items-center space-x-1 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all flex items-center space-x-1 cursor-pointer ${
               onlyWithPhotos
                 ? 'bg-emerald-600 text-white shadow-md'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -563,9 +524,9 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
             placeholder="Cari ulasan atau topik..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-full text-xs font-semibold outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all text-slate-800 dark:text-white"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all text-slate-900 dark:text-white"
           />
-          <Search size={14} className="absolute left-3.5 top-2.5 text-slate-400" />
+          <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
           {searchQuery && (
             <button 
               onClick={() => setSearchQuery('')}
@@ -579,31 +540,36 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
 
       {/* 3. REVIEWS GRID DISPLAY */}
       {filteredReviews.length === 0 ? (
-        <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8">
-          <MessageSquare size={36} className="text-slate-300 dark:text-slate-700 mx-auto mb-3" />
-          <h3 className="text-base font-black text-slate-800 dark:text-white mb-1">Belum ada ulasan yang cocok</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4 font-medium">
-            Tidak menemukan ulasan untuk filter yang Anda pilih. Jadilah yang pertama memberikan ulasan untuk kategori ini!
+        <div className="text-center py-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl border border-slate-200/80 dark:border-slate-800 p-8 shadow-sm">
+          <MessageSquare size={40} className="text-slate-300 dark:text-slate-700 mx-auto mb-3" />
+          <h3 className="text-base font-black text-slate-800 dark:text-white mb-1">
+            {reviews.length === 0 ? 'Belum Ada Ulasan Komunitas' : 'Belum Ada Ulasan yang Cocok'}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-5 font-medium leading-relaxed">
+            {reviews.length === 0 
+              ? 'Jadilah kreator pertama yang membagikan pengalaman, rating bintang, dan screenshot portfolio Anda!' 
+              : 'Tidak menemukan ulasan untuk filter yang Anda pilih. Coba pilih filter bintang lain.'}
           </p>
           <button
             onClick={() => setShowWriteModal(true)}
-            className="px-4 py-2 bg-[#7c3aed] text-white text-xs font-bold rounded-xl shadow cursor-pointer hover:bg-violet-600 transition-all"
+            className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl shadow-lg shadow-amber-500/20 cursor-pointer transition-all inline-flex items-center space-x-2 active:scale-95"
           >
-            Tulis Ulasan Sekarang
+            <Plus size={14} />
+            <span>Tulis Ulasan Pertama (+ Foto)</span>
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {filteredReviews.map((review) => {
             const isLiked = likedReviewIds[review.id];
-            const initial = review.userName.charAt(0).toUpperCase();
+            const initial = (review.userName || 'U').charAt(0).toUpperCase();
 
             return (
               <div 
                 key={review.id}
-                className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-violet-500/30 rounded-3xl p-6 shadow-sm hover:shadow-lg transition-all flex flex-col justify-between space-y-4 group/card"
+                className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 hover:border-violet-500/40 dark:hover:border-violet-500/40 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 group/card"
               >
-                <div className="space-y-3.5">
+                <div className="space-y-3">
                   {/* Top Row: User Avatar & Badge & Date */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
@@ -611,10 +577,10 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                         <img 
                           src={review.userAvatar} 
                           alt={review.userName} 
-                          className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-sm"
+                          className="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shadow-sm"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-black text-sm flex items-center justify-center shadow-md shadow-violet-500/20">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-black text-sm flex items-center justify-center shadow-md shadow-violet-500/20">
                           {initial}
                         </div>
                       )}
@@ -624,7 +590,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                             {review.userName}
                           </h4>
                           {review.isPro && (
-                            <span className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[8px] font-black uppercase tracking-wider border border-emerald-300 dark:border-emerald-500/30">
+                            <span className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-[8px] font-black uppercase tracking-wider border border-emerald-200 dark:border-emerald-500/20">
                               <ShieldCheck size={9} />
                               <span>PRO Verified</span>
                             </span>
@@ -637,7 +603,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                     </div>
 
                     {/* Star Rating Badge */}
-                    <div className="flex items-center space-x-0.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-500/20 px-2.5 py-1 rounded-xl">
+                    <div className="flex items-center space-x-0.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-500/20 px-2.5 py-1 rounded-xl">
                       {[1, 2, 3, 4, 5].map((s) => (
                         <Star 
                           key={s} 
@@ -649,7 +615,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                   </div>
 
                   {/* Title & Comment */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {review.title && (
                       <h5 className="text-xs font-black text-slate-800 dark:text-slate-200">
                         {review.title}
@@ -662,11 +628,11 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
 
                   {/* Tags */}
                   {review.tags && review.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
                       {review.tags.map((tag, idx) => (
                         <span 
                           key={idx}
-                          className="text-[9px] font-extrabold bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-lg border border-slate-200/60 dark:border-slate-700/60"
+                          className="text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-lg border border-slate-200/60 dark:border-slate-700/60"
                         >
                           {tag}
                         </span>
@@ -676,7 +642,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
 
                   {/* Attached Photos / Screenshots (Clickable to Lightbox) */}
                   {review.photos && review.photos.length > 0 && (
-                    <div className="pt-2">
+                    <div className="pt-1.5">
                       <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
                         📸 Lampiran Bukti / Hasil ({review.photos.length}):
                       </span>
@@ -703,7 +669,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                 </div>
 
                 {/* Footer Helpful Button */}
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <span className="text-[9px] text-slate-400 font-semibold">
                     Apakah ulasan ini membantu?
                   </span>
@@ -729,7 +695,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
       {/* 4. MODAL WRITE A REVIEW (TULIS ULASAN & UNGGAH FOTO) */}
       <AnimatePresence>
         {showWriteModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -738,7 +704,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
             >
               <button
                 onClick={() => setShowWriteModal(false)}
-                className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -747,7 +713,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                 <div>
                   <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[9px] font-black uppercase tracking-widest mb-1.5">
                     <Star size={10} className="fill-current" />
-                    <span>Ulasan Pengguna Play Store</span>
+                    <span>Ulasan Pengguna MetaZo</span>
                   </div>
                   <h3 className="text-xl font-black text-slate-900 dark:text-white">
                     Tulis Ulasan & Pengalaman Anda
@@ -757,10 +723,10 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                   </p>
                 </div>
 
-                <form onSubmit={handleSubmitReview} className="space-y-4 pt-2">
+                <form onSubmit={handleSubmitReview} className="space-y-4 pt-1">
                   
                   {/* Star Picker */}
-                  <div className="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center space-y-2">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950/80 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center space-y-2">
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                       Beri Nilai Bintang
                     </span>
@@ -800,7 +766,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                       placeholder="Contoh: Approval Adobe Stock 100% lancar & cepat!"
                       value={formTitle}
                       onChange={(e) => setFormTitle(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2 text-xs font-semibold outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-slate-900 dark:text-white transition-all"
+                      className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2 text-xs font-semibold outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-slate-900 dark:text-white transition-all"
                     />
                   </div>
 
@@ -815,7 +781,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
                       value={formComment}
                       onChange={(e) => setFormComment(e.target.value)}
                       required
-                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-medium outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-slate-900 dark:text-white transition-all resize-none"
+                      className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-medium outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-slate-900 dark:text-white transition-all resize-none"
                     />
                   </div>
 
@@ -942,7 +908,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
         {zoomedPhoto && (
           <div 
             onClick={() => setZoomedPhoto(null)}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 animate-in fade-in"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in"
           >
             <div className="relative max-w-4xl max-h-[90vh] w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
               <img 
@@ -952,7 +918,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
               />
               <button
                 onClick={() => setZoomedPhoto(null)}
-                className="absolute top-3 right-3 p-2 bg-black/60 hover:bg-black/90 text-white rounded-full backdrop-blur-md transition-colors"
+                className="absolute top-3 right-3 p-2 bg-black/60 hover:bg-black/90 text-white rounded-full backdrop-blur-md transition-colors cursor-pointer"
               >
                 <X size={20} />
               </button>
