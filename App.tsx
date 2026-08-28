@@ -1117,6 +1117,8 @@ const App: React.FC = () => {
   });
   const [titleLength, setTitleLength] = useState<'short' | 'medium' | 'long'>(() => (localStorage.getItem('mz_title_length') as 'short' | 'medium' | 'long') || 'medium');
   const [metadataLanguage, setMetadataLanguage] = useState<string>(() => localStorage.getItem('mz_metadata_language') || 'en');
+  const [user, setUser] = useState<User | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [activeAccountsCount, setActiveAccountsCount] = useState<number>(0);
   const [activeUsers, setActiveUsers] = useState<string[]>([]);
 
@@ -1342,9 +1344,6 @@ const App: React.FC = () => {
 
   const [promoCodesForModal, setPromoCodesForModal] = useState<any[]>([]);
   const [copiedCodeInModal, setCopiedCodeInModal] = useState<string | null>(null);
-
-  const [user, setUser] = useState<User | null>(null);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
     if (user?.uid !== lastUid) {
