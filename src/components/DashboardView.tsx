@@ -854,7 +854,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          {/* Dynamic Real Reviews Display */}
+          {/* Dynamic Real Reviews Display (Smooth Marquee Ticker) */}
           {realReviews.length === 0 ? (
             <div className="bg-slate-50/60 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 text-center space-y-2">
               <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
@@ -868,40 +868,86 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {realReviews.slice(0, 3).map((rev) => {
-                const initial = (rev.userName || 'U').charAt(0).toUpperCase();
-                const starCount = Math.min(5, Math.max(1, Number(rev.rating) || 5));
-                return (
-                  <div key={rev.id} className="bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 hover:border-amber-400/40 rounded-2xl p-4 transition-all flex flex-col justify-between space-y-3">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 font-black text-[11px] flex items-center justify-center text-white shadow-sm">
-                            {initial}
+            <div className="relative w-full overflow-hidden py-1">
+              <style>{`
+                @keyframes mzReviewMarquee {
+                  0% { transform: translateX(0); }
+                  100% { transform: translateX(-50%); }
+                }
+                .mz-marquee-track {
+                  display: flex;
+                  width: max-content;
+                  animation: mzReviewMarquee 45s linear infinite;
+                }
+                .mz-marquee-track:hover {
+                  animation-play-state: paused;
+                }
+              `}</style>
+
+              {/* Side Gradient Fade Masks */}
+              <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-r from-white/95 dark:from-slate-900/95 via-white/50 dark:via-slate-900/50 to-transparent z-10" />
+              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-l from-white/95 dark:from-slate-900/95 via-white/50 dark:via-slate-900/50 to-transparent z-10" />
+
+              {/* Marquee Content Track */}
+              <div className="mz-marquee-track flex items-stretch space-x-4">
+                {(() => {
+                  let repeatedList = [...realReviews];
+                  while (repeatedList.length < 6) {
+                    repeatedList = [...repeatedList, ...realReviews];
+                  }
+                  const displayList = [...repeatedList, ...repeatedList];
+
+                  return displayList.map((rev, index) => {
+                    const initial = (rev.userName || 'U').charAt(0).toUpperCase();
+                    const starCount = Math.min(5, Math.max(1, Number(rev.rating) || 5));
+                    return (
+                      <div 
+                        key={`${rev.id}-${index}`} 
+                        onClick={() => setActiveTool(ToolType.REVIEWS)}
+                        className="w-72 sm:w-80 shrink-0 bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 hover:border-amber-400/50 dark:hover:border-amber-400/50 rounded-2xl p-4 transition-all flex flex-col justify-between space-y-3 cursor-pointer shadow-sm hover:shadow-md hover:scale-[1.02] duration-200 select-none"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              {rev.userAvatar ? (
+                                <img src={rev.userAvatar} alt={rev.userName} className="w-7 h-7 rounded-xl object-cover border border-slate-200 dark:border-slate-700" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 font-black text-[11px] flex items-center justify-center text-white shadow-sm shrink-0">
+                                  {initial}
+                                </div>
+                              )}
+                              <div className="leading-tight truncate max-w-[130px]">
+                                <h5 className="text-[11px] font-black text-slate-900 dark:text-white truncate">{rev.userName}</h5>
+                                <span className="text-[8.5px] text-emerald-600 dark:text-emerald-400 font-bold">{rev.isPro ? 'PRO Verified' : 'Community User'}</span>
+                              </div>
+                            </div>
+                            <div className="flex text-amber-400 text-xs shrink-0">
+                              {'★'.repeat(starCount)}
+                            </div>
                           </div>
-                          <div className="leading-tight">
-                            <h5 className="text-[11px] font-black text-slate-900 dark:text-white truncate max-w-[130px]">{rev.userName}</h5>
-                            <span className="text-[8.5px] text-emerald-600 dark:text-emerald-400 font-bold">{rev.isPro ? 'PRO Verified' : 'Community User'}</span>
-                          </div>
+                          
+                          {rev.title && (
+                            <h6 className="text-[10.5px] font-black text-slate-800 dark:text-slate-200 truncate">
+                              {rev.title}
+                            </h6>
+                          )}
+
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium line-clamp-2 leading-relaxed">
+                            "{rev.comment}"
+                          </p>
                         </div>
-                        <div className="flex text-amber-400 text-xs">
-                          {'★'.repeat(starCount)}
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800 text-[9px] text-slate-500 dark:text-slate-400">
+                          <span className="bg-slate-200/60 dark:bg-slate-800/80 px-2 py-0.5 rounded text-amber-600 dark:text-amber-300 truncate max-w-[140px] font-bold">
+                            {rev.tags && rev.tags[0] ? rev.tags[0] : (rev.photos && rev.photos.length > 0 ? '📸 Ada Foto' : '⭐ Rating')}
+                          </span>
+                          <span>👍 {rev.helpfulCount || 0} Membantu</span>
                         </div>
                       </div>
-                      <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium line-clamp-3 leading-relaxed">
-                        "{rev.comment}"
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800 text-[9px] text-slate-500 dark:text-slate-400">
-                      <span className="bg-slate-200/60 dark:bg-slate-800/80 px-2 py-0.5 rounded text-amber-600 dark:text-amber-300 truncate max-w-[140px] font-bold">
-                        {rev.tags && rev.tags[0] ? rev.tags[0] : (rev.photos && rev.photos.length > 0 ? '📸 Ada Foto' : '⭐ Rating')}
-                      </span>
-                      <span>👍 {rev.helpfulCount || 0} Membantu</span>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  });
+                })()}
+              </div>
             </div>
           )}
         </div>
