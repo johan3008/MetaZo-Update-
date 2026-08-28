@@ -4,9 +4,9 @@ import { motion } from 'motion/react';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
-  Calendar, CreditCard, Info, Receipt, VolumeX, Monitor
+  Calendar, CreditCard, Info, Receipt, VolumeX, Video, Eraser, Star
 } from 'lucide-react';
-import { ToolType, GenerationMode, toolToPath } from '@/types';
+import { ToolType, GenerationMode, toolToPath } from '../../types';
 
 const AnimatedAppName: React.FC<{ name: string; fontSizeClass?: string }> = ({ name, fontSizeClass = "text-base" }) => {
   const chars = name.split('');
@@ -323,12 +323,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <a href={toolToPath[ToolType.MOTION_GEN]} onClick={(e) => handleNavClick(e, ToolType.MOTION_GEN)}
               className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
                 activeTool === ToolType.MOTION_GEN 
-                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-violet-500" 
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-indigo-500" 
                   : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              <Monitor size={16} className={activeTool === ToolType.MOTION_GEN ? "text-purple-400" : "text-slate-400"} />
-              {!sidebarCollapsed && <span>Motion Gen (Remotion)</span>}
+              <Video size={16} className={activeTool === ToolType.MOTION_GEN ? "text-indigo-400" : "text-slate-400"} />
+              {!sidebarCollapsed && <span>{t.sidebar_motion_gen || "Motion Gen"}</span>}
+            </a>
+
+            <a href={toolToPath[ToolType.REMOVAL_GEN]} onClick={(e) => handleNavClick(e, ToolType.REMOVAL_GEN)}
+              className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
+                activeTool === ToolType.REMOVAL_GEN 
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-fuchsia-500" 
+                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Eraser size={16} className={activeTool === ToolType.REMOVAL_GEN ? "text-fuchsia-400" : "text-slate-400"} />
+              {!sidebarCollapsed && <span>{t.sidebar_removal_gen || "Removal Gen"}</span>}
             </a>
           </nav>
         </div>
@@ -431,6 +442,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Receipt size={14} className="text-blue-400" />
               {!sidebarCollapsed && <span>{t.language === 'id' ? 'Tagihan (Billing)' : 'Billing'}</span>}
             </button>
+
+            {/* Community Reviews Menu Item */}
+            <a 
+              href={toolToPath[ToolType.REVIEWS] || '/CommunityReviews'} 
+              onClick={(e) => handleNavClick(e, ToolType.REVIEWS)}
+              className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 mb-1.5 ${
+                activeTool === ToolType.REVIEWS 
+                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-md border-l-4 border-amber-400" 
+                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Star size={14} className={activeTool === ToolType.REVIEWS ? "text-amber-400 fill-amber-400" : "text-amber-400"} />
+              {!sidebarCollapsed && <span>{t.language === 'Bahasa' ? '⭐ Ulasan & Rating' : '⭐ Reviews & Ratings'}</span>}
+            </a>
 
             <button 
               type="button"
@@ -694,6 +719,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     >
                       <VolumeX size={14} className={activeTool === ToolType.MUTE_VIDEO ? "text-rose-400" : "text-slate-400"} />
                       <span>{t.sidebar_mute_video || "Mute Video Gen"}</span></button>
+
+                    <button 
+                      onClick={() => { setActiveTool(ToolType.MOTION_GEN); setSidebarOpen(false); }}
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                        activeTool === ToolType.MOTION_GEN 
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-indigo-500" 
+                          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      <Video size={14} className={activeTool === ToolType.MOTION_GEN ? "text-indigo-400" : "text-slate-400"} />
+                      <span>{t.sidebar_motion_gen || "Motion Gen"}</span></button>
+
+                    <button 
+                      onClick={() => { setActiveTool(ToolType.REMOVAL_GEN); setSidebarOpen(false); }}
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                        activeTool === ToolType.REMOVAL_GEN 
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-fuchsia-500" 
+                          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      <Eraser size={14} className={activeTool === ToolType.REMOVAL_GEN ? "text-fuchsia-400" : "text-slate-400"} />
+                      <span>{t.sidebar_removal_gen || "Removal Gen"}</span></button>
                   </nav>
                 </div>
 

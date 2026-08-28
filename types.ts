@@ -13,7 +13,8 @@ export enum ToolType {
   CALENDAR_GEN = 'calendar_gen',
   MUTE_VIDEO = 'mute_video',
   MOTION_GEN = 'motion_gen',
-  REMOVAL_GEN = 'removal_gen'
+  REMOVAL_GEN = 'removal_gen',
+  REVIEWS = 'reviews'
 }
 
 export const toolToPath: Record<ToolType, string> = {
@@ -30,7 +31,8 @@ export const toolToPath: Record<ToolType, string> = {
   [ToolType.CALENDAR_GEN]: '/NicheCalendar',
   [ToolType.MUTE_VIDEO]: '/MuteVideoGen',
   [ToolType.MOTION_GEN]: '/MotionGen',
-  [ToolType.REMOVAL_GEN]: '/RemovalGen'
+  [ToolType.REMOVAL_GEN]: '/RemovalGen',
+  [ToolType.REVIEWS]: '/CommunityReviews'
 };
 
 export enum GenerationMode {
@@ -119,3 +121,21 @@ export interface MarketTrend {
   opportunityScore: number;
   statusBadge: 'Excellent' | 'High Potential' | 'Moderate' | 'Oversaturated';
 }
+
+export interface CommunityReview {
+  id: string;
+  userName: string;
+  userEmail?: string;
+  userAvatar?: string;
+  isPro?: boolean;
+  rating: number; // 1 to 5
+  title?: string;
+  comment: string;
+  tags?: string[];
+  photos?: string[];
+  createdAt: string;
+  helpfulCount?: number;
+  verifiedBuyer?: boolean;
+  appVersion?: string;
+}
+
