@@ -13,6 +13,17 @@ export default defineConfig(({ mode }) => {
         }
       },
       plugins: [react()],
+      worker: {
+        format: 'es'
+      },
+      optimizeDeps: {
+        exclude: [
+          '@ffmpeg/ffmpeg',
+          '@ffmpeg/util',
+          '@ffmpeg/core',
+          'pdfjs-dist'
+        ]
+      },
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)

@@ -2,13 +2,6 @@ import "@ffmpeg-installer/ffmpeg";
 import "@ffprobe-installer/ffprobe";
 import "fluent-ffmpeg";
 
-// Vercel NFT hack to include binaries
-import "@ffmpeg-installer/linux-x64/package.json";
-import "@ffprobe-installer/linux-x64/package.json";
-
-
-// Vercel NFT hack to include binaries
-
 
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
@@ -25,6 +18,7 @@ import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
+import { testFtpConnection, uploadToFtp } from './server/ftpService.ts';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
 try { _require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); _require.resolve('@ffprobe-installer/linux-x64/ffprobe'); } catch(e) {}
@@ -514,6 +508,28 @@ app.get('/api/debug-uploads', (req, res) => {
             keyObj.activated = false;
             keyObj.activatedBy = '';
             keyObj.activatedAt = '';
+            writeKeys(currentKeys);
+            res.json({ success: true, allKeys: currentKeys });
+        } else {
+            res.status(404).json({ error: 'Key not found' });
+        }
+    });
+
+    // 4b. Renew key duration
+    app.post('/api/keys/renew', (req, res) => {
+        const { key, duration } = req.body;
+        if (!key) {
+            return res.status(400).json({ error: 'Key is required' });
+        }
+        const currentKeys = readKeys();
+        const keyObj = currentKeys.find(k => k.key === key);
+        if (keyObj) {
+            (keyObj as any).duration = duration || '30days';
+            if (duration === '30days') {
+                keyObj.activatedAt = new Date().toISOString();
+            } else {
+                keyObj.activatedAt = '';
+            }
             writeKeys(currentKeys);
             res.json({ success: true, allKeys: currentKeys });
         } else {
@@ -3780,6 +3796,90 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                     console.log("[MANDOR GC] Memori dibersihkan untuk worker selanjutnya.");
                 }
             }, 100);
+        }
+    });
+
+    // ==========================================
+    // AUTO FTP / SFTP STOCK UPLOADER ENDPOINTS
+    // ==========================================
+
+    // Test FTP / FTPS / SFTP Connection
+    app.post('/api/ftp/test-connection', async (req, res) => {
+        try {
+            const { host, port, protocol, username, password, remoteDir } = req.body;
+            if (!host || !username || !password) {
+                return res.status(400).json({ success: false, error: 'Host, Username, and Password are required.' });
+            }
+
+            const result = await testFtpConnection({
+                host: String(host).trim(),
+                port: port ? Number(port) : undefined,
+                protocol: protocol || 'ftp',
+                username: String(username).trim(),
+                password: String(password),
+                remoteDir: remoteDir || '/'
+            });
+
+            if (result.success) {
+                return res.json({ success: true, message: result.message });
+            } else {
+                return res.status(400).json({ success: false, error: result.error });
+            }
+        } catch (err: any) {
+            console.error('[FTP TEST ERROR]', err);
+            return res.status(500).json({ success: false, error: err.message || 'Internal FTP testing error' });
+        }
+    });
+
+    // Upload File to Remote FTP / SFTP Server
+    app.post('/api/ftp/upload', upload.single('file'), async (req, res) => {
+        const uploadedFile = req.file;
+        try {
+            if (!uploadedFile) {
+                return res.status(400).json({ success: false, error: 'No file uploaded.' });
+            }
+
+            const accountConfigRaw = req.body.accountConfig;
+            if (!accountConfigRaw) {
+                if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
+                return res.status(400).json({ success: false, error: 'Target FTP account configuration is missing.' });
+            }
+
+            const accountConfig = typeof accountConfigRaw === 'string' ? JSON.parse(accountConfigRaw) : accountConfigRaw;
+            const { host, port, protocol, username, password, remoteDir } = accountConfig;
+
+            if (!host || !username || !password) {
+                if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
+                return res.status(400).json({ success: false, error: 'Target account host, username, or password missing.' });
+            }
+
+            const uploadResult = await uploadToFtp({
+                host: String(host).trim(),
+                port: port ? Number(port) : undefined,
+                protocol: protocol || 'ftp',
+                username: String(username).trim(),
+                password: String(password),
+                remoteDir: remoteDir || '/',
+                localFilePath: uploadedFile.path,
+                filename: uploadedFile.originalname || path.basename(uploadedFile.path)
+            });
+
+            // Clean up temporary local upload file
+            if (fs.existsSync(uploadedFile.path)) {
+                try { fs.unlinkSync(uploadedFile.path); } catch (e) {}
+            }
+
+            if (uploadResult.success) {
+                return res.json({ success: true, message: uploadResult.message, filename: uploadedFile.originalname });
+            } else {
+                return res.status(400).json({ success: false, error: uploadResult.error });
+            }
+        } catch (err: any) {
+            console.error('[FTP UPLOAD ERROR]', err);
+            if (uploadedFile && fs.existsSync(uploadedFile.path)) {
+                try { fs.unlinkSync(uploadedFile.path); } catch (e) {}
+            }
+            return res.status(500).json({ success: false, error: err.message || 'Internal FTP upload error' });
         }
     });
 

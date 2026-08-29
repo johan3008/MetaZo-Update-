@@ -14,7 +14,8 @@ export enum ToolType {
   MUTE_VIDEO = 'mute_video',
   MOTION_GEN = 'motion_gen',
   ANTI_SPAM = 'anti_spam',
-  REVIEWS = 'reviews'
+  REVIEWS = 'reviews',
+  FTP_UPLOADER = 'ftp_uploader'
 }
 
 export const toolToPath: Record<ToolType, string> = {
@@ -32,7 +33,8 @@ export const toolToPath: Record<ToolType, string> = {
   [ToolType.MUTE_VIDEO]: '/MuteVideoGen',
   [ToolType.MOTION_GEN]: '/MotionGen',
   [ToolType.ANTI_SPAM]: '/SimilarContentChecker',
-  [ToolType.REVIEWS]: '/CommunityReviews'
+  [ToolType.REVIEWS]: '/CommunityReviews',
+  [ToolType.FTP_UPLOADER]: '/FtpUploader'
 };
 
 export enum GenerationMode {
@@ -138,4 +140,36 @@ export interface CommunityReview {
   verifiedBuyer?: boolean;
   appVersion?: string;
 }
+
+export type FtpProtocol = 'ftp' | 'ftps' | 'sftp';
+
+export interface FtpAccountConfig {
+  id: string;
+  agencyKey: string;
+  agencyName: string;
+  host: string;
+  port: number;
+  protocol: FtpProtocol;
+  username: string;
+  password?: string;
+  remoteDir?: string;
+  enabled: boolean;
+  lastTested?: string;
+  lastStatus?: 'success' | 'failed';
+  lastError?: string;
+}
+
+export interface FtpUploadJobItem {
+  id: string;
+  file: File;
+  name: string;
+  size: number;
+  type: string;
+  status: 'pending' | 'uploading' | 'success' | 'failed' | 'cancelled';
+  progress: number; // 0 to 100
+  targetAgencyKeys: string[];
+  results: Record<string, { status: 'success' | 'failed'; message?: string; timestamp: string }>;
+  error?: string;
+}
+
 
