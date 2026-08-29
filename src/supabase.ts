@@ -418,9 +418,19 @@ export function notifyTableMutation(table: string) {
 }
 
 export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merge?: boolean }): Promise<void> {
-  const processedData = { ...(data || {}) };
+  let processedData = { ...(data || {}) };
   if (docRef.table === 'keys') {
     processedData.key = docRef.id;
+    // Keep only valid columns for keys table in Supabase
+    const allowedKeysCols = new Set(['key', 'id', 'activated', 'activatedBy', 'firstActivatedBy', 'activatedAt', 'duration', 'createdAt', 'settings']);
+    const sanitized: any = {};
+    for (const [k, v] of Object.entries(processedData)) {
+      if (allowedKeysCols.has(k)) {
+        sanitized[k] = v;
+      }
+    }
+    sanitized.key = docRef.id;
+    processedData = sanitized;
   } else {
     processedData.id = docRef.id;
   }
@@ -507,6 +517,18 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
     if (value && typeof value === 'object' && (value as any).__deleteField) {
       topLevelUpdates[key] = null;
     }
+  }
+
+  // Sanitize columns for keys table to prevent schema mismatch errors
+  if (docRef.table === 'keys') {
+    const allowedKeysCols = new Set(['key', 'id', 'activated', 'activatedBy', 'firstActivatedBy', 'activatedAt', 'duration', 'createdAt', 'settings']);
+    const sanitized: any = {};
+    for (const [k, v] of Object.entries(topLevelUpdates)) {
+      if (allowedKeysCols.has(k)) {
+        sanitized[k] = v;
+      }
+    }
+    topLevelUpdates = sanitized;
   }
 
   if (!supabase) {

@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Player } from '@remotion/player';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Player, PlayerRef, Thumbnail } from '@remotion/player';
 import * as Babel from '@babel/standalone';
 import * as Remotion from 'remotion';
+import { DynamicMotionRenderer } from './DynamicMotionRenderer';
+import { MotionProject } from '../../types/motionSchema';
 
 interface LiveRemotionRunnerProps {
     code: string;
@@ -37,9 +39,24 @@ function ensurePresetsRegistered() {
 }
 
 export function LiveRemotionRunner({ code, fps, durationInFrames, width, height, onError, inputProps }: LiveRemotionRunnerProps) {
-    const [Component, setComponent] = useState<React.FC | null>(null);
+    const [Component, setComponent] = useState<React.FC<any> | null>(null);
+    const [activeProps, setActiveProps] = useState<any>({});
     const [error, setError] = useState<string | null>(null);
     const [renderKey, setRenderKey] = useState(0);
+    const [renderFrame, setRenderFrame] = useState<number | null>(null);
+    const playerRef = useRef<PlayerRef>(null);
+
+    useEffect(() => {
+        if (playerRef.current) {
+            (window as any).__remotionPlayerRef = playerRef.current;
+        }
+        (window as any).__setRemotionRenderFrame = (frame: number | null) => {
+            setRenderFrame(frame);
+        };
+        return () => {
+            delete (window as any).__setRemotionRenderFrame;
+        };
+    }, [Component, renderKey]);
 
     const compileAndEval = useCallback((sourceCode: string) => {
         ensurePresetsRegistered();
@@ -76,7 +93,7 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
             if (moduleName === 'react/jsx-runtime') return React;
             // Handle common interop modules
             if (moduleName === 'react-dom') return {};
-            if (moduleName === '@remotion/player') return { Player };
+            if (moduleName === '@remotion/player') return { Player, Thumbnail };
             console.warn(`[LiveRemotionRunner] Unsupported module requested: ${moduleName}`);
             return {};
         };
@@ -113,27 +130,65 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
             return;
         }
 
-        try {
-            const finalExports = compileAndEval(code);
+        const trimmed = code.trim();
 
-            if (finalExports.MotionComposition) {
-                const NewComponent = finalExports.MotionComposition;
-                setComponent(() => NewComponent);
-                setError(null);
-                if (onError) onError(null);
-                setRenderKey(prev => prev + 1);
-            } else if (finalExports.default) {
-                const NewComponent = finalExports.default;
-                setComponent(() => NewComponent);
+        // 1. Check if input is a Structured Motion JSON Schema
+        if (trimmed.startsWith('{') && (trimmed.includes('"scenes"') || trimmed.includes('"title"') || trimmed.includes('"background"'))) {
+            try {
+                const parsedProject = JSON.parse(trimmed) as MotionProject;
+                if (parsedProject && Array.isArray(parsedProject.scenes)) {
+                    // Directly mount native Remotion Dynamic Renderer (zero Babel evaluation!)
+                    setComponent(() => DynamicMotionRenderer);
+                    setActiveProps({ project: parsedProject });
+                    setError(null);
+                    if (onError) onError(null);
+                    setRenderKey(prev => prev + 1);
+                    return;
+                }
+            } catch (jsonErr: any) {
+                console.warn('[LiveRemotionRunner] JSON parse attempt failed, falling back to JSX:', jsonErr.message);
+            }
+        }
+
+        // 2. Fallback: Parse and evaluate raw JSX via Babel
+        try {
+            let processedCode = code;
+            // Auto-append export if MotionComposition is defined but not exported
+            if (!/export\s+(default|const|let|var|function)/.test(processedCode)) {
+                if (processedCode.includes('MotionComposition')) {
+                    processedCode += '\nexport default MotionComposition;';
+                }
+            }
+
+            const finalExports = compileAndEval(processedCode);
+
+            let FoundComponent: any = null;
+            if (finalExports.MotionComposition && typeof finalExports.MotionComposition === 'function') {
+                FoundComponent = finalExports.MotionComposition;
+            } else if (finalExports.default && typeof finalExports.default === 'function') {
+                FoundComponent = finalExports.default;
+            } else {
+                // Fallback: search for first function component export
+                for (const key of Object.keys(finalExports)) {
+                    if (key !== '__esModule' && typeof finalExports[key] === 'function') {
+                        FoundComponent = finalExports[key];
+                        break;
+                    }
+                }
+            }
+
+            if (FoundComponent) {
+                setComponent(() => FoundComponent);
+                setActiveProps(inputProps || {});
                 setError(null);
                 if (onError) onError(null);
                 setRenderKey(prev => prev + 1);
             } else {
                 const availableExports = Object.keys(finalExports).filter(k => k !== '__esModule');
-                console.warn('[LiveRemotionRunner] No MotionComposition found. Available:', availableExports);
+                console.warn('[LiveRemotionRunner] No valid component found in exports. Available:', availableExports);
                 const errMsg = availableExports.length > 0
-                        ? `Export ditemukan: "${availableExports.join('", "')}". Harus pakai nama "MotionComposition".`
-                        : "Kode harus mengekspor komponen bernama 'MotionComposition' atau default export";
+                        ? `Export ditemukan: "${availableExports.join('", "')}". Pastikan mengekspor fungsi komponen React.`
+                        : "Kode harus mengekspor komponen bernama 'MotionComposition' atau default export.";
                 setError(errMsg);
                 if (onError) onError(errMsg);
                 setComponent(null);
@@ -145,7 +200,7 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
             if (onError) onError(errMsg);
             setComponent(null);
         }
-    }, [code, compileAndEval]);
+    }, [code, compileAndEval, inputProps, onError]);
 
     if (error) {
         return (
@@ -166,19 +221,62 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
         );
     }
 
+    const effectiveFps = activeProps?.project?.fps || fps || 30;
+    const effectiveDuration = activeProps?.project?.durationInFrames || durationInFrames || 150;
+
     return (
-        <Player
-            key={renderKey}
-            component={Component}
-            inputProps={inputProps || {}}
-            durationInFrames={durationInFrames}
-            fps={fps}
-            compositionWidth={width}
-            compositionHeight={height}
-            style={{ width: '100%', height: '100%' }}
-            controls
-            autoPlay
-            loop
-        />
+        <div className="w-full h-full relative">
+            {/* Live Interactive Player (Real-time Preview) */}
+            <Player
+                ref={playerRef}
+                key={renderKey}
+                component={Component}
+                inputProps={activeProps}
+                durationInFrames={effectiveDuration}
+                fps={effectiveFps}
+                compositionWidth={width}
+                compositionHeight={height}
+                style={{ width: '100%', height: '100%' }}
+                controls
+                clickToPlay
+                spaceKeyToPlayOrPause={false}
+                doubleClickToFullscreen={false}
+                allowFullscreen
+                showVolumeControls={false}
+                autoPlay
+                loop
+            />
+
+            {/* Dedicated Pure Video Render Stage (Offscreen Behind App, Zero Player Controls, Pure Vector/Composition) */}
+            {renderFrame !== null && (
+                <div
+                    id="remotion-pure-render-stage"
+                    style={{
+                        position: 'fixed',
+                        left: '0px',
+                        top: '0px',
+                        width: `${width}px`,
+                        height: `${height}px`,
+                        overflow: 'hidden',
+                        backgroundColor: '#000000',
+                        zIndex: -999,
+                        pointerEvents: 'none',
+                        visibility: 'visible',
+                        opacity: 0.999
+                    }}
+                >
+                    <Thumbnail
+                        component={Component}
+                        compositionWidth={width}
+                        compositionHeight={height}
+                        frame={renderFrame}
+                        fps={fps}
+                        durationInFrames={durationInFrames}
+                        inputProps={activeProps}
+                        style={{ width: `${width}px`, height: `${height}px` }}
+                    />
+                </div>
+            )}
+        </div>
     );
 }

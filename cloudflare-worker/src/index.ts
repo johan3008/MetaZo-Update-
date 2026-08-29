@@ -377,6 +377,18 @@ export default {
         return jsonResponse({ success: true });
       }
 
+      if (path.startsWith("/api/keys/renew/") && request.method === "POST") {
+        const key = decodeURIComponent(path.substring(16));
+        const body: any = await request.json().catch(() => ({}));
+        const duration = body.duration || '30days';
+        const durationDays = duration === '30days' ? 30 : 9999;
+        const activatedAt = duration === '30days' ? new Date().toISOString() : null;
+        await env.DB.prepare(
+          "UPDATE license_keys SET duration_days = ?, activated_at = ? WHERE key = ?"
+        ).bind(durationDays, activatedAt, key).run();
+        return jsonResponse({ success: true });
+      }
+
       // ----------------------------------------------------
       // PROMO CODES ENDPOINTS
       // ----------------------------------------------------

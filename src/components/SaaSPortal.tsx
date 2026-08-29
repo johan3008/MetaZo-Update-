@@ -688,18 +688,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
 
       const updates: any = {
         duration: renewDuration,
-        updatedAt: new Date().toISOString()
+        activatedAt: renewDuration === '30days' ? new Date().toISOString() : null
       };
-
-      if (renewDuration === '30days') {
-        updates.activatedAt = new Date().toISOString();
-      } else {
-        updates.activatedAt = '';
-      }
 
       await updateDoc(doc(db, 'keys', keyToRenew), updates);
 
-      // If the key was already active, restore/update the user profile in Firestore
+      // If the key was already active, restore/update the user profile in Database
       if (email && keyObj?.activated) {
         try {
           const qSnap = await getDocs(collection(db, 'users'));
@@ -719,33 +713,12 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
       }
 
       await fetchBackendKeys();
-      alert(`Key ${keyToRenew} berhasil diperpanjang menjadi ${renewDuration === '30days' ? '30 Hari' : 'Unlimited'}.`);
+      alert(`Key ${keyToRenew} berhasil diperpanjang secara Real ke Database menjadi ${renewDuration === '30days' ? '30 Hari' : 'Unlimited'}.`);
       setActiveRenewKey(null);
-    } catch (err) {
-      console.error('Failed to renew key inside Firestore, falling back to local storage:', err);
+    } catch (err: any) {
+      console.error('Failed to renew key inside database:', err);
       handleFirestoreError(err, OperationType.UPDATE, `keys/${keyToRenew}`);
-      
-      let cached = localStorage.getItem('mz_backend_keys_cache');
-      let currentList: LicenseKeyBackend[] = [];
-      if (cached) {
-        try {
-          currentList = JSON.parse(cached);
-        } catch(e) {}
-      }
-      const updatedList = currentList.map(k => {
-        if (k.key === keyToRenew) {
-          return {
-            ...k,
-            duration: renewDuration,
-            activatedAt: renewDuration === '30days' ? new Date().toISOString() : ''
-          };
-        }
-        return k;
-      });
-      setBackendKeys(updatedList);
-      localStorage.setItem('mz_backend_keys_cache', JSON.stringify(updatedList));
-      alert(`Key ${keyToRenew} berhasil diperpanjang secara lokal (Sandbox Mode).`);
-      setActiveRenewKey(null);
+      alert(`Gagal memperpanjang key di Database: ${err?.message || String(err)}`);
     } finally {
       setIsRenewing(false);
     }

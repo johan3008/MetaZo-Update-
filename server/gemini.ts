@@ -7444,7 +7444,6 @@ Language: ${targetLanguageName}. Return pure JSON.`;
       },
       heatmaps: []
     };
-    
     return fallbackReport;
   }
 
@@ -7471,21 +7470,94 @@ Language: ${targetLanguageName}. Return pure JSON.`;
   }
 }
 
-/* ===== FIXED: generateMotionCode restored as standalone function ===== */
+/* ===== generateMotionCode ===== */
 export async function generateMotionCode(userPrompt: string, options?: { currentCode?: string; fps?: number; durationSeconds?: number; width?: number; height?: number; history?: Array<{role: string; content: string}>; model?: string }) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   const model = options?.model;
 
-  const systemInstruction = `You are an expert Remotion developer. Your task is to generate a self-contained React component that composes a stunning, modern motion graphics animation. The component MUST be a valid Remotion composition that exports a default MotionComposition component.
-RULES: Use @remotion packages appropriately. The animation should be smooth, professional, and visually impressive. Use React hooks as needed. Use useCurrentFrame() and useVideoConfig() from remotion. Export as: export default MotionComposition. Keep the code self-contained and production-ready. Return ONLY valid, runnable JSX/TSX code.`;
+  const systemInstruction = `You are a world-class Motion Graphics and Creative Director specializing in Structured Remotion Compositions.
+Your task is to generate a structured, type-safe Motion Graphic JSON Project that is interpreted deterministically by a built-in Remotion Dynamic Renderer.
+
+CRITICAL SCHEMA RULES:
+Generate a valid JSON object matching this schema:
+{
+  "title": "Short Title",
+  "description": "Short description of the motion design",
+  "fps": 30,
+  "durationInFrames": 150,
+  "background": {
+    "type": "gradient" | "mesh" | "radial" | "particles" | "grid" | "solid",
+    "colors": ["#0f172a", "#1e1b4b", "#312e81"],
+    "angle": 135,
+    "animated": true
+  },
+  "scenes": [
+    {
+      "id": "scene-1",
+      "from": 0,
+      "durationInFrames": 150,
+      "transition": "fade",
+      "elements": [
+        {
+          "id": "badge-1",
+          "type": "badge",
+          "content": "NEW RELEASE 2026",
+          "iconName": "sparkles" | "zap" | "flame" | "star" | "shield" | "award" | "trending-up" | "play" | "gift" | "dollar" | "shopping-cart" | "cpu",
+          "layout": { "align": "center" },
+          "style": { "color": "#818cf8", "backgroundColor": "rgba(99, 102, 241, 0.15)", "borderRadius": 999, "fontSize": 16, "fontWeight": 700 },
+          "animation": { "type": "spring-in", "delay": 0, "damping": 12 }
+        },
+        {
+          "id": "heading-1",
+          "type": "heading",
+          "content": "Next-Gen Motion AI",
+          "layout": { "align": "center" },
+          "style": { "fontSize": 64, "fontWeight": 800, "gradient": ["#ffffff", "#cbd5e1", "#818cf8"] },
+          "animation": { "type": "slide-up", "delay": 5, "damping": 12 }
+        },
+        {
+          "id": "subtitle-1",
+          "type": "subtitle",
+          "content": "Create cinematic animations with pure microsecond precision.",
+          "layout": { "align": "center", "maxWidth": "700px" },
+          "style": { "fontSize": 24, "color": "#94a3b8" },
+          "animation": { "type": "fade-in", "delay": 12 }
+        },
+        {
+          "id": "cta-1",
+          "type": "button",
+          "content": "Start Creating Free",
+          "iconName": "zap",
+          "layout": { "align": "center" },
+          "style": { "fontSize": 20, "fontWeight": 700, "gradient": ["#6366f1", "#a855f7", "#ec4899"], "borderRadius": 16, "boxShadow": "0 10px 30px rgba(99, 102, 241, 0.5)" },
+          "animation": { "type": "bounce-in", "delay": 18 }
+        }
+      ]
+    }
+  ]
+}
+
+ELEMENT TYPES SUPPORTED:
+- 'heading': Large impact typography, supports 'gradient' colors array, 'fontSize' (40-80), 'fontWeight' (700-900).
+- 'subtitle' / 'text': Clean descriptive body copy, 'fontSize' (18-28).
+- 'badge': Pill badge with optional 'iconName' (e.g. 'flame', 'sparkles', 'zap', 'shield', 'award').
+- 'card': Glassmorphic floating container.
+- 'button': High-converting CTA button with gradient backgrounds and glow shadow.
+- 'counter': Animated number counting up from 0 to target value with optional 'prefix' (e.g. '$', '+') and 'suffix' (e.g. 'K', '%', ' OFF').
+- 'icon': Standalone glowing vector icon.
+
+ANIMATIONS SUPPORTED:
+- 'spring-in', 'bounce-in', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom-in', 'float', 'pulse', 'glow-pulse', 'typewriter', 'rotate-continuous'.
+
+ALWAYS output a rich, modern, aesthetic color scheme and clean typography. Return valid JSON only.`;
 
   const { width = 1920, height = 1080, fps = 30, durationSeconds = 5 } = options || {};
   const durationInFrames = fps * durationSeconds;
 
   const contextParts: string[] = [];
-  contextParts.push(`Canvas: ${width}x${height}, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s).`);
-  if (options?.currentCode?.trim()) contextParts.push(`Existing code:\n\`\`\`jsx\n${options.currentCode}\n\`\`\``);
+  contextParts.push(`Canvas: ${width}x${height}, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s duration).`);
+  if (options?.currentCode?.trim()) contextParts.push(`Existing motion schema/code:\n\`\`\`json\n${options.currentCode}\n\`\`\``);
   if (options?.history?.length) {
     const h = options.history.slice(-6);
     contextParts.push(`History:\n${h.map(m => `${m.role}: ${m.content}`).join('\n')}`);
@@ -7493,28 +7565,58 @@ RULES: Use @remotion packages appropriately. The animation should be smooth, pro
   contextParts.push(`Request: "${userPrompt}"`);
   const fullContents = contextParts.join('\n\n');
 
-  const responseSchema = { type: Type.OBJECT, properties: { title: { type: Type.STRING }, summary: { type: Type.STRING }, code: { type: Type.STRING } }, required: ["title", "summary", "code"] };
+  const responseSchema = { 
+    type: Type.OBJECT, 
+    properties: { 
+      title: { type: Type.STRING }, 
+      summary: { type: Type.STRING }, 
+      code: { type: Type.STRING } 
+    }, 
+    required: ["title", "summary", "code"] 
+  };
 
   let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.9 }, model });
+    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.8 }, model });
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-2.5-pro', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
+      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-2.5-pro', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.8 }, 2);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
+      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.8 }, 1);
       responseText = res.text || "{}";
     }
   }
 
   const parsed = JSON.parse(extractJSON(responseText));
+  let finalCode = "";
+  
   if (typeof parsed.code === 'string') {
-    parsed.code = parsed.code.replace(/^```(jsx|javascript|js|tsx)?\s*/i, '').replace(/```\s*$/i, '').trim();
-    if (!/MotionComposition/.test(parsed.code)) throw new Error('AI response did not include a MotionComposition export.');
-  } else throw new Error('AI response missing code field.');
-  return { title: parsed.title || 'Untitled Motion', summary: parsed.summary || '', code: parsed.code as string };
+    finalCode = parsed.code.replace(/^```(json|jsx|javascript|js|tsx)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  } else if (typeof parsed.code === 'object') {
+    finalCode = JSON.stringify(parsed.code, null, 2);
+  } else if (parsed.scenes) {
+    finalCode = JSON.stringify(parsed, null, 2);
+  } else {
+    throw new Error('AI response missing code or project schema field.');
+  }
+
+  // Format valid JSON if possible
+  try {
+    const parsedObj = JSON.parse(finalCode);
+    if (!parsedObj.durationInFrames) parsedObj.durationInFrames = durationInFrames;
+    if (!parsedObj.fps) parsedObj.fps = fps;
+    finalCode = JSON.stringify(parsedObj, null, 2);
+  } catch (_) {
+    // If raw JSX string was returned by fallback, keep it
+  }
+
+  return { 
+    title: parsed.title || 'Untitled Motion', 
+    summary: parsed.summary || 'Generated modern Motion schema', 
+    code: finalCode 
+  };
 }
 
 /* ===== uploadVideoToGemini ===== */
