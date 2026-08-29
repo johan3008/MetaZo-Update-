@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -6,7 +5,8 @@ import {
   Sun, Moon, HelpCircle, X, Zap, Clock, Info, FileCode, Film, ImageIcon, Sparkles,
   AlertCircle, Copy, Check, RefreshCcw, Download, Trash2, ArrowRight, CheckCircle2,
   Heart, Menu, ChevronLeft, ChevronRight, Search, AlertTriangle, Settings, Loader2,
-  Plus, Key, Lock, MessageCircle, Monitor, Palette, Gift, Tag, ExternalLink
+  Plus, Key, Lock, MessageCircle, Monitor, Palette, Gift, Tag, ExternalLink,
+  Video, UploadCloud
 } from 'lucide-react';
 import { ToolType, GenerationMode, FileItem, ProgressInfo, toolToPath } from './types';
 import { Sidebar } from './src/components/Sidebar';
@@ -29,6 +29,7 @@ import { MuteVideoView } from './src/components/MuteVideoView';
 import { MotionGenView } from './src/components/MotionGenView';
 import { AntiSpamView } from './src/components/AntiSpamView';
 import { ReviewsView } from './src/components/ReviewsView';
+import { FtpUploaderView } from './src/components/FtpUploaderView';
 import { AutoReviewPromptModal } from './src/components/AutoReviewPromptModal';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { FAQAccordion } from './src/components/FAQAccordion';
@@ -1336,6 +1337,7 @@ const App: React.FC = () => {
   const [subDaysLeft, setSubDaysLeft] = useState<number | null>(null);
   const [showActivationModal, setShowActivationModal] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [comingSoonFeature, setComingSoonFeature] = useState<'motion_gen' | 'ftp_uploader' | null>(null);
 
   // Promo Window States
   const [showPromoWindow, setShowPromoWindow] = useState(false);
@@ -1672,8 +1674,10 @@ const App: React.FC = () => {
   }, [getDailyCount, refreshDailyCounts, user, isMzLicensed]);
 
   useEffect(() => {
+    // Purge any legacy offline guest session
+    localStorage.removeItem('mz_offline_user');
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+      setUser(firebaseUser || null);
       setIsCheckingAuth(false);
     });
     return () => unsubscribe();
@@ -1703,14 +1707,33 @@ const App: React.FC = () => {
       try {
         const q1 = query(keysRef, where('activatedBy', '==', email), where('activated', '==', true));
         const qSnap1 = await getDocs(q1);
-        if (!qSnap1.empty) {
-          return qSnap1.docs[0].id;
+        for (const docSnap of qSnap1.docs) {
+          const kData = docSnap.data();
+          if (kData.duration === '30days' && kData.activatedAt) {
+            const actTime = new Date(kData.activatedAt).getTime();
+            const elapsedDays = (Date.now() - actTime) / (1000 * 60 * 60 * 24);
+            if (elapsedDays >= 30) {
+              // Key expired, deactivate in database
+              updateDoc(doc(db, 'keys', docSnap.id), { activated: false, activatedBy: '', activatedAt: '' }).catch(() => {});
+              continue;
+            }
+          }
+          return docSnap.id;
         }
         if (email.toLowerCase() !== email) {
           const q2 = query(keysRef, where('activatedBy', '==', email.toLowerCase()), where('activated', '==', true));
           const qSnap2 = await getDocs(q2);
-          if (!qSnap2.empty) {
-            return qSnap2.docs[0].id;
+          for (const docSnap of qSnap2.docs) {
+            const kData = docSnap.data();
+            if (kData.duration === '30days' && kData.activatedAt) {
+              const actTime = new Date(kData.activatedAt).getTime();
+              const elapsedDays = (Date.now() - actTime) / (1000 * 60 * 60 * 24);
+              if (elapsedDays >= 30) {
+                updateDoc(doc(db, 'keys', docSnap.id), { activated: false, activatedBy: '', activatedAt: '' }).catch(() => {});
+                continue;
+              }
+            }
+            return docSnap.id;
           }
         }
       } catch (err) {
@@ -1766,35 +1789,40 @@ const App: React.FC = () => {
               // Defer: validator will set setHasSyncedProfile(true) when validation completes
             }
           } else {
-            // Attempt to restore from keys collection if both cloud and local are empty
-            findActiveKeyForEmail(user.email || '').then((foundKey) => {
-              if (foundKey) {
-                setMzLicenseKey((prev) => {
-                  
-                  return foundKey;
-                });
-                setIsCheckingLicense(true);
-                localStorage.setItem('mz_license_key', foundKey);
-                localStorage.removeItem('mz_cancelled_subscription');
-                setDoc(userDocRef, {
-                  licenseKey: foundKey,
-                  cancelledSubscription: false,
-                  updatedAt: new Date().toISOString()
-                }, { merge: true })
-                .then(() => {
-                  // Defer: validator will set setHasSyncedProfile(true)
-                })
-                .catch(e => {
-                  console.info('db_op', e);
-                });
-              } else {
-                setMzLicenseKey((prev) => {
-                  
-                  return '';
-                });
-                setHasSyncedProfile(true);
-              }
-            });
+            // Attempt to restore from keys collection if both cloud and local are empty and not cancelled
+            if (data.cancelledSubscription || localStorage.getItem('mz_cancelled_subscription') === 'true') {
+              setMzLicenseKey('');
+              setHasSyncedProfile(true);
+            } else {
+              findActiveKeyForEmail(user.email || '').then((foundKey) => {
+                if (foundKey) {
+                  setMzLicenseKey((prev) => {
+                    
+                    return foundKey;
+                  });
+                  setIsCheckingLicense(true);
+                  localStorage.setItem('mz_license_key', foundKey);
+                  localStorage.removeItem('mz_cancelled_subscription');
+                  setDoc(userDocRef, {
+                    licenseKey: foundKey,
+                    cancelledSubscription: false,
+                    updatedAt: new Date().toISOString()
+                  }, { merge: true })
+                  .then(() => {
+                    // Defer: validator will set setHasSyncedProfile(true)
+                  })
+                  .catch(e => {
+                    console.info('db_op', e);
+                  });
+                } else {
+                  setMzLicenseKey((prev) => {
+                    
+                    return '';
+                  });
+                  setHasSyncedProfile(true);
+                }
+              });
+            }
           }
         }
 
@@ -2028,7 +2056,12 @@ const App: React.FC = () => {
   // Automatically check trial status on mount or when licensing changes
   useEffect(() => {
     if (!isMzLicensed && trialDaysLeft <= 0) {
-      setShowActivationModal(true);
+      const todayStr = getTodayDateString();
+      const lastModalDate = localStorage.getItem('mz_last_expired_modal_date');
+      if (lastModalDate !== todayStr) {
+        localStorage.setItem('mz_last_expired_modal_date', todayStr);
+        setShowActivationModal(true);
+      }
     }
   }, [isMzLicensed, trialDaysLeft]);
 
@@ -2092,6 +2125,14 @@ const App: React.FC = () => {
   // Login promo modal removed per user request
 
   const handleSetActiveTool = (tool: ToolType) => {
+    if (tool === ToolType.MOTION_GEN) {
+      setComingSoonFeature('motion_gen');
+      return;
+    }
+    if (tool === ToolType.FTP_UPLOADER) {
+      setComingSoonFeature('ftp_uploader');
+      return;
+    }
     setActiveTool(tool);
     const path = toolToPath[tool] || '/Dashboard';
     const isIframe = typeof window !== 'undefined' && window.self !== window.top;
@@ -2206,10 +2247,11 @@ const App: React.FC = () => {
       localStorage.setItem('mz_device_id', devId);
     }
 
-    const clearLicenseKey = (msg?: string) => {
+    const clearLicenseKey = (msg?: string, expiredKey?: string) => {
       setIsMzLicensed(false);
       setSubDaysLeft(null);
       localStorage.removeItem('mz_license_key');
+      localStorage.setItem('mz_cancelled_subscription', 'true');
       setMzLicenseKey((prev) => {
                   
                   return '';
@@ -2221,12 +2263,17 @@ const App: React.FC = () => {
         localStorage.removeItem(`mz_daily_gen_${type}_TRIAL_${dateStr}`);
       });
 
+      if (expiredKey) {
+        updateDoc(doc(db, 'keys', expiredKey), { activated: false, activatedBy: '', activatedAt: '' }).catch(() => {});
+      }
+
       if (user) {
         const userRef = doc(db, 'users', user.uid);
         
         // Remove free trial counts from db
         const updates: any = {
           licenseKey: '',
+          cancelledSubscription: true,
           updatedAt: new Date().toISOString()
         };
         Object.values(ToolType).forEach(type => {
@@ -2237,7 +2284,17 @@ const App: React.FC = () => {
       }
       setIsCheckingLicense(false);
       setHasSyncedProfile(true);
-      if (msg) alert(msg);
+      
+      // Rate-limit expiration notice to only 1 time per day (1 hari 1 kali)
+      if (msg) {
+        const todayStr = getTodayDateString();
+        const lastAlertDate = localStorage.getItem('mz_last_expiry_notice_date');
+        if (lastAlertDate !== todayStr) {
+          localStorage.setItem('mz_last_expiry_notice_date', todayStr);
+          setShowActivationModal(true);
+          alert(msg);
+        }
+      }
       
       refreshDailyCounts();
     };
@@ -2304,7 +2361,7 @@ const App: React.FC = () => {
               const remainingDays = 30 - elapsedDays;
 
               if (remainingDays <= 0) {
-                clearLicenseKey('Masa berlangganan 30 Hari Anda telah habis! Sistem secara otomatis mematikan lisensi terdaftar dan mengembalikan Anda ke masa trial.');
+                clearLicenseKey('Masa berlangganan 30 Hari Anda telah habis! Sistem secara otomatis mematikan lisensi terdaftar dan mengembalikan Anda ke masa trial.', k);
                 return;
               }
               setSubDaysLeft(Math.max(0, remainingDays));
@@ -4711,6 +4768,7 @@ const App: React.FC = () => {
         appName={mzAppName}
         unreadChatCount={unreadChatCount}
         onShowAbout={() => setShowAboutModal(true)}
+        onComingSoon={(feature) => setComingSoonFeature(feature)}
       />
 
       {/* Main Content Area Container */}
@@ -4741,8 +4799,10 @@ const App: React.FC = () => {
                 await updateDoc(userRef, { lastSeen: 0 }).catch(()=>console.info("onSignOut update error"));
               }
               await signOut(auth);
+              localStorage.removeItem('mz_offline_user');
               localStorage.removeItem('mz_license_key');
               localStorage.removeItem('mz_trial_start');
+              setUser(null);
               setMzLicenseKey('');
               setIsMzLicensed(false);
               setHasSyncedProfile(false);
@@ -4871,14 +4931,28 @@ const App: React.FC = () => {
               setShowActivationModal={setShowActivationModal}
             />
           ) : activeTool === ToolType.MOTION_GEN ? (
-            <MotionGenView 
-              isLicensed={isMzLicensed}
-              dailyGenCount={dailyGenCounts[ToolType.MOTION_GEN] || 0}
-              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.MOTION_GEN, amount)}
-              setShowLimitModal={setShowLimitModal}
-              setShowActivationModal={setShowActivationModal}
-              aiOptions={commonAiOptions}
-            />
+            <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center animate-in fade-in zoom-in-95 duration-200">
+              <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-2xl shadow-indigo-500/20 mb-6 relative">
+                <Video size={44} className="animate-pulse" />
+                <div className="absolute -bottom-2 -right-2 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow">
+                  Soon
+                </div>
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">
+                {uiLanguage === 'id' ? 'Fitur MotionGen Sedang Dikembangkan' : 'MotionGen Feature Coming Soon'}
+              </h2>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400 max-w-md mb-6 leading-relaxed">
+                {uiLanguage === 'id' 
+                  ? 'Fitur MotionGen AI saat ini sedang dalam tahap pengembangan dan optimasi server rendering. Fitur ini akan segera aktif pada pembaruan mendatang.'
+                  : 'The AI MotionGen feature is currently under active development. It will be available in the upcoming update.'}
+              </p>
+              <button
+                onClick={() => handleSetActiveTool(ToolType.DASHBOARD)}
+                className="px-6 py-3 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-550 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer"
+              >
+                {uiLanguage === 'id' ? 'Kembali ke Dashboard' : 'Back to Dashboard'}
+              </button>
+            </div>
           ) : activeTool === ToolType.ANTI_SPAM ? (
             <AntiSpamView 
               t={t}
@@ -4896,6 +4970,29 @@ const App: React.FC = () => {
               appName={mzAppName}
               onOpenDashboard={() => handleSetActiveTool(ToolType.DASHBOARD)}
             />
+          ) : activeTool === ToolType.FTP_UPLOADER ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center animate-in fade-in zoom-in-95 duration-200">
+              <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-2xl shadow-violet-500/20 mb-6 relative">
+                <UploadCloud size={44} className="animate-pulse" />
+                <div className="absolute -bottom-2 -right-2 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow">
+                  Soon
+                </div>
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">
+                {uiLanguage === 'id' ? 'Fitur Auto Upload Sedang Dioptimasi' : 'Auto Upload Feature Coming Soon'}
+              </h2>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400 max-w-md mb-6 leading-relaxed">
+                {uiLanguage === 'id' 
+                  ? 'Fitur FTP/SFTP Auto Upload multi-agency saat ini sedang dalam peningkatan protokol performa dan keamanan. Fitur ini akan segera aktif pada update berikutnya.'
+                  : 'The multi-agency FTP/SFTP Auto Upload feature is undergoing security and performance optimization. It will be enabled in the next update.'}
+              </p>
+              <button
+                onClick={() => handleSetActiveTool(ToolType.DASHBOARD)}
+                className="px-6 py-3 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-550 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer"
+              >
+                {uiLanguage === 'id' ? 'Kembali ke Dashboard' : 'Back to Dashboard'}
+              </button>
+            </div>
           ) : (
             <>
               {/* Welcome Intro Row */}
@@ -7055,6 +7152,92 @@ const App: React.FC = () => {
         </div>
       )}
       
+      {/* Coming Soon Feature Modal */}
+      {comingSoonFeature && (
+        <div 
+          className="fixed inset-0 z-[350] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200" 
+          onClick={() => setComingSoonFeature(null)}
+        >
+          <div 
+            className="bg-white dark:bg-[#111827] rounded-[2.5rem] p-7 md:p-9 max-w-md w-full shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col items-center text-center relative animate-in zoom-in-95 duration-200" 
+            onClick={e => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => setComingSoonFeature(null)} 
+              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-full transition-colors cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+            
+            {/* Feature Icon Header with Glow */}
+            <div className="relative mb-6">
+              <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-xl ${
+                comingSoonFeature === 'motion_gen' 
+                  ? 'bg-gradient-to-tr from-indigo-500 to-purple-600 text-white shadow-indigo-500/30' 
+                  : 'bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-violet-500/30'
+              }`}>
+                {comingSoonFeature === 'motion_gen' ? (
+                  <Video size={38} className="animate-pulse" />
+                ) : (
+                  <UploadCloud size={38} className="animate-pulse" />
+                )}
+              </div>
+              <div className="absolute -bottom-2.5 -right-2.5 px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow-md flex items-center gap-1">
+                <Sparkles size={10} className="text-slate-950" />
+                <span>Coming Soon</span>
+              </div>
+            </div>
+            
+            {/* Title & Badge */}
+            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">
+              {comingSoonFeature === 'motion_gen' ? (
+                uiLanguage === 'id' ? 'Fitur MotionGen' : 'MotionGen Feature'
+              ) : (
+                uiLanguage === 'id' ? 'Fitur Auto Upload' : 'Auto Upload Feature'
+              )}
+            </h3>
+            
+            <p className="text-xs font-extrabold text-[#7c3aed] dark:text-violet-400 mt-1 uppercase tracking-widest">
+              {comingSoonFeature === 'motion_gen' ? (
+                uiLanguage === 'id' ? '⚡ AI Motion & Video Generator' : '⚡ AI Motion & Video Generator'
+              ) : (
+                uiLanguage === 'id' ? '🚀 FTP / SFTP Multi-Stock Auto Uploader' : '🚀 FTP / SFTP Multi-Stock Auto Uploader'
+              )}
+            </p>
+            
+            {/* Detailed Explanation / Keterangan */}
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-4.5 rounded-2xl w-full my-5 border border-slate-200/80 dark:border-white/5 text-left">
+              <div className="flex items-center gap-2 mb-2 text-slate-700 dark:text-slate-200 font-extrabold text-xs uppercase tracking-wide">
+                <Clock size={14} className="text-indigo-500" />
+                <span>{uiLanguage === 'id' ? 'Status Pengembangan' : 'Development Status'}</span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                {comingSoonFeature === 'motion_gen' ? (
+                  uiLanguage === 'id' 
+                    ? 'Fitur MotionGen saat ini sedang dalam tahap pengembangan dan optimasi server rendering. Fitur ini dirancang untuk mengubah aset vektor & gambar Anda menjadi animasi video motion berkualitas tinggi secara otomatis. Nantikan peluncurannya pada pembaruan versi berikutnya!'
+                    : 'The MotionGen feature is currently under active development and rendering pipeline optimization. It is built to convert your vector and image assets into high quality video animations automatically. Stay tuned for the upcoming version release!'
+                ) : (
+                  uiLanguage === 'id'
+                    ? 'Fitur Auto Upload (FTP / SFTP) sedang dalam tahap peningkatan enkripsi keamanan dan optimasi queue server agar upload ribuan file metadata ke berbagai microstock (Adobe Stock, Freepik, Shutterstock, Vecteezy, dll) berlangsung super cepat, stabil, dan otomatis. Fitur ini akan hadir pada update berikutnya!'
+                    : 'The Auto Upload (FTP / SFTP) feature is undergoing security protocol enhancements and multi-thread queue server optimization to ensure reliable, lightning-fast batch uploads to all major stock agencies. It will be enabled in the next update!'
+                )}
+              </p>
+            </div>
+
+            {/* Action Button */}
+            <div className="w-full space-y-2">
+              <button
+                onClick={() => setComingSoonFeature(null)}
+                className="w-full py-3.5 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-550 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer"
+              >
+                <Check size={14} />
+                <span>{uiLanguage === 'id' ? 'Mengerti & Tutup' : 'Got It / Close'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Return to Start Countdown float message */}
       {returnToStartCountdown !== null && (
         <div className="fixed bottom-6 left-6 z-[9999] animate-in slide-in-from-bottom-5 duration-300">

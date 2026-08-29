@@ -28,6 +28,7 @@
     "@types/fluent-ffmpeg": "^2.1.28",
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.4.0",
+    "basic-ftp": "^6.2.1",
     "copy-to-clipboard": "^4.0.2",
     "exiftool-vendored": "^37.2.0",
     "express": "^5.2.1",
@@ -45,6 +46,8 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "remotion": "^4.0.487",
+    "sharp": "^0.35.4",
+    "ssh2-sftp-client": "^12.1.1",
     "utif": "^3.1.0"
   },
   "optionalDependencies": {

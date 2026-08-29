@@ -124,6 +124,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
   };
 
+
+
   const handleInstantGoogleLogin = async () => {
     setIsLoading(true);
     setErrorHeader('');
@@ -594,6 +596,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   )}
                   <span>{isLoading ? tc.btn_logging_in : tc.btn_login}</span>
                 </button>
+
+
 
                 {/* Shield credentials reassurance badge */}
                 <div className="flex items-center space-x-1.5 text-slate-400 dark:text-slate-500 pb-1">
