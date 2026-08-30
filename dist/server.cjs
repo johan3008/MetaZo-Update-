@@ -478,17 +478,12 @@ __export(server_exports, {
   app: () => app
 });
 module.exports = __toCommonJS(server_exports);
-var import_ffmpeg = require("@ffmpeg-installer/ffmpeg");
-var import_ffprobe = require("@ffprobe-installer/ffprobe");
-var import_fluent_ffmpeg = require("fluent-ffmpeg");
-var import_package = require("@ffmpeg-installer/linux-x64/package.json");
-var import_package2 = require("@ffprobe-installer/linux-x64/package.json");
 var import_express = __toESM(require("express"), 1);
 var import_genai2 = require("@google/genai");
 var import_multer = __toESM(require("multer"), 1);
 var import_child_process2 = require("child_process");
 var import_util2 = __toESM(require("util"), 1);
-var import_fs = __toESM(require("fs"), 1);
+var import_fs2 = __toESM(require("fs"), 1);
 var import_path = __toESM(require("path"), 1);
 var import_client_s3 = require("@aws-sdk/client-s3");
 var import_s3_request_presigner = require("@aws-sdk/s3-request-presigner");
@@ -2059,6 +2054,7 @@ var TRANSLATIONS = {
     sidebar_prompt_video: "Video Prompt",
     sidebar_image_check: "Image Check",
     sidebar_calendar_gen: "Calendar Gen",
+    sidebar_ftp_uploader: "FTP Stock Uploader",
     sidebar_chat: "Account Chat",
     sidebar_activation_premium: "ACTIVATE PREMIUM",
     sidebar_pro_active: "PRO ACTIVE",
@@ -2498,6 +2494,7 @@ var TRANSLATIONS = {
     sidebar_prompt_video: "Prompt Video",
     sidebar_image_check: "Kurator Adobe Cek",
     sidebar_calendar_gen: "Gen Kalender",
+    sidebar_ftp_uploader: "FTP Stock Uploader",
     sidebar_chat: "Chat Akun",
     sidebar_activation_premium: "AKTIVASI PREMIUM",
     sidebar_pro_active: "PRO AKTIF",
@@ -8492,14 +8489,87 @@ async function generateMotionCode(userPrompt, options) {
   const store = apiKeyStorage.getStore();
   const provider = store && store.provider || "gemini";
   const model = options?.model;
-  const systemInstruction = `You are an expert Remotion developer. Your task is to generate a self-contained React component that composes a stunning, modern motion graphics animation. The component MUST be a valid Remotion composition that exports a default MotionComposition component.
-RULES: Use @remotion packages appropriately. The animation should be smooth, professional, and visually impressive. Use React hooks as needed. Use useCurrentFrame() and useVideoConfig() from remotion. Export as: export default MotionComposition. Keep the code self-contained and production-ready. Return ONLY valid, runnable JSX/TSX code.`;
+  const systemInstruction = `You are a world-class Motion Graphics and Creative Director specializing in Structured Remotion Compositions.
+Your task is to generate a structured, type-safe Motion Graphic JSON Project that is interpreted deterministically by a built-in Remotion Dynamic Renderer.
+
+CRITICAL SCHEMA RULES:
+Generate a valid JSON object matching this schema:
+{
+  "title": "Short Title",
+  "description": "Short description of the motion design",
+  "fps": 30,
+  "durationInFrames": 150,
+  "background": {
+    "type": "gradient" | "mesh" | "radial" | "particles" | "grid" | "solid",
+    "colors": ["#0f172a", "#1e1b4b", "#312e81"],
+    "angle": 135,
+    "animated": true
+  },
+  "scenes": [
+    {
+      "id": "scene-1",
+      "from": 0,
+      "durationInFrames": 150,
+      "transition": "fade",
+      "elements": [
+        {
+          "id": "badge-1",
+          "type": "badge",
+          "content": "NEW RELEASE 2026",
+          "iconName": "sparkles" | "zap" | "flame" | "star" | "shield" | "award" | "trending-up" | "play" | "gift" | "dollar" | "shopping-cart" | "cpu",
+          "layout": { "align": "center" },
+          "style": { "color": "#818cf8", "backgroundColor": "rgba(99, 102, 241, 0.15)", "borderRadius": 999, "fontSize": 16, "fontWeight": 700 },
+          "animation": { "type": "spring-in", "delay": 0, "damping": 12 }
+        },
+        {
+          "id": "heading-1",
+          "type": "heading",
+          "content": "Next-Gen Motion AI",
+          "layout": { "align": "center" },
+          "style": { "fontSize": 64, "fontWeight": 800, "gradient": ["#ffffff", "#cbd5e1", "#818cf8"] },
+          "animation": { "type": "slide-up", "delay": 5, "damping": 12 }
+        },
+        {
+          "id": "subtitle-1",
+          "type": "subtitle",
+          "content": "Create cinematic animations with pure microsecond precision.",
+          "layout": { "align": "center", "maxWidth": "700px" },
+          "style": { "fontSize": 24, "color": "#94a3b8" },
+          "animation": { "type": "fade-in", "delay": 12 }
+        },
+        {
+          "id": "cta-1",
+          "type": "button",
+          "content": "Start Creating Free",
+          "iconName": "zap",
+          "layout": { "align": "center" },
+          "style": { "fontSize": 20, "fontWeight": 700, "gradient": ["#6366f1", "#a855f7", "#ec4899"], "borderRadius": 16, "boxShadow": "0 10px 30px rgba(99, 102, 241, 0.5)" },
+          "animation": { "type": "bounce-in", "delay": 18 }
+        }
+      ]
+    }
+  ]
+}
+
+ELEMENT TYPES SUPPORTED:
+- 'heading': Large impact typography, supports 'gradient' colors array, 'fontSize' (40-80), 'fontWeight' (700-900).
+- 'subtitle' / 'text': Clean descriptive body copy, 'fontSize' (18-28).
+- 'badge': Pill badge with optional 'iconName' (e.g. 'flame', 'sparkles', 'zap', 'shield', 'award').
+- 'card': Glassmorphic floating container.
+- 'button': High-converting CTA button with gradient backgrounds and glow shadow.
+- 'counter': Animated number counting up from 0 to target value with optional 'prefix' (e.g. '$', '+') and 'suffix' (e.g. 'K', '%', ' OFF').
+- 'icon': Standalone glowing vector icon.
+
+ANIMATIONS SUPPORTED:
+- 'spring-in', 'bounce-in', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom-in', 'float', 'pulse', 'glow-pulse', 'typewriter', 'rotate-continuous'.
+
+ALWAYS output a rich, modern, aesthetic color scheme and clean typography. Return valid JSON only.`;
   const { width = 1920, height = 1080, fps = 30, durationSeconds = 5 } = options || {};
   const durationInFrames = fps * durationSeconds;
   const contextParts = [];
-  contextParts.push(`Canvas: ${width}x${height}, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s).`);
-  if (options?.currentCode?.trim()) contextParts.push(`Existing code:
-\`\`\`jsx
+  contextParts.push(`Canvas: ${width}x${height}, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s duration).`);
+  if (options?.currentCode?.trim()) contextParts.push(`Existing motion schema/code:
+\`\`\`json
 ${options.currentCode}
 \`\`\``);
   if (options?.history?.length) {
@@ -8509,37 +8579,62 @@ ${h.map((m) => `${m.role}: ${m.content}`).join("\n")}`);
   }
   contextParts.push(`Request: "${userPrompt}"`);
   const fullContents = contextParts.join("\n\n");
-  const responseSchema = { type: import_genai.Type.OBJECT, properties: { title: { type: import_genai.Type.STRING }, summary: { type: import_genai.Type.STRING }, code: { type: import_genai.Type.STRING } }, required: ["title", "summary", "code"] };
+  const responseSchema = {
+    type: import_genai.Type.OBJECT,
+    properties: {
+      title: { type: import_genai.Type.STRING },
+      summary: { type: import_genai.Type.STRING },
+      code: { type: import_genai.Type.STRING }
+    },
+    required: ["title", "summary", "code"]
+  };
   let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.9 }, model });
+    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.8 }, model });
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model?.startsWith("gemini") ? model : "gemini-2.5-pro", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
+      const res = await callGeminiWithRetry(model?.startsWith("gemini") ? model : "gemini-2.5-pro", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.8 }, 2);
       responseText = res.text || "{}";
     } catch (err) {
-      const res = await callGeminiWithRetry("gemini-2.5-flash", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
+      const res = await callGeminiWithRetry("gemini-2.5-flash", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.8 }, 1);
       responseText = res.text || "{}";
     }
   }
   const parsed = JSON.parse(extractJSON(responseText));
+  let finalCode = "";
   if (typeof parsed.code === "string") {
-    parsed.code = parsed.code.replace(/^```(jsx|javascript|js|tsx)?\s*/i, "").replace(/```\s*$/i, "").trim();
-    if (!/MotionComposition/.test(parsed.code)) throw new Error("AI response did not include a MotionComposition export.");
-  } else throw new Error("AI response missing code field.");
-  return { title: parsed.title || "Untitled Motion", summary: parsed.summary || "", code: parsed.code };
+    finalCode = parsed.code.replace(/^```(json|jsx|javascript|js|tsx)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  } else if (typeof parsed.code === "object") {
+    finalCode = JSON.stringify(parsed.code, null, 2);
+  } else if (parsed.scenes) {
+    finalCode = JSON.stringify(parsed, null, 2);
+  } else {
+    throw new Error("AI response missing code or project schema field.");
+  }
+  try {
+    const parsedObj = JSON.parse(finalCode);
+    if (!parsedObj.durationInFrames) parsedObj.durationInFrames = durationInFrames;
+    if (!parsedObj.fps) parsedObj.fps = fps;
+    finalCode = JSON.stringify(parsedObj, null, 2);
+  } catch (_) {
+  }
+  return {
+    title: parsed.title || "Untitled Motion",
+    summary: parsed.summary || "Generated modern Motion schema",
+    code: finalCode
+  };
 }
 async function uploadVideoToGemini(videoPath, mimeType) {
-  const fs3 = await import("fs");
-  if (!videoPath || !fs3.existsSync(videoPath)) return null;
-  const stats = fs3.statSync(videoPath);
+  const fs4 = await import("fs");
+  if (!videoPath || !fs4.existsSync(videoPath)) return null;
+  const stats = fs4.statSync(videoPath);
   const MAX_BYTES = 25 * 1024 * 1024;
   if (stats.size > MAX_BYTES) {
     console.log(`[uploadVideoToGemini] File too large (${(stats.size / 1024 / 1024).toFixed(1)}MB > 25MB), skipping upload. Using frames only.`);
     return null;
   }
-  const fileBuffer = fs3.readFileSync(videoPath);
+  const fileBuffer = fs4.readFileSync(videoPath);
   const base64Data = fileBuffer.toString("base64");
   return { fileUri: `data:${mimeType};base64,${base64Data}`, mimeType };
 }
@@ -8695,25 +8790,144 @@ async function generateAutoSubject(styleCategory, model, currentSubject, promptM
   }
 }
 
+// server/ftpService.ts
+var ftp = __toESM(require("basic-ftp"), 1);
+var import_ssh2_sftp_client = __toESM(require("ssh2-sftp-client"), 1);
+var import_fs = __toESM(require("fs"), 1);
+async function testFtpConnection(options) {
+  const protocol = options.protocol || "ftp";
+  const port = options.port || (protocol === "sftp" ? 22 : 21);
+  if (protocol === "sftp") {
+    const sftp = new import_ssh2_sftp_client.default();
+    try {
+      await sftp.connect({
+        host: options.host,
+        port,
+        username: options.username,
+        password: options.password,
+        readyTimeout: 15e3,
+        retries: 1
+      });
+      const dirToList = options.remoteDir && options.remoteDir !== "/" ? options.remoteDir : "/";
+      try {
+        await sftp.list(dirToList);
+      } catch (listErr) {
+      }
+      await sftp.end();
+      return { success: true, message: `Successfully connected to SFTP ${options.host}:${port}` };
+    } catch (err) {
+      try {
+        await sftp.end();
+      } catch (e) {
+      }
+      return { success: false, error: err.message || "SFTP connection failed" };
+    }
+  } else {
+    const client = new ftp.Client(15e3);
+    client.ftp.verbose = false;
+    try {
+      await client.access({
+        host: options.host,
+        port,
+        user: options.username,
+        password: options.password,
+        secure: protocol === "ftps" ? "implicit" : false,
+        secureOptions: { rejectUnauthorized: false }
+      });
+      try {
+        await client.list();
+      } catch (listErr) {
+      }
+      client.close();
+      return { success: true, message: `Successfully connected to FTP ${options.host}:${port}` };
+    } catch (err) {
+      client.close();
+      return { success: false, error: err.message || "FTP connection failed" };
+    }
+  }
+}
+async function uploadToFtp(options) {
+  const protocol = options.protocol || "ftp";
+  const port = options.port || (protocol === "sftp" ? 22 : 21);
+  const remoteFolder = options.remoteDir && options.remoteDir !== "/" ? options.remoteDir : "";
+  const remotePath = remoteFolder ? `${remoteFolder.replace(/\/$/, "")}/${options.filename}` : options.filename;
+  if (!import_fs.default.existsSync(options.localFilePath)) {
+    return { success: false, error: "Local file does not exist." };
+  }
+  if (protocol === "sftp") {
+    const sftp = new import_ssh2_sftp_client.default();
+    try {
+      await sftp.connect({
+        host: options.host,
+        port,
+        username: options.username,
+        password: options.password,
+        readyTimeout: 3e4,
+        retries: 2
+      });
+      await sftp.fastPut(options.localFilePath, remotePath);
+      await sftp.end();
+      return { success: true, message: `Uploaded ${options.filename} to SFTP server` };
+    } catch (err) {
+      try {
+        await sftp.end();
+      } catch (e) {
+      }
+      return { success: false, error: err.message || "SFTP upload failed" };
+    }
+  } else {
+    const client = new ftp.Client(3e4);
+    client.ftp.verbose = false;
+    try {
+      await client.access({
+        host: options.host,
+        port,
+        user: options.username,
+        password: options.password,
+        secure: protocol === "ftps" ? "implicit" : false,
+        secureOptions: { rejectUnauthorized: false }
+      });
+      await client.uploadFrom(options.localFilePath, remotePath);
+      client.close();
+      return { success: true, message: `Uploaded ${options.filename} to FTP server` };
+    } catch (err) {
+      client.close();
+      return { success: false, error: err.message || "FTP upload failed" };
+    }
+  }
+}
+
 // server.ts
 var import_module = require("module");
 var import_meta = {};
 var _require = typeof require !== "undefined" ? require : (0, import_module.createRequire)(import_meta.url);
 try {
-  _require.resolve("@ffmpeg-installer/linux-x64/ffmpeg");
-  _require.resolve("@ffprobe-installer/linux-x64/ffprobe");
+  _require.resolve("@ffmpeg-installer/linux-x64/package.json");
+  _require.resolve("@ffprobe-installer/linux-x64/package.json");
 } catch (e) {
 }
 var ffmpeg;
-if (true) {
+try {
+  const ffmpegLib = _require("fluent-ffmpeg");
+  ffmpeg = typeof ffmpegLib === "function" ? ffmpegLib : ffmpegLib.default || ffmpegLib;
   try {
-    const ffmpegLib = _require("fluent-ffmpeg");
-    ffmpeg = typeof ffmpegLib === "function" ? ffmpegLib : ffmpegLib.default || ffmpegLib;
-    ffmpeg.setFfmpegPath(_require("@ffmpeg-installer/ffmpeg").path);
-    ffmpeg.setFfprobePath(_require("@ffprobe-installer/ffprobe").path);
-  } catch (e) {
-    console.warn("ffmpeg not available locally", e);
+    const ffmpegInstaller = _require("@ffmpeg-installer/ffmpeg");
+    if (ffmpegInstaller && ffmpegInstaller.path) {
+      ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+    }
+  } catch (err) {
+    console.warn("ffmpeg installer path not available:", err);
   }
+  try {
+    const ffprobeInstaller = _require("@ffprobe-installer/ffprobe");
+    if (ffprobeInstaller && ffprobeInstaller.path) {
+      ffmpeg.setFfprobePath(ffprobeInstaller.path);
+    }
+  } catch (err) {
+    console.warn("ffprobe installer path not available:", err);
+  }
+} catch (e) {
+  console.warn("ffmpeg not available locally:", e);
 }
 var AsyncQueue = class {
   constructor() {
@@ -8785,23 +8999,23 @@ var spawnAsync = (command, args, options) => {
 };
 var uploadDir = process.env.VERCEL ? "/tmp" : import_path.default.join(process.cwd(), "uploads");
 try {
-  if (!import_fs.default.existsSync(uploadDir)) {
-    import_fs.default.mkdirSync(uploadDir, { recursive: true });
+  if (!import_fs2.default.existsSync(uploadDir)) {
+    import_fs2.default.mkdirSync(uploadDir, { recursive: true });
   }
 } catch (err) {
   console.warn("[WARNING] Cannot create uploadDir on Vercel, using default fallback /tmp:", err);
 }
 var localGsPath = import_path.default.join(process.cwd(), "bin", "gs");
-if (import_fs.default.existsSync(localGsPath)) {
+if (import_fs2.default.existsSync(localGsPath)) {
   try {
-    import_fs.default.chmodSync(localGsPath, "0755");
+    import_fs2.default.chmodSync(localGsPath, "0755");
   } catch (err) {
     if (err && err.code !== "EROFS") {
       console.warn("[PERMISSIONS] Failed to set executable permission on gs binary:", err.message || err);
     }
   }
 }
-var gsExecutable = import_fs.default.existsSync(localGsPath) ? localGsPath : "gs";
+var gsExecutable = import_fs2.default.existsSync(localGsPath) ? localGsPath : "gs";
 var upload = (0, import_multer.default)({
   dest: uploadDir,
   limits: { fileSize: 500 * 1024 * 1024 }
@@ -8867,9 +9081,9 @@ var throttleMiddleware = (req, res, next) => {
     isCleanedUp = true;
     activeEpsConversions--;
     console.log(`[THROTTLE CLEANUP] 1 request finished. Active EPS conversions now: ${activeEpsConversions}`);
-    if (req.file && import_fs.default.existsSync(req.file.path)) {
+    if (req.file && import_fs2.default.existsSync(req.file.path)) {
       try {
-        import_fs.default.unlinkSync(req.file.path);
+        import_fs2.default.unlinkSync(req.file.path);
         console.log(`[MULTER FAILSAFE] Deleted stray upload: ${req.file.path}`);
       } catch (e) {
       }
@@ -8888,10 +9102,10 @@ var throttleMiddleware = (req, res, next) => {
 };
 async function startServer() {
   try {
-    if (import_fs.default.existsSync(uploadDir)) {
-      const files = await import_fs.default.promises.readdir(uploadDir);
+    if (import_fs2.default.existsSync(uploadDir)) {
+      const files = await import_fs2.default.promises.readdir(uploadDir);
       for (const file of files) {
-        await import_fs.default.promises.unlink(import_path.default.join(uploadDir, file)).catch(() => {
+        await import_fs2.default.promises.unlink(import_path.default.join(uploadDir, file)).catch(() => {
         });
       }
       console.log(`Cleared ${files.length} files from uploads directory.`);
@@ -9014,10 +9228,10 @@ app.get(["/auth/callback", "/auth/callback/"], (req, res) => {
 });
 app.get("/api/debug-uploads", (req, res) => {
   try {
-    const files = import_fs.default.readdirSync(uploadDir);
+    const files = import_fs2.default.readdirSync(uploadDir);
     let totalSize = 0;
     const fileStats = files.map((file) => {
-      const stat = import_fs.default.statSync(import_path.default.join(uploadDir, file));
+      const stat = import_fs2.default.statSync(import_path.default.join(uploadDir, file));
       totalSize += stat.size;
       return { name: file, size: stat.size };
     });
@@ -9029,8 +9243,8 @@ app.get("/api/debug-uploads", (req, res) => {
 var KEYS_FILE = import_path.default.join(process.cwd(), "keys.json");
 var readKeys = () => {
   try {
-    if (import_fs.default.existsSync(KEYS_FILE)) {
-      const data = import_fs.default.readFileSync(KEYS_FILE, "utf-8");
+    if (import_fs2.default.existsSync(KEYS_FILE)) {
+      const data = import_fs2.default.readFileSync(KEYS_FILE, "utf-8");
       return JSON.parse(data);
     }
   } catch (e) {
@@ -9040,7 +9254,7 @@ var readKeys = () => {
 };
 var writeKeys = (keys) => {
   try {
-    import_fs.default.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2), "utf-8");
+    import_fs2.default.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2), "utf-8");
   } catch (e) {
     console.error("Failed to write keys.json:", e);
   }
@@ -9100,6 +9314,26 @@ app.post("/api/keys/reset", (req, res) => {
     keyObj.activated = false;
     keyObj.activatedBy = "";
     keyObj.activatedAt = "";
+    writeKeys(currentKeys);
+    res.json({ success: true, allKeys: currentKeys });
+  } else {
+    res.status(404).json({ error: "Key not found" });
+  }
+});
+app.post("/api/keys/renew", (req, res) => {
+  const { key, duration } = req.body;
+  if (!key) {
+    return res.status(400).json({ error: "Key is required" });
+  }
+  const currentKeys = readKeys();
+  const keyObj = currentKeys.find((k) => k.key === key);
+  if (keyObj) {
+    keyObj.duration = duration || "30days";
+    if (duration === "30days") {
+      keyObj.activatedAt = (/* @__PURE__ */ new Date()).toISOString();
+    } else {
+      keyObj.activatedAt = "";
+    }
     writeKeys(currentKeys);
     res.json({ success: true, allKeys: currentKeys });
   } else {
@@ -9923,7 +10157,7 @@ app.post("/api/extract-exif", upload.single("file"), async (req, res) => {
       tempFilePath = filePath;
       cleanupFn = () => {
         try {
-          if (import_fs.default.existsSync(filePath)) import_fs.default.unlinkSync(filePath);
+          if (import_fs2.default.existsSync(filePath)) import_fs2.default.unlinkSync(filePath);
         } catch (e) {
         }
       };
@@ -10020,7 +10254,7 @@ async function embedMetadataForAdobe(filePath, metadata) {
   const isVideo = [".mp4", ".mov", ".webm", ".m4v", ".avi"].includes(ext);
   if (ext === ".svg") {
     try {
-      let svgContent = import_fs.default.readFileSync(filePath, "utf8");
+      let svgContent = import_fs2.default.readFileSync(filePath, "utf8");
       const escapeXml = (unsafe) => unsafe.replace(/[<>&'"]/g, (c) => {
         switch (c) {
           case "<":
@@ -10047,7 +10281,7 @@ async function embedMetadataForAdobe(filePath, metadata) {
   ${titleTag}
   ${descTag}
   ${metadataTag}`);
-        import_fs.default.writeFileSync(filePath, svgContent, "utf8");
+        import_fs2.default.writeFileSync(filePath, svgContent, "utf8");
       }
     } catch (svgErr) {
       console.warn("[embedMetadataForAdobe] SVG injection note:", svgErr);
@@ -10055,14 +10289,14 @@ async function embedMetadataForAdobe(filePath, metadata) {
   }
   if (ext === ".eps" || ext === ".ai") {
     try {
-      let epsContent = import_fs.default.readFileSync(filePath, "binary");
+      let epsContent = import_fs2.default.readFileSync(filePath, "binary");
       if (epsContent.includes("%!PS-Adobe")) {
         epsContent = epsContent.replace(/^%%Title:.*$/gm, "").replace(/^%%Keywords:.*$/gm, "");
         const dscTags = `%%Title: ${title.replace(/[\r\n]/g, " ")}
 %%Keywords: ${keywordString.replace(/[\r\n]/g, " ")}`;
         epsContent = epsContent.replace(/(%!PS-Adobe[^\r\n]*)/, `$1
 ${dscTags}`);
-        import_fs.default.writeFileSync(filePath, epsContent, "binary");
+        import_fs2.default.writeFileSync(filePath, epsContent, "binary");
       }
     } catch (epsErr) {
       console.warn("[embedMetadataForAdobe] EPS injection note:", epsErr);
@@ -10223,21 +10457,21 @@ app.post("/api/embed-metadata", upload.single("file"), async (req, res) => {
       const ext = import_path.default.extname(originalName) || ".jpg";
       const fixedPath = `${localInputPath}${ext}`;
       try {
-        import_fs.default.renameSync(localInputPath, fixedPath);
+        import_fs2.default.renameSync(localInputPath, fixedPath);
         localInputPath = fixedPath;
       } catch (_) {
       }
       cleanupLocal = () => {
         try {
-          if (import_fs.default.existsSync(localInputPath)) import_fs.default.unlinkSync(localInputPath);
+          if (import_fs2.default.existsSync(localInputPath)) import_fs2.default.unlinkSync(localInputPath);
         } catch (e) {
         }
         try {
-          if (import_fs.default.existsSync(localOutputPath)) import_fs.default.unlinkSync(localOutputPath);
+          if (import_fs2.default.existsSync(localOutputPath)) import_fs2.default.unlinkSync(localOutputPath);
         } catch (e) {
         }
         try {
-          if (import_fs.default.existsSync(`${localInputPath}_original`)) import_fs.default.unlinkSync(`${localInputPath}_original`);
+          if (import_fs2.default.existsSync(`${localInputPath}_original`)) import_fs2.default.unlinkSync(`${localInputPath}_original`);
         } catch (e) {
         }
       };
@@ -10402,7 +10636,7 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
       model = req.body.model;
       cleanupFn = () => {
         try {
-          if (import_fs.default.existsSync(videoPath)) import_fs.default.unlinkSync(videoPath);
+          if (import_fs2.default.existsSync(videoPath)) import_fs2.default.unlinkSync(videoPath);
         } catch (e) {
         }
       };
@@ -10420,7 +10654,7 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
         const s3Client2 = getS3Client();
         const response = await s3Client2.send(command);
         const tempFilePath = import_path.default.join(uploadDir, `dl_${Date.now()}_${import_path.default.basename(pathKey)}`);
-        const writeStream = import_fs.default.createWriteStream(tempFilePath);
+        const writeStream = import_fs2.default.createWriteStream(tempFilePath);
         const { finished } = await import("stream/promises");
         if (response.Body) {
           response.Body.pipe(writeStream);
@@ -10431,7 +10665,7 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
         videoPath = tempFilePath;
         cleanupFn = () => {
           try {
-            if (import_fs.default.existsSync(tempFilePath)) import_fs.default.unlinkSync(tempFilePath);
+            if (import_fs2.default.existsSync(tempFilePath)) import_fs2.default.unlinkSync(tempFilePath);
           } catch (e) {
           }
         };
@@ -10449,7 +10683,7 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
         try {
           console.log("Server check-video-quality: Extracting keyframes with FFmpeg...");
           const outDir = import_path.default.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
-          import_fs.default.mkdirSync(outDir, { recursive: true });
+          import_fs2.default.mkdirSync(outDir, { recursive: true });
           frames = await new Promise((resolve, reject) => {
             let isDone = false;
             const timeout = setTimeout(() => {
@@ -10485,8 +10719,8 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
                   framePaths.push(fPathFull);
                   framePaths.push(fPathZoom);
                 }
-                const frameData = framePaths.map((fPath) => import_fs.default.readFileSync(fPath, "base64"));
-                import_fs.default.rmSync(outDir, { recursive: true, force: true });
+                const frameData = framePaths.map((fPath) => import_fs2.default.readFileSync(fPath, "base64"));
+                import_fs2.default.rmSync(outDir, { recursive: true, force: true });
                 if (!isDone) {
                   isDone = true;
                   clearTimeout(timeout);
@@ -10587,12 +10821,12 @@ app.post("/api/mute-video", upload.single("video"), async (req, res) => {
       extension = import_path.default.extname(originalName) || ".mp4";
       inputPath = `${originalPath}${extension}`;
       contentType = req.file.mimetype || "video/mp4";
-      import_fs.default.renameSync(originalPath, inputPath);
+      import_fs2.default.renameSync(originalPath, inputPath);
       baseName = import_path.default.basename(originalName, extension);
       cleanupFn = () => {
         try {
-          if (import_fs.default.existsSync(originalPath)) import_fs.default.unlinkSync(originalPath);
-          if (import_fs.default.existsSync(inputPath)) import_fs.default.unlinkSync(inputPath);
+          if (import_fs2.default.existsSync(originalPath)) import_fs2.default.unlinkSync(originalPath);
+          if (import_fs2.default.existsSync(inputPath)) import_fs2.default.unlinkSync(inputPath);
         } catch (e) {
         }
       };
@@ -10640,9 +10874,9 @@ app.post("/api/mute-video", upload.single("video"), async (req, res) => {
           const fileRes = await fetch(inputPath);
           if (!fileRes.ok) throw new Error(`Failed to fetch remote file: ${fileRes.statusText}`);
           const arrayBuffer = await fileRes.arrayBuffer();
-          import_fs.default.writeFileSync(outputPath, Buffer.from(arrayBuffer));
+          import_fs2.default.writeFileSync(outputPath, Buffer.from(arrayBuffer));
         } else {
-          import_fs.default.copyFileSync(inputPath, outputPath);
+          import_fs2.default.copyFileSync(inputPath, outputPath);
         }
       } catch (copyErr) {
         console.error("[MUTE VIDEO FALLBACK] Failed to copy file:", copyErr);
@@ -10654,8 +10888,8 @@ app.post("/api/mute-video", upload.single("video"), async (req, res) => {
       console.log("[MUTE VIDEO] S3/R2 is configured. Uploading muted video to R2...");
       const uploadResult = await uploadFileToStorage(outputPath, `muted_${baseName}${extension}`, contentType);
       try {
-        if (import_fs.default.existsSync(outputPath)) {
-          import_fs.default.unlinkSync(outputPath);
+        if (import_fs2.default.existsSync(outputPath)) {
+          import_fs2.default.unlinkSync(outputPath);
         }
       } catch (e) {
         console.warn("Failed to clean up output video:", e);
@@ -10664,8 +10898,8 @@ app.post("/api/mute-video", upload.single("video"), async (req, res) => {
     }
     res.download(outputPath, `muted_${baseName}${extension}`, (err) => {
       try {
-        if (import_fs.default.existsSync(outputPath)) {
-          import_fs.default.unlinkSync(outputPath);
+        if (import_fs2.default.existsSync(outputPath)) {
+          import_fs2.default.unlinkSync(outputPath);
         }
       } catch (e) {
         console.warn("Failed to clean up output video:", e);
@@ -10677,9 +10911,9 @@ app.post("/api/mute-video", upload.single("video"), async (req, res) => {
   } catch (error) {
     console.error("[MUTE VIDEO API ERROR]", error);
     cleanupFn();
-    if (outputPath && import_fs.default.existsSync(outputPath)) {
+    if (outputPath && import_fs2.default.existsSync(outputPath)) {
       try {
-        import_fs.default.unlinkSync(outputPath);
+        import_fs2.default.unlinkSync(outputPath);
       } catch (e) {
       }
     }
@@ -10735,15 +10969,15 @@ async function analyzeImageWithFFmpeg(tempFilePath) {
   try {
     ffmpegPath = _require("@ffmpeg-installer/ffmpeg").path;
     ffprobePath = _require("@ffprobe-installer/ffprobe").path;
-    if (import_fs.default.existsSync(ffmpegPath)) {
+    if (import_fs2.default.existsSync(ffmpegPath)) {
       try {
-        import_fs.default.chmodSync(ffmpegPath, "0755");
+        import_fs2.default.chmodSync(ffmpegPath, "0755");
       } catch (e) {
       }
     }
-    if (import_fs.default.existsSync(ffprobePath)) {
+    if (import_fs2.default.existsSync(ffprobePath)) {
       try {
-        import_fs.default.chmodSync(ffprobePath, "0755");
+        import_fs2.default.chmodSync(ffprobePath, "0755");
       } catch (e) {
       }
     }
@@ -10776,7 +11010,7 @@ async function analyzeImageWithFFmpeg(tempFilePath) {
     console.warn("FFprobe analysis failed:", probeErr);
   }
   try {
-    const stats = import_fs.default.statSync(tempFilePath);
+    const stats = import_fs2.default.statSync(tempFilePath);
     fileSizeKb = Math.round(stats.size / 1024);
   } catch (e) {
   }
@@ -10793,8 +11027,8 @@ async function analyzeImageWithFFmpeg(tempFilePath) {
   let fileValidation = "Valid (Passed FFmpeg Integrity Check)";
   try {
     await execPromise2(`"${ffmpegPath}" -i "${tempFilePath}" -vf "scale=256:256" -f rawvideo -pix_fmt gray "${rawOutputPath}" -y`);
-    if (import_fs.default.existsSync(rawOutputPath)) {
-      const bytes = import_fs.default.readFileSync(rawOutputPath);
+    if (import_fs2.default.existsSync(rawOutputPath)) {
+      const bytes = import_fs2.default.readFileSync(rawOutputPath);
       let sum = 0;
       for (let i = 0; i < bytes.length; i++) {
         sum += bytes[i];
@@ -10863,9 +11097,9 @@ async function analyzeImageWithFFmpeg(tempFilePath) {
     console.warn("FFmpeg statistics filter failed:", ffmpegErr);
     fileValidation = "Validation Warning (FFmpeg decoding limit reached)";
   } finally {
-    if (import_fs.default.existsSync(rawOutputPath)) {
+    if (import_fs2.default.existsSync(rawOutputPath)) {
       try {
-        import_fs.default.unlinkSync(rawOutputPath);
+        import_fs2.default.unlinkSync(rawOutputPath);
       } catch (e) {
       }
     }
@@ -10891,15 +11125,15 @@ async function analyzeVideoWithFFmpeg(videoFilePath) {
   try {
     ffmpegPath = _require("@ffmpeg-installer/ffmpeg").path;
     ffprobePath = _require("@ffprobe-installer/ffprobe").path;
-    if (import_fs.default.existsSync(ffmpegPath)) {
+    if (import_fs2.default.existsSync(ffmpegPath)) {
       try {
-        import_fs.default.chmodSync(ffmpegPath, "0755");
+        import_fs2.default.chmodSync(ffmpegPath, "0755");
       } catch (e) {
       }
     }
-    if (import_fs.default.existsSync(ffprobePath)) {
+    if (import_fs2.default.existsSync(ffprobePath)) {
       try {
-        import_fs.default.chmodSync(ffprobePath, "0755");
+        import_fs2.default.chmodSync(ffprobePath, "0755");
       } catch (e) {
       }
     }
@@ -10964,8 +11198,8 @@ async function analyzeVideoWithFFmpeg(videoFilePath) {
     const outFramePath = import_path.default.join(tempDir, `vframe_${i}_${Date.now()}.jpg`);
     try {
       await execPromise2(`"${ffmpegPath}" -ss ${ts.toFixed(2)} -i "${videoFilePath}" -vframes 1 -q:v 3 -vf "scale=960:-1" "${outFramePath}" -y`);
-      if (import_fs.default.existsSync(outFramePath)) {
-        const buf = import_fs.default.readFileSync(outFramePath);
+      if (import_fs2.default.existsSync(outFramePath)) {
+        const buf = import_fs2.default.readFileSync(outFramePath);
         keyframesBase64.push(`data:image/jpeg;base64,${buf.toString("base64")}`);
         frameAnalysis.push({
           frameIndex: i,
@@ -10976,7 +11210,7 @@ async function analyzeVideoWithFFmpeg(videoFilePath) {
           averageLuminance: 128,
           averageColor: { r: 128, g: 128, b: 128 }
         });
-        import_fs.default.unlinkSync(outFramePath);
+        import_fs2.default.unlinkSync(outFramePath);
       }
     } catch (fErr) {
       console.warn(`[Video Audit] Failed to extract frame ${i}:`, fErr);
@@ -11171,7 +11405,7 @@ app.post("/api/check-image-quality", upload.single("image"), async (req, res) =>
       tempFilePath = req.file.path;
       cleanupFn = () => {
       };
-      const fileBuffer = import_fs.default.readFileSync(tempFilePath);
+      const fileBuffer = import_fs2.default.readFileSync(tempFilePath);
       const mime = req.file.mimetype || fileType || "application/octet-stream";
       imageBase64 = `data:${mime};base64,${fileBuffer.toString("base64")}`;
       console.log(`Server check-image-quality: Using ORIGINAL multipart file: ${req.file.originalname} (${req.file.size} bytes)`);
@@ -11181,19 +11415,19 @@ app.post("/api/check-image-quality", upload.single("image"), async (req, res) =>
       const downloadResult = await downloadFileFromStorage(fileUrl, pathKey, ext);
       tempFilePath = downloadResult.localPath;
       cleanupFn = downloadResult.cleanup;
-      const fileBuffer = import_fs.default.readFileSync(tempFilePath);
+      const fileBuffer = import_fs2.default.readFileSync(tempFilePath);
       const mime = fileType || (ext === ".png" ? "image/png" : "image/jpeg");
       imageBase64 = `data:${mime};base64,${fileBuffer.toString("base64")}`;
     } else if (image) {
       const tempDir = uploadDir;
-      if (!import_fs.default.existsSync(tempDir)) {
-        import_fs.default.mkdirSync(tempDir, { recursive: true });
+      if (!import_fs2.default.existsSync(tempDir)) {
+        import_fs2.default.mkdirSync(tempDir, { recursive: true });
       }
       const fileExt = fileType?.includes("png") ? "png" : fileType?.includes("gif") ? "gif" : "jpg";
       const tempFileName = `img_${import_crypto.default.randomBytes(8).toString("hex")}.${fileExt}`;
       tempFilePath = import_path.default.join(tempDir, tempFileName);
       const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
-      import_fs.default.writeFileSync(tempFilePath, Buffer.from(base64Data, "base64"));
+      import_fs2.default.writeFileSync(tempFilePath, Buffer.from(base64Data, "base64"));
       imageBase64 = image;
     } else {
       console.warn("Server check-image-quality error: Missing image data or fileUrl");
@@ -11220,7 +11454,7 @@ app.post("/api/check-image-quality", upload.single("image"), async (req, res) =>
           sharpness: { value: 50, status: "Normal (Estimated by AI)" },
           noise: { value: 5, status: "Low Noise / Clean" },
           file_validation: "Valid (Passed Structure Integrity Check)",
-          file_size_kb: import_fs.default.existsSync(tempFilePath) ? Math.round(import_fs.default.statSync(tempFilePath).size / 1024) : 1024
+          file_size_kb: import_fs2.default.existsSync(tempFilePath) ? Math.round(import_fs2.default.statSync(tempFilePath).size / 1024) : 1024
         };
       }
     }
@@ -11242,8 +11476,8 @@ app.post("/api/check-image-quality", upload.single("image"), async (req, res) =>
       await Promise.all(cropFilters.map(
         (filter, i) => execPromise2(`"${ffmpegPath}" -y -i "${tempFilePath}" -vf "${filter}" -frames:v 1 -c:v png -pix_fmt rgba "${cropFilePaths[i]}"`)
       ));
-      const availableCrops = cropFilePaths.filter((p) => import_fs.default.existsSync(p)).map((p) => {
-        const buf = import_fs.default.readFileSync(p);
+      const availableCrops = cropFilePaths.filter((p) => import_fs2.default.existsSync(p)).map((p) => {
+        const buf = import_fs2.default.readFileSync(p);
         return `data:image/png;base64,${buf.toString("base64")}`;
       });
       if (availableCrops.length > 0) {
@@ -11302,18 +11536,18 @@ app.post("/api/check-image-quality", upload.single("image"), async (req, res) =>
     res.status(500).json({ error: e.message || "Error checking image quality" });
   } finally {
     cleanupFn();
-    if (tempFilePath && import_fs.default.existsSync(tempFilePath)) {
+    if (tempFilePath && import_fs2.default.existsSync(tempFilePath)) {
       try {
-        import_fs.default.unlinkSync(tempFilePath);
+        import_fs2.default.unlinkSync(tempFilePath);
       } catch (err) {
       }
     }
     if (tempFilePath) {
       for (const suffix of ["tl", "tr", "bl", "br", "macro_center", "macro_bottom"]) {
         const qPath = `${tempFilePath}_${suffix}.png`;
-        if (import_fs.default.existsSync(qPath)) {
+        if (import_fs2.default.existsSync(qPath)) {
           try {
-            import_fs.default.unlinkSync(qPath);
+            import_fs2.default.unlinkSync(qPath);
           } catch (err) {
           }
         }
@@ -11381,9 +11615,9 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
     res.status(500).json({ error: err.message || "Error checking video quality" });
   } finally {
     cleanupFn();
-    if (tempFilePath && import_fs.default.existsSync(tempFilePath)) {
+    if (tempFilePath && import_fs2.default.existsSync(tempFilePath)) {
       try {
-        import_fs.default.unlinkSync(tempFilePath);
+        import_fs2.default.unlinkSync(tempFilePath);
       } catch (_) {
       }
     }
@@ -11643,9 +11877,9 @@ function getS3Client() {
 var s3Client = { send: (cmd) => getS3Client().send(cmd) };
 async function downloadFileFromStorage(fileUrl, pathKey, extension = ".mp4") {
   const uniqueTmpDir = import_path.default.join(uploadDir, `tmp_${Date.now()}_${Math.random().toString(36).substring(7)}`);
-  import_fs.default.mkdirSync(uniqueTmpDir, { recursive: true });
+  import_fs2.default.mkdirSync(uniqueTmpDir, { recursive: true });
   const localPath = import_path.default.join(uniqueTmpDir, `downloaded${extension}`);
-  const fileStream = import_fs.default.createWriteStream(localPath);
+  const fileStream = import_fs2.default.createWriteStream(localPath);
   const { finished } = await import("stream/promises");
   if (pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
     console.log(`[Storage] Downloading from S3 with key ${pathKey}...`);
@@ -11662,12 +11896,12 @@ async function downloadFileFromStorage(fileUrl, pathKey, extension = ".mp4") {
     const response = await fetch(fileUrl);
     if (!response.ok) throw new Error(`Failed to fetch file from URL: ${response.statusText}`);
     const arrayBuffer = await response.arrayBuffer();
-    import_fs.default.writeFileSync(localPath, Buffer.from(arrayBuffer));
+    import_fs2.default.writeFileSync(localPath, Buffer.from(arrayBuffer));
   }
   const cleanup = () => {
     try {
-      if (import_fs.default.existsSync(localPath)) import_fs.default.unlinkSync(localPath);
-      if (import_fs.default.existsSync(uniqueTmpDir)) import_fs.default.rmSync(uniqueTmpDir, { recursive: true, force: true });
+      if (import_fs2.default.existsSync(localPath)) import_fs2.default.unlinkSync(localPath);
+      if (import_fs2.default.existsSync(uniqueTmpDir)) import_fs2.default.rmSync(uniqueTmpDir, { recursive: true, force: true });
     } catch (e) {
       console.warn("[Storage] Cleanup error:", e);
     }
@@ -11679,7 +11913,7 @@ var uploadFileToStorage = async (localPath, originalName, contentType) => {
   const sanitizedName = originalName.replace(/[^a-zA-Z0-9._-]/g, "_");
   const uniqueFilename = `video-muted/${Date.now()}_${Math.random().toString(36).substring(7)}_${sanitizedName}`;
   const bucketName = process.env.S3_BUCKET_NAME;
-  const fileBuffer = import_fs.default.readFileSync(localPath);
+  const fileBuffer = import_fs2.default.readFileSync(localPath);
   const command = new import_client_s3.PutObjectCommand({
     Bucket: bucketName,
     Key: uniqueFilename,
@@ -11779,9 +12013,9 @@ app.post("/api/convert-eps", throttleMiddleware, async (req, res) => {
   const inputPath = import_path.default.join(uniqueTmpDir, "downloaded.eps");
   const outputPath = `${inputPath}.jpg`;
   try {
-    import_fs.default.mkdirSync(uniqueTmpDir, { recursive: true });
+    import_fs2.default.mkdirSync(uniqueTmpDir, { recursive: true });
     const { finished } = await import("stream/promises");
-    const fileStream = import_fs.default.createWriteStream(inputPath);
+    const fileStream = import_fs2.default.createWriteStream(inputPath);
     if (pathKey && process.env.S3_BUCKET_NAME) {
       console.log(`Downloading EPS from S3 with key ${pathKey}...`);
       const command = new import_client_s3.GetObjectCommand({
@@ -11849,7 +12083,7 @@ app.post("/api/convert-eps", throttleMiddleware, async (req, res) => {
       await spawnAsync(gsExecutable, gsArgs, spawnOptions);
     });
     try {
-      const stats = await import_fs.default.promises.stat(outputPath);
+      const stats = await import_fs2.default.promises.stat(outputPath);
       if (stats.size === 0) {
         throw new Error("Generated JPEG is 0 bytes");
       }
@@ -11865,9 +12099,9 @@ app.post("/api/convert-eps", throttleMiddleware, async (req, res) => {
         } else resolve();
         setTimeout(async () => {
           try {
-            if (import_fs.default.existsSync(inputPath)) import_fs.default.unlinkSync(inputPath);
-            if (import_fs.default.existsSync(outputPath)) import_fs.default.unlinkSync(outputPath);
-            if (import_fs.default.existsSync(uniqueTmpDir)) import_fs.default.rmSync(uniqueTmpDir, { recursive: true, force: true });
+            if (import_fs2.default.existsSync(inputPath)) import_fs2.default.unlinkSync(inputPath);
+            if (import_fs2.default.existsSync(outputPath)) import_fs2.default.unlinkSync(outputPath);
+            if (import_fs2.default.existsSync(uniqueTmpDir)) import_fs2.default.rmSync(uniqueTmpDir, { recursive: true, force: true });
           } catch (e) {
           }
           if (pathKey && isR2Configured()) {
@@ -11886,9 +12120,9 @@ app.post("/api/convert-eps", throttleMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error("API /convert-eps-url error:", error);
-    if (import_fs.default.existsSync(uniqueTmpDir)) {
+    if (import_fs2.default.existsSync(uniqueTmpDir)) {
       try {
-        import_fs.default.rmSync(uniqueTmpDir, { recursive: true, force: true });
+        import_fs2.default.rmSync(uniqueTmpDir, { recursive: true, force: true });
       } catch (e) {
       }
     }
@@ -11908,7 +12142,7 @@ app.post("/api/convert-eps-multipart", throttleMiddleware, upload.single("file")
   const outputPath = `${inputPath}.jpg`;
   const uniqueTmpDir = import_path.default.join(uploadDir, `tmp_${Date.now()}_${Math.random().toString(36).substring(7)}`);
   try {
-    import_fs.default.mkdirSync(uniqueTmpDir, { recursive: true });
+    import_fs2.default.mkdirSync(uniqueTmpDir, { recursive: true });
     console.log(`Starting conversion for ${req.file.originalname} (${req.file.size} bytes)`);
     const gsMemoryLimits = `-dMaxBitmap=5000000 -dBufferSpace=2000000 -dBandHeight=50 -dBandBufferSpace=2000000 -dNumRenderingThreads=1 -dVMReclaim=1 -c "<< /MaxPatternBitmap 500000 >> setuserparams" -f`;
     const gsArgs = [
@@ -11948,7 +12182,7 @@ app.post("/api/convert-eps-multipart", throttleMiddleware, upload.single("file")
     });
     console.log(`Conversion successful for ${req.file.originalname}`);
     try {
-      const stats = await import_fs.default.promises.stat(outputPath);
+      const stats = await import_fs2.default.promises.stat(outputPath);
       if (stats.size === 0) {
         throw new Error("Generated JPEG is 0 bytes (Ghostscript failed silently)");
       }
@@ -11968,11 +12202,11 @@ app.post("/api/convert-eps-multipart", throttleMiddleware, upload.single("file")
         }
         setTimeout(() => {
           try {
-            if (import_fs.default.existsSync(inputPath)) {
-              import_fs.default.unlinkSync(inputPath);
+            if (import_fs2.default.existsSync(inputPath)) {
+              import_fs2.default.unlinkSync(inputPath);
             }
-            if (import_fs.default.existsSync(outputPath)) {
-              import_fs.default.unlinkSync(outputPath);
+            if (import_fs2.default.existsSync(outputPath)) {
+              import_fs2.default.unlinkSync(outputPath);
             }
             console.log(`[CLEANUP MANDOR] Sisa sampah file ${req.file?.originalname} dimusnahkan. Kapasitas diturunkan!`);
           } catch (cleanupErr) {
@@ -11987,14 +12221,14 @@ app.post("/api/convert-eps-multipart", throttleMiddleware, upload.single("file")
       res.status(500).json({ error: "Failed to convert EPS file", details: error.message });
     }
   } finally {
-    if (import_fs.default.existsSync(uniqueTmpDir)) {
-      import_fs.default.rmSync(uniqueTmpDir, { recursive: true, force: true });
+    if (import_fs2.default.existsSync(uniqueTmpDir)) {
+      import_fs2.default.rmSync(uniqueTmpDir, { recursive: true, force: true });
     }
-    if (import_fs.default.existsSync(inputPath)) {
-      import_fs.default.rmSync(inputPath, { force: true });
+    if (import_fs2.default.existsSync(inputPath)) {
+      import_fs2.default.rmSync(inputPath, { force: true });
     }
-    if (import_fs.default.existsSync(outputPath)) {
-      import_fs.default.rmSync(outputPath, { force: true });
+    if (import_fs2.default.existsSync(outputPath)) {
+      import_fs2.default.rmSync(outputPath, { force: true });
     }
     setTimeout(() => {
       if (global.gc) {
@@ -12002,6 +12236,79 @@ app.post("/api/convert-eps-multipart", throttleMiddleware, upload.single("file")
         console.log("[MANDOR GC] Memori dibersihkan untuk worker selanjutnya.");
       }
     }, 100);
+  }
+});
+app.post("/api/ftp/test-connection", async (req, res) => {
+  try {
+    const { host, port, protocol, username, password, remoteDir } = req.body;
+    if (!host || !username || !password) {
+      return res.status(400).json({ success: false, error: "Host, Username, and Password are required." });
+    }
+    const result = await testFtpConnection({
+      host: String(host).trim(),
+      port: port ? Number(port) : void 0,
+      protocol: protocol || "ftp",
+      username: String(username).trim(),
+      password: String(password),
+      remoteDir: remoteDir || "/"
+    });
+    if (result.success) {
+      return res.json({ success: true, message: result.message });
+    } else {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    console.error("[FTP TEST ERROR]", err);
+    return res.status(500).json({ success: false, error: err.message || "Internal FTP testing error" });
+  }
+});
+app.post("/api/ftp/upload", upload.single("file"), async (req, res) => {
+  const uploadedFile = req.file;
+  try {
+    if (!uploadedFile) {
+      return res.status(400).json({ success: false, error: "No file uploaded." });
+    }
+    const accountConfigRaw = req.body.accountConfig;
+    if (!accountConfigRaw) {
+      if (import_fs2.default.existsSync(uploadedFile.path)) import_fs2.default.unlinkSync(uploadedFile.path);
+      return res.status(400).json({ success: false, error: "Target FTP account configuration is missing." });
+    }
+    const accountConfig = typeof accountConfigRaw === "string" ? JSON.parse(accountConfigRaw) : accountConfigRaw;
+    const { host, port, protocol, username, password, remoteDir } = accountConfig;
+    if (!host || !username || !password) {
+      if (import_fs2.default.existsSync(uploadedFile.path)) import_fs2.default.unlinkSync(uploadedFile.path);
+      return res.status(400).json({ success: false, error: "Target account host, username, or password missing." });
+    }
+    const uploadResult = await uploadToFtp({
+      host: String(host).trim(),
+      port: port ? Number(port) : void 0,
+      protocol: protocol || "ftp",
+      username: String(username).trim(),
+      password: String(password),
+      remoteDir: remoteDir || "/",
+      localFilePath: uploadedFile.path,
+      filename: uploadedFile.originalname || import_path.default.basename(uploadedFile.path)
+    });
+    if (import_fs2.default.existsSync(uploadedFile.path)) {
+      try {
+        import_fs2.default.unlinkSync(uploadedFile.path);
+      } catch (e) {
+      }
+    }
+    if (uploadResult.success) {
+      return res.json({ success: true, message: uploadResult.message, filename: uploadedFile.originalname });
+    } else {
+      return res.status(400).json({ success: false, error: uploadResult.error });
+    }
+  } catch (err) {
+    console.error("[FTP UPLOAD ERROR]", err);
+    if (uploadedFile && import_fs2.default.existsSync(uploadedFile.path)) {
+      try {
+        import_fs2.default.unlinkSync(uploadedFile.path);
+      } catch (e) {
+      }
+    }
+    return res.status(500).json({ success: false, error: err.message || "Internal FTP upload error" });
   }
 });
 async function startHosting() {
