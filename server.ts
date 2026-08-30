@@ -1,8 +1,3 @@
-import "@ffmpeg-installer/ffmpeg";
-import "@ffprobe-installer/ffprobe";
-import "fluent-ffmpeg";
-
-
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
 import multer from 'multer';
@@ -21,21 +16,35 @@ import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata,
 import { testFtpConnection, uploadToFtp } from './server/ftpService.ts';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
-try { _require.resolve('@ffmpeg-installer/linux-x64/ffmpeg'); _require.resolve('@ffprobe-installer/linux-x64/ffprobe'); } catch(e) {}
-// Vercel NFT hack to include binaries
 
-
+// NFT tracing hints
+try {
+    _require.resolve('@ffmpeg-installer/linux-x64/package.json');
+    _require.resolve('@ffprobe-installer/linux-x64/package.json');
+} catch(e) {}
 
 let ffmpeg: any;
-if (true) { // always try to load ffmpeg
+try {
+    const ffmpegLib = _require('fluent-ffmpeg');
+    ffmpeg = typeof ffmpegLib === 'function' ? ffmpegLib : (ffmpegLib.default || ffmpegLib);
     try {
-        const ffmpegLib = _require('fluent-ffmpeg');
-ffmpeg = typeof ffmpegLib === 'function' ? ffmpegLib : (ffmpegLib.default || ffmpegLib);
-ffmpeg.setFfmpegPath(_require('@ffmpeg-installer/ffmpeg').path);
-ffmpeg.setFfprobePath(_require('@ffprobe-installer/ffprobe').path);
-    } catch (e) {
-        console.warn('ffmpeg not available locally', e);
+        const ffmpegInstaller = _require('@ffmpeg-installer/ffmpeg');
+        if (ffmpegInstaller && ffmpegInstaller.path) {
+            ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+        }
+    } catch (err) {
+        console.warn('ffmpeg installer path not available:', err);
     }
+    try {
+        const ffprobeInstaller = _require('@ffprobe-installer/ffprobe');
+        if (ffprobeInstaller && ffprobeInstaller.path) {
+            ffmpeg.setFfprobePath(ffprobeInstaller.path);
+        }
+    } catch (err) {
+        console.warn('ffprobe installer path not available:', err);
+    }
+} catch (e) {
+    console.warn('ffmpeg not available locally:', e);
 }
 
 
