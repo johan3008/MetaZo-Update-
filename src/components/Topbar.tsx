@@ -236,8 +236,13 @@ export const Topbar: React.FC<TopbarProps> = ({
                     {user.email}
                   </p>
                   
-                  {/* License Info inside dropdown */}
-                  <div className="mt-2 flex">
+                  {/* License & Offline Info inside dropdown */}
+                  <div className="mt-2 flex items-center space-x-1.5 flex-wrap gap-1">
+                    {user?.email?.includes('local') || user?.uid?.startsWith('offline') ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8.5px] font-extrabold bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+                        ⚡ Mode Offline (Lokal)
+                      </span>
+                    ) : null}
                     {isLicensed ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8.5px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                         {t.topbar_pro_active}

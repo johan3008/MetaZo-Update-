@@ -267,7 +267,8 @@ const RenderMotionElement: React.FC<{
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const relFrame = Math.max(0, frame - sceneStartFrame);
+  // Inside <Sequence>, useCurrentFrame() is already local to the scene (starts at 0)
+  const relFrame = Math.max(0, frame);
   const anim = element.animation || { type: 'spring-in' };
   const delay = anim.delay ?? 0;
   const activeFrame = Math.max(0, relFrame - delay);

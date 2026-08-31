@@ -137,9 +137,22 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
             try {
                 const parsedProject = JSON.parse(trimmed) as MotionProject;
                 if (parsedProject && Array.isArray(parsedProject.scenes)) {
+                    // Dynamically sync project duration and fps with user configured parameters
+                    const syncedProject: MotionProject = {
+                        ...parsedProject,
+                        fps: fps || parsedProject.fps || 30,
+                        durationInFrames: durationInFrames || parsedProject.durationInFrames || 150,
+                        scenes: parsedProject.scenes.map(sc => ({
+                            ...sc,
+                            durationInFrames: (parsedProject.scenes.length === 1) 
+                                ? (durationInFrames || sc.durationInFrames || 150) 
+                                : sc.durationInFrames
+                        }))
+                    };
+
                     // Directly mount native Remotion Dynamic Renderer (zero Babel evaluation!)
                     setComponent(() => DynamicMotionRenderer);
-                    setActiveProps({ project: parsedProject });
+                    setActiveProps({ project: syncedProject });
                     setError(null);
                     if (onError) onError(null);
                     setRenderKey(prev => prev + 1);
@@ -184,23 +197,21 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
                 if (onError) onError(null);
                 setRenderKey(prev => prev + 1);
             } else {
-                const availableExports = Object.keys(finalExports).filter(k => k !== '__esModule');
+                const availableExports = Object.keys(finalExports).filter(k => k !== '__esModule').join(', ') || 'none';
                 console.warn('[LiveRemotionRunner] No valid component found in exports. Available:', availableExports);
-                const errMsg = availableExports.length > 0
-                        ? `Export ditemukan: "${availableExports.join('", "')}". Pastikan mengekspor fungsi komponen React.`
-                        : "Kode harus mengekspor komponen bernama 'MotionComposition' atau default export.";
+                const errMsg = `Komponen React tidak ditemukan dalam kode. Pastikan mengekspor komponen utama. (Export yang tersedia: ${availableExports})`;
                 setError(errMsg);
                 if (onError) onError(errMsg);
                 setComponent(null);
             }
         } catch (err: any) {
             console.error('[LiveRemotionRunner] Compilation Error:', err);
-            const errMsg = err.message || 'Terjadi kesalahan saat kompilasi JSX';
+            const errMsg = err.message || 'Gagal mengompilasi kode Remotion.';
             setError(errMsg);
             if (onError) onError(errMsg);
             setComponent(null);
         }
-    }, [code, compileAndEval, inputProps, onError]);
+    }, [code, fps, durationInFrames, compileAndEval, inputProps, onError]);
 
     if (error) {
         return (
@@ -221,8 +232,8 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
         );
     }
 
-    const effectiveFps = activeProps?.project?.fps || fps || 30;
-    const effectiveDuration = activeProps?.project?.durationInFrames || durationInFrames || 150;
+    const effectiveFps = fps || activeProps?.project?.fps || 30;
+    const effectiveDuration = durationInFrames || activeProps?.project?.durationInFrames || 150;
 
     return (
         <div className="w-full h-full relative">
@@ -247,36 +258,34 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
                 loop
             />
 
-            {/* Dedicated Pure Video Render Stage (Offscreen Behind App, Zero Player Controls, Pure Vector/Composition) */}
-            {renderFrame !== null && (
-                <div
-                    id="remotion-pure-render-stage"
-                    style={{
-                        position: 'fixed',
-                        left: '0px',
-                        top: '0px',
-                        width: `${width}px`,
-                        height: `${height}px`,
-                        overflow: 'hidden',
-                        backgroundColor: '#000000',
-                        zIndex: -999,
-                        pointerEvents: 'none',
-                        visibility: 'visible',
-                        opacity: 0.999
-                    }}
-                >
-                    <Thumbnail
-                        component={Component}
-                        compositionWidth={width}
-                        compositionHeight={height}
-                        frame={renderFrame}
-                        fps={fps}
-                        durationInFrames={durationInFrames}
-                        inputProps={activeProps}
-                        style={{ width: `${width}px`, height: `${height}px` }}
-                    />
-                </div>
-            )}
+            {/* Dedicated Pure Video Render Stage (Always available for zero-drift frame rendering) */}
+            <div
+                id="remotion-pure-render-stage"
+                style={{
+                    position: 'fixed',
+                    left: '0px',
+                    top: '0px',
+                    width: `${width}px`,
+                    height: `${height}px`,
+                    overflow: 'hidden',
+                    backgroundColor: '#000000',
+                    zIndex: -9999,
+                    pointerEvents: 'none',
+                    visibility: 'visible',
+                    opacity: 0.999
+                }}
+            >
+                <Thumbnail
+                    component={Component}
+                    compositionWidth={width}
+                    compositionHeight={height}
+                    frame={renderFrame ?? 0}
+                    fps={effectiveFps}
+                    durationInFrames={effectiveDuration}
+                    inputProps={activeProps}
+                    style={{ width: `${width}px`, height: `${height}px` }}
+                />
+            </div>
         </div>
     );
 }

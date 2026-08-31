@@ -82,6 +82,15 @@ function saveSandboxAccount(email: string, pass: string) {
 // --- AUTH API ADAPTERS ---
 export const auth = {
   get currentUser(): User | null {
+    // 1. Prioritize offline/local session if active
+    const offlineStr = localStorage.getItem('mz_offline_user');
+    if (offlineStr) {
+      try {
+        const u = JSON.parse(offlineStr);
+        if (u && u.uid) return u;
+      } catch (e) {}
+    }
+
     if (supabase) {
       // Return local cached user session or handle reactively
       const sessionStr = localStorage.getItem('supabase.auth.token');
@@ -272,13 +281,29 @@ export async function signInWithPopup(authInstance: any, provider: any): Promise
   }
 }
 
-export async function signOut(authInstance: any): Promise<void> {
+export function signInOffline(creatorName?: string): { user: User } {
+  const offlineUser: User = {
+    uid: 'offline_user_' + (localStorage.getItem('mz_device_id') || 'local_creator'),
+    email: 'offline.creator@metazo.local',
+    displayName: creatorName || 'Offline Creator',
+    emailVerified: true,
+    photoURL: null
+  };
+  localStorage.setItem('mz_offline_user', JSON.stringify(offlineUser));
+  saveSandboxUser(offlineUser);
+  authListeners.forEach(cb => cb(offlineUser));
+  return { user: offlineUser };
+}
+
+export async function signOut(authInstance?: any): Promise<void> {
+  localStorage.removeItem('mz_offline_user');
+  saveSandboxUser(null);
   if (supabase) {
-    await supabase.auth.signOut();
-  } else {
-    saveSandboxUser(null);
-    authListeners.forEach(cb => cb(null));
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {}
   }
+  authListeners.forEach(cb => cb(null));
 }
 
 // --- DATABASE COMPATIBILITY OBJECTS ---

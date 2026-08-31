@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, Key, Image as ImageIcon, Film, FileText, Layers, 
   ArrowRight, ShieldCheck, HelpCircle, Sun, Moon, Globe, Loader2, AlertCircle, Mail, Lock, X,
-  Calendar, VolumeX
+  Calendar, VolumeX, WifiOff, User as UserIcon
 } from 'lucide-react';
-import { signInWithPopup, GoogleAuthProvider, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, auth, runSandboxGoogleSignIn, signInWithTokens } from '@/src/supabase';
+import { signInWithPopup, GoogleAuthProvider, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, auth, runSandboxGoogleSignIn, signInWithTokens, signInOffline } from '@/src/supabase';
 import LogoImage from '@/src/assets/images/mz_pro_logo_1780923659277.png';
 import { AppLanguage } from '@/constants';
 import { Meteors } from './Meteors';
@@ -137,7 +137,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setErrorHeader(err.message || "Simulated sign-in failed.");
     } finally {
       setIsLoading(false);
-      
+    }
+  };
+
+  const handleOfflineLogin = () => {
+    setIsLoading(true);
+    setErrorHeader('');
+    try {
+      const result = signInOffline(language === 'id' ? 'Creator Offline' : 'Offline Creator');
+      if (result.user) {
+        onLoginSuccess(result.user);
+      }
+    } catch (err: any) {
+      console.error("Offline Sign-In Error:", err);
+      setErrorHeader(err.message || "Gagal masuk mode offline.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -593,6 +608,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     </svg>
                   )}
                   <span>{isLoading ? tc.btn_logging_in : tc.btn_login}</span>
+                </button>
+
+                {/* Direct Offline Access Button */}
+                <button
+                  type="button"
+                  onClick={handleOfflineLogin}
+                  disabled={isLoading}
+                  className="w-full py-3 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-[0.98] border border-emerald-500/30 hover:border-emerald-500/50 text-emerald-700 dark:text-emerald-400 font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-2.5 disabled:opacity-75 disabled:cursor-not-allowed group/offline"
+                >
+                  <WifiOff size={15} className="text-emerald-500 transition-transform group-hover/offline:scale-110" />
+                  <span>{language === 'id' ? '⚡ Masuk Mode Offline (Tanpa Internet)' : '⚡ Offline Mode (No Internet Access)'}</span>
                 </button>
 
 

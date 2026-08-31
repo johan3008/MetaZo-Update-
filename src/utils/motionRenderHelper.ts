@@ -70,12 +70,17 @@ function applyPrePad(blob: Blob, minSizePadMb: number = 0, format: VideoFormat =
  */
 async function waitForFrameRender(frame: number): Promise<void> {
   const setRenderFrame = (window as any).__setRemotionRenderFrame;
+  const player = (window as any).__remotionPlayerRef;
+
   if (typeof setRenderFrame === 'function') {
     setRenderFrame(frame);
   }
+  if (player && typeof player.seekTo === 'function') {
+    player.seekTo(frame);
+  }
   // Allow React and DOM to commit the frame update
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-  await delay(25);
+  await delay(35);
 }
 
 /**
@@ -237,8 +242,12 @@ const renderDeterministicMaster = async (
       for (let i = 0; i < durationInFrames; i++) {
         await waitForFrameRender(i);
 
+        const currentTarget = document.getElementById('remotion-pure-render-stage')
+          || (player && typeof player.getContainerNode === 'function' ? player.getContainerNode() : null)
+          || document.body;
+
         await captureFrameToCanvas(
-          targetElement,
+          currentTarget,
           ctx,
           width,
           height,
@@ -396,8 +405,12 @@ const renderRealtimeDirectStream = async (
 
         await waitForFrameRender(i);
 
+        const currentTarget = document.getElementById('remotion-pure-render-stage')
+          || (player && typeof player.getContainerNode === 'function' ? player.getContainerNode() : null)
+          || document.body;
+
         await captureFrameToCanvas(
-          targetElement,
+          currentTarget,
           ctx,
           width,
           height,
@@ -523,8 +536,12 @@ const renderUniversalEncoder = async (
 
         await waitForFrameRender(i);
 
+        const currentTarget = document.getElementById('remotion-pure-render-stage')
+          || (player && typeof player.getContainerNode === 'function' ? player.getContainerNode() : null)
+          || document.body;
+
         await captureFrameToCanvas(
-          targetElement,
+          currentTarget,
           ctx,
           width,
           height,
