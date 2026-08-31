@@ -25,6 +25,7 @@ import { PromptVideoView } from './src/components/PromptVideoView';
 import { ImageCheckView } from './src/components/ImageCheckView';
 import { VideoQualityCheck } from './src/components/VideoQualityCheck';
 import { CalendarGenView } from './src/components/CalendarGenView';
+import { SearchGenView } from './src/components/SearchGenView';
 import { MuteVideoView } from './src/components/MuteVideoView';
 import { MotionGenView } from './src/components/MotionGenView';
 import { AntiSpamView } from './src/components/AntiSpamView';
@@ -1014,6 +1015,7 @@ const getToolFromPath = (path: string): ToolType | null => {
     case 'aivideoqualitycheck': return ToolType.PROMPT_VIDEO_CHECK;
     case 'epsconverter': return ToolType.VECTOR_EPS;
     case 'nichecalendar': return ToolType.CALENDAR_GEN;
+    case 'searchgen': return ToolType.SEARCH_GEN;
     case 'mutevideogen': return ToolType.MUTE_VIDEO;
     case 'motiongen': return ToolType.MOTION_GEN;
     case 'removalgen': return ToolType.REMOVAL_GEN;
@@ -1618,6 +1620,7 @@ const App: React.FC = () => {
       ToolType.PROMPT_VIDEO_CHECK,
       ToolType.PROMPT_VIDEO_CHECK,
       ToolType.CALENDAR_GEN,
+      ToolType.SEARCH_GEN,
       ToolType.MUTE_VIDEO,
       ToolType.MOTION_GEN
     ];
@@ -1639,6 +1642,7 @@ const App: React.FC = () => {
       [ToolType.PROMPT_VIDEO_CHECK]: getDailyCount(ToolType.PROMPT_VIDEO_CHECK),
       [ToolType.VECTOR_EPS]: 0,
       [ToolType.CALENDAR_GEN]: getDailyCount(ToolType.CALENDAR_GEN),
+      [ToolType.SEARCH_GEN]: getDailyCount(ToolType.SEARCH_GEN),
       [ToolType.MUTE_VIDEO]: getDailyCount(ToolType.MUTE_VIDEO),
       [ToolType.MOTION_GEN]: getDailyCount(ToolType.MOTION_GEN)
     });
@@ -1881,6 +1885,7 @@ const App: React.FC = () => {
             ToolType.PROMPT_VIDEO,
             ToolType.PROMPT_IMAGE_CHECK,
             ToolType.CALENDAR_GEN,
+            ToolType.SEARCH_GEN,
             ToolType.MUTE_VIDEO,
             ToolType.MOTION_GEN
           ];
@@ -2127,10 +2132,6 @@ const App: React.FC = () => {
   const handleSetActiveTool = (tool: ToolType) => {
     if (tool === ToolType.MOTION_GEN) {
       setComingSoonFeature('motion_gen');
-      return;
-    }
-    if (tool === ToolType.FTP_UPLOADER) {
-      setComingSoonFeature('ftp_uploader');
       return;
     }
     setActiveTool(tool);
@@ -4921,6 +4922,19 @@ const App: React.FC = () => {
               }}
               aiOptions={commonAiOptions}
             />
+          ) : activeTool === ToolType.SEARCH_GEN ? (
+            <SearchGenView 
+              t={t}
+              onSendToPrompt={(text) => {
+                setPrefilledSubject(text);
+                handleSetActiveTool(ToolType.PROMPT_GEN);
+              }}
+              onSendToMetadata={(keywords, title) => {
+                if (title) setCustomPrompt(title);
+                handleSetActiveTool(ToolType.IMAGE);
+              }}
+              aiOptions={commonAiOptions}
+            />
           ) : activeTool === ToolType.MUTE_VIDEO ? (
             <MuteVideoView 
               t={t} 
@@ -4931,28 +4945,15 @@ const App: React.FC = () => {
               setShowActivationModal={setShowActivationModal}
             />
           ) : activeTool === ToolType.MOTION_GEN ? (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center animate-in fade-in zoom-in-95 duration-200">
-              <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-2xl shadow-indigo-500/20 mb-6 relative">
-                <Video size={44} className="animate-pulse" />
-                <div className="absolute -bottom-2 -right-2 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow">
-                  Soon
-                </div>
-              </div>
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">
-                {uiLanguage === 'id' ? 'Fitur MotionGen Sedang Dikembangkan' : 'MotionGen Feature Coming Soon'}
-              </h2>
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400 max-w-md mb-6 leading-relaxed">
-                {uiLanguage === 'id' 
-                  ? 'Fitur MotionGen AI saat ini sedang dalam tahap pengembangan dan optimasi server rendering. Fitur ini akan segera aktif pada pembaruan mendatang.'
-                  : 'The AI MotionGen feature is currently under active development. It will be available in the upcoming update.'}
-              </p>
-              <button
-                onClick={() => handleSetActiveTool(ToolType.DASHBOARD)}
-                className="px-6 py-3 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-550 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer"
-              >
-                {uiLanguage === 'id' ? 'Kembali ke Dashboard' : 'Back to Dashboard'}
-              </button>
-            </div>
+            <MotionGenView 
+              t={t}
+              isLicensed={isMzLicensed}
+              dailyGenCount={dailyGenCounts[ToolType.MOTION_GEN] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.MOTION_GEN, amount)}
+              setShowLimitModal={setShowLimitModal}
+              setShowActivationModal={setShowActivationModal}
+              aiOptions={commonAiOptions}
+            />
           ) : activeTool === ToolType.ANTI_SPAM ? (
             <AntiSpamView 
               t={t}
@@ -4971,28 +4972,12 @@ const App: React.FC = () => {
               onOpenDashboard={() => handleSetActiveTool(ToolType.DASHBOARD)}
             />
           ) : activeTool === ToolType.FTP_UPLOADER ? (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center animate-in fade-in zoom-in-95 duration-200">
-              <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-2xl shadow-violet-500/20 mb-6 relative">
-                <UploadCloud size={44} className="animate-pulse" />
-                <div className="absolute -bottom-2 -right-2 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow">
-                  Soon
-                </div>
-              </div>
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">
-                {uiLanguage === 'id' ? 'Fitur Auto Upload Sedang Dioptimasi' : 'Auto Upload Feature Coming Soon'}
-              </h2>
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400 max-w-md mb-6 leading-relaxed">
-                {uiLanguage === 'id' 
-                  ? 'Fitur FTP/SFTP Auto Upload multi-agency saat ini sedang dalam peningkatan protokol performa dan keamanan. Fitur ini akan segera aktif pada update berikutnya.'
-                  : 'The multi-agency FTP/SFTP Auto Upload feature is undergoing security and performance optimization. It will be enabled in the next update.'}
-              </p>
-              <button
-                onClick={() => handleSetActiveTool(ToolType.DASHBOARD)}
-                className="px-6 py-3 bg-gradient-to-r from-[#7c3aed] to-indigo-600 hover:from-violet-600 hover:to-indigo-550 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer"
-              >
-                {uiLanguage === 'id' ? 'Kembali ke Dashboard' : 'Back to Dashboard'}
-              </button>
-            </div>
+            <FtpUploaderView 
+              t={t}
+              isLicensed={isMzLicensed}
+              onNavigateToMetadata={() => handleSetActiveTool(ToolType.IMAGE)}
+              uiLanguage={uiLanguage}
+            />
           ) : (
             <>
               {/* Welcome Intro Row */}
