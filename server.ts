@@ -12,7 +12,7 @@ import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
-import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
+import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode, analyzeSearchGenNiche } from './server/gemini.ts';
 import { testFtpConnection, uploadToFtp } from './server/ftpService.ts';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
@@ -3198,6 +3198,24 @@ ffprobePath = _require('@ffprobe-installer/ffprobe').path;
                 res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
             } else {
                 res.status(500).json({ error: e.message || 'Error generating keywords' });
+            }
+        }
+    });
+
+    app.post('/api/search-gen', async (req, res) => {
+        try {
+            const { query, mediaType, model } = req.body;
+            if (!query || typeof query !== 'string' || !query.trim()) {
+                return res.status(400).json({ error: 'Missing or invalid query field' });
+            }
+            const data = await analyzeSearchGenNiche(query.trim(), mediaType || 'all', { model });
+            res.json(data);
+        } catch (e: any) {
+            console.warn('Server search-gen error:', e);
+            if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
+                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
+            } else {
+                res.status(500).json({ error: e.message || 'Error analyzing search niche' });
             }
         }
     });

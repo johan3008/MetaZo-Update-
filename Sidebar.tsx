@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
-  Calendar, CreditCard, Info, Receipt, VolumeX, Video, Star, CopyCheck, UploadCloud, Maximize2
+  Calendar, Compass, Search, CreditCard, Info, Receipt, VolumeX, Video, Star, CopyCheck, UploadCloud, Maximize2
 } from 'lucide-react';
 import { ToolType, GenerationMode, toolToPath } from '@/types';
 
@@ -311,6 +311,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {!sidebarCollapsed && <span>{t.sidebar_calendar_gen}</span>}
             </a>
 
+            <a href={toolToPath[ToolType.SEARCH_GEN]} onClick={(e) => handleNavClick(e, ToolType.SEARCH_GEN)}
+              className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
+                activeTool === ToolType.SEARCH_GEN 
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-indigo-500" 
+                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Compass size={16} className={activeTool === ToolType.SEARCH_GEN ? "text-indigo-400 animate-spin" : "text-slate-400"} style={activeTool === ToolType.SEARCH_GEN ? { animationDuration: '6s' } : undefined} />
+              {!sidebarCollapsed && <span>{t.sidebar_search_gen || "Search Gen"}</span>}
+            </a>
+
             <a href={toolToPath[ToolType.MUTE_VIDEO]} onClick={(e) => handleNavClick(e, ToolType.MUTE_VIDEO)}
               className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
                 activeTool === ToolType.MUTE_VIDEO 
@@ -322,22 +333,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {!sidebarCollapsed && <span>{t.sidebar_mute_video || "Mute Video Gen"}</span>}
             </a>
 
-            <button
-              type="button"
-              onClick={() => onComingSoon?.('motion_gen')}
-              className="w-full text-left flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60 cursor-pointer group"
-              title="Motion Gen - Coming Soon"
+            <a href={toolToPath[ToolType.MOTION_GEN]} onClick={(e) => handleNavClick(e, ToolType.MOTION_GEN)}
+              className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
+                activeTool === ToolType.MOTION_GEN 
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-indigo-500" 
+                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
             >
-              <div className="flex items-center space-x-3">
-                <Video size={16} className="text-slate-400 group-hover:text-indigo-400 transition-colors" />
-                {!sidebarCollapsed && <span>{t.sidebar_motion_gen || "Motion Gen"}</span>}
-              </div>
-              {!sidebarCollapsed && (
-                <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                  Coming Soon
-                </span>
-              )}
-            </button>
+              <Video size={16} className={activeTool === ToolType.MOTION_GEN ? "text-indigo-400" : "text-slate-400"} />
+              {!sidebarCollapsed && <span>{t.sidebar_motion_gen || "Motion Gen"}</span>}
+            </a>
 
             <a href={toolToPath[ToolType.ANTI_SPAM]} onClick={(e) => handleNavClick(e, ToolType.ANTI_SPAM)}
               className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
@@ -350,22 +355,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {!sidebarCollapsed && <span>{t.sidebar_anti_spam || "Anti-Spam Similar Checker"}</span>}
             </a>
 
-            <button
-              type="button"
-              onClick={() => onComingSoon?.('ftp_uploader')}
-              className="w-full text-left flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60 cursor-pointer group"
-              title="FTP Auto Uploader - Coming Soon"
+            <a
+              href={toolToPath[ToolType.FTP_UPLOADER] || "/FtpUploader"}
+              onClick={(e) => { e.preventDefault(); setActiveTool(ToolType.FTP_UPLOADER); }}
+              className={`flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
+                activeTool === ToolType.FTP_UPLOADER 
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-violet-500" 
+                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
             >
               <div className="flex items-center space-x-3">
-                <UploadCloud size={16} className="text-slate-400 group-hover:text-violet-400 transition-colors" />
+                <UploadCloud size={16} className={activeTool === ToolType.FTP_UPLOADER ? "text-violet-400" : "text-slate-400"} />
                 {!sidebarCollapsed && <span>{t.sidebar_ftp_uploader || "FTP Auto Uploader"}</span>}
               </div>
               {!sidebarCollapsed && (
-                <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
-                  Coming Soon
+                <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  PRO
                 </span>
               )}
-            </button>
+            </a>
           </nav>
         </div>
 
@@ -735,6 +743,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span>{t.sidebar_calendar_gen}</span></button>
 
                     <button 
+                      onClick={() => { setActiveTool(ToolType.SEARCH_GEN); setSidebarOpen(false); }}
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                        activeTool === ToolType.SEARCH_GEN 
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-indigo-500" 
+                          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      <Compass size={14} className={activeTool === ToolType.SEARCH_GEN ? "text-indigo-400 animate-spin" : "text-slate-400"} />
+                      <span>{t.sidebar_search_gen || "Search Gen"}</span></button>
+
+                    <button 
                       onClick={() => { setActiveTool(ToolType.MUTE_VIDEO); setSidebarOpen(false); }}
                       className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
                         activeTool === ToolType.MUTE_VIDEO 
@@ -746,17 +765,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span>{t.sidebar_mute_video || "Mute Video Gen"}</span></button>
 
                     <button 
-                      type="button"
-                      onClick={() => { setSidebarOpen(false); onComingSoon?.('motion_gen'); }}
-                      className="w-full text-left flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                      onClick={() => { setActiveTool(ToolType.MOTION_GEN); setSidebarOpen(false); }}
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                        activeTool === ToolType.MOTION_GEN 
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-indigo-500" 
+                          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
                     >
-                      <div className="flex items-center space-x-3">
-                        <Video size={14} className="text-slate-400" />
-                        <span>{t.sidebar_motion_gen || "Motion Gen"}</span>
-                      </div>
-                      <span className="text-[7.5px] font-black uppercase px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                        Coming Soon
-                      </span>
+                      <Video size={14} className={activeTool === ToolType.MOTION_GEN ? "text-indigo-400" : "text-slate-400"} />
+                      <span>{t.sidebar_motion_gen || "Motion Gen"}</span>
                     </button>
 
                     <button 
@@ -772,15 +789,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                     <button 
                       type="button"
-                      onClick={() => { setSidebarOpen(false); onComingSoon?.('ftp_uploader'); }}
-                      className="w-full text-left flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                      onClick={() => { setSidebarOpen(false); setActiveTool(ToolType.FTP_UPLOADER); }}
+                      className={`w-full text-left flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                        activeTool === ToolType.FTP_UPLOADER 
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-violet-500" 
+                          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
                     >
                       <div className="flex items-center space-x-3">
-                        <UploadCloud size={14} className="text-slate-400" />
+                        <UploadCloud size={14} className={activeTool === ToolType.FTP_UPLOADER ? "text-violet-400" : "text-slate-400"} />
                         <span>{t.sidebar_ftp_uploader || "FTP Auto Uploader"}</span>
                       </div>
-                      <span className="text-[7.5px] font-black uppercase px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
-                        Coming Soon
+                      <span className="text-[7.5px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        PRO
                       </span>
                     </button>
                   </nav>
