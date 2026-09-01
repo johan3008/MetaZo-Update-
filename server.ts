@@ -1933,6 +1933,144 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    app.post('/api/analyze-video-keyword', async (req, res) => {
+        try {
+            const { keyword, model } = req.body;
+            if (!keyword || typeof keyword !== 'string') {
+                return res.status(400).json({ error: 'Keyword is required and must be a string' });
+            }
+            const data = await analyzeVideoKeyword(keyword.trim(), model);
+            res.json(data);
+        } catch (e: any) {
+            console.warn('Server /api/analyze-video-keyword error:', e);
+            if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
+                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
+            } else {
+                res.status(500).json({ error: e.message || 'Error analyzing video keyword' });
+            }
+        }
+    });
+
+    app.post('/api/generate-hollywood-prompts', async (req, res) => {
+        try {
+            const { keyword, model } = req.body;
+            if (!keyword || typeof keyword !== 'string') {
+                return res.status(400).json({ error: 'Keyword is required and must be a string' });
+            }
+            const data = await generateHollywoodPrompts(keyword.trim(), model);
+            res.json(data);
+        } catch (e: any) {
+            console.warn('Server /api/generate-hollywood-prompts error:', e);
+            if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
+                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
+            } else {
+                res.status(500).json({ error: e.message || 'Error generating Hollywood prompts' });
+            }
+        }
+    });
+
+    app.post('/api/generate-motion-code', async (req, res) => {
+        try {
+            const { prompt, currentCode, fps, durationSeconds, width, height, history, model } = req.body;
+            if (!prompt || typeof prompt !== 'string') {
+                return res.status(400).json({ error: 'Prompt is required' });
+            }
+            const data = await generateMotionCode(prompt.trim(), {
+                currentCode,
+                fps,
+                durationSeconds,
+                width,
+                height,
+                history,
+                model
+            });
+            res.json(data);
+        } catch (e: any) {
+            console.warn('Server /api/generate-motion-code error:', e);
+            if (e.message?.includes('429') || e.status === 429 || e.code === 429) {
+                res.status(429).json({ error: `Kuota ${getProviderName()} API terbatas. Silakan coba lagi nanti.` });
+            } else {
+                res.status(500).json({ error: e.message || 'Error generating motion graphic code' });
+            }
+        }
+    });
+
+    app.post('/api/mute-video', upload.single('video'), async (req, res) => {
+        let tempInputPath: string | null = null;
+        let tempOutputPath: string | null = null;
+
+        try {
+            if (!ffmpeg) {
+                return res.status(500).json({ error: 'ffmpeg is not initialized on the server.' });
+            }
+
+            if (req.file) {
+                tempInputPath = req.file.path;
+                const ext = path.extname(req.file.originalname || '.mp4') || '.mp4';
+                tempOutputPath = path.join(uploadDir, `muted_${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`);
+
+                await new Promise<void>((resolve, reject) => {
+                    ffmpeg(tempInputPath)
+                        .noAudio()
+                        .videoCodec('copy')
+                        .output(tempOutputPath)
+                        .on('end', () => resolve())
+                        .on('error', (err: any) => reject(err))
+                        .run();
+                });
+
+                res.download(tempOutputPath, `muted_${req.file.originalname}`, (err) => {
+                    if (tempInputPath && fs.existsSync(tempInputPath)) {
+                        try { fs.unlinkSync(tempInputPath); } catch (_) {}
+                    }
+                    if (tempOutputPath && fs.existsSync(tempOutputPath)) {
+                        try { fs.unlinkSync(tempOutputPath); } catch (_) {}
+                    }
+                });
+            } else if (req.body && req.body.fileUrl) {
+                const fileUrl = req.body.fileUrl;
+                const ext = path.extname(new URL(fileUrl).pathname) || '.mp4';
+                tempInputPath = path.join(uploadDir, `input_${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`);
+                tempOutputPath = path.join(uploadDir, `muted_${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`);
+
+                const fileRes = await fetch(fileUrl);
+                if (!fileRes.ok) throw new Error(`Failed to fetch source video from ${fileUrl}`);
+                const fileBuf = Buffer.from(await fileRes.arrayBuffer());
+                fs.writeFileSync(tempInputPath, fileBuf);
+
+                await new Promise<void>((resolve, reject) => {
+                    ffmpeg(tempInputPath)
+                        .noAudio()
+                        .videoCodec('copy')
+                        .output(tempOutputPath)
+                        .on('end', () => resolve())
+                        .on('error', (err: any) => reject(err))
+                        .run();
+                });
+
+                res.download(tempOutputPath, `muted_video${ext}`, (err) => {
+                    if (tempInputPath && fs.existsSync(tempInputPath)) {
+                        try { fs.unlinkSync(tempInputPath); } catch (_) {}
+                    }
+                    if (tempOutputPath && fs.existsSync(tempOutputPath)) {
+                        try { fs.unlinkSync(tempOutputPath); } catch (_) {}
+                    }
+                });
+            } else {
+                return res.status(400).json({ error: 'No video file or fileUrl provided' });
+            }
+        } catch (e: any) {
+            console.warn('Server /api/mute-video error:', e);
+            if (tempInputPath && fs.existsSync(tempInputPath)) {
+                try { fs.unlinkSync(tempInputPath); } catch (_) {}
+            }
+            if (tempOutputPath && fs.existsSync(tempOutputPath)) {
+                try { fs.unlinkSync(tempOutputPath); } catch (_) {}
+            }
+            res.status(500).json({ error: e.message || 'Failed to mute video' });
+        }
+    });
+
     const handleCalendarEventsRequest = async (req: any, res: any) => {
         try {
             const month = req.body?.month || req.query?.month || new Date().toLocaleString('en-US', { month: 'long' });
