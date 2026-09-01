@@ -14,18 +14,22 @@ import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
 import { testFtpConnection, uploadToFtp } from './server/ftpService.ts';
+import fluentFfmpeg from 'fluent-ffmpeg';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
 
-// NFT tracing hints
+// NFT tracing hints for Vercel Serverless Function bundler
 try {
+    _require.resolve('fluent-ffmpeg/package.json');
+    _require.resolve('@ffmpeg-installer/ffmpeg/package.json');
     _require.resolve('@ffmpeg-installer/linux-x64/package.json');
+    _require.resolve('@ffprobe-installer/ffprobe/package.json');
     _require.resolve('@ffprobe-installer/linux-x64/package.json');
 } catch(e) {}
 
 let ffmpeg: any;
 try {
-    const ffmpegLib = _require('fluent-ffmpeg');
+    const ffmpegLib = fluentFfmpeg || _require('fluent-ffmpeg');
     ffmpeg = typeof ffmpegLib === 'function' ? ffmpegLib : (ffmpegLib.default || ffmpegLib);
     try {
         const ffmpegInstaller = _require('@ffmpeg-installer/ffmpeg');
