@@ -1919,6 +1919,58 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    app.post('/api/analyze-batch-image-to-prompt', async (req, res) => {
+        try {
+            const { images, styleCategory, variation, model } = req.body;
+            if (!images || !Array.isArray(images) || images.length === 0) {
+                return res.status(400).json({ error: 'Missing or invalid images array' });
+            }
+            const data = await analyzeBatchImageToPrompt(images, styleCategory || 'Default', variation || 5, model);
+            res.json(data);
+        } catch (e: any) {
+            console.warn('Server analyze-batch-image-to-prompt error:', e);
+            res.status(500).json({ error: e.message || 'Error analyzing batch images to prompt' });
+        }
+    });
+
+    const handleCalendarEventsRequest = async (req: any, res: any) => {
+        try {
+            const month = req.body?.month || req.query?.month || new Date().toLocaleString('en-US', { month: 'long' });
+            const model = req.body?.model || req.query?.model;
+            const data = await generateCalendarEvents(month, model);
+            res.json(data);
+        } catch (e: any) {
+            console.warn('Server generate-calendar-events error:', e);
+            res.status(500).json({ error: e.message || 'Error generating calendar events' });
+        }
+    };
+
+    app.post('/api/generate-calendar-events', handleCalendarEventsRequest);
+    app.get('/api/generate-calendar-events', handleCalendarEventsRequest);
+    app.post('/api/calendar-events', handleCalendarEventsRequest);
+    app.get('/api/calendar-events', handleCalendarEventsRequest);
+
+    const handleEventKeywordsRequest = async (req: any, res: any) => {
+        try {
+            const eventName = req.body?.eventName || req.query?.eventName;
+            const eventDetails = req.body?.eventDetails || req.query?.eventDetails || '';
+            const model = req.body?.model || req.query?.model;
+            if (!eventName) {
+                return res.status(400).json({ error: 'Missing eventName parameter' });
+            }
+            const data = await generateEventKeywords(eventName, eventDetails, model);
+            res.json(data);
+        } catch (e: any) {
+            console.warn('Server generate-event-keywords error:', e);
+            res.status(500).json({ error: e.message || 'Error generating event keywords' });
+        }
+    };
+
+    app.post('/api/generate-event-keywords', handleEventKeywordsRequest);
+    app.get('/api/generate-event-keywords', handleEventKeywordsRequest);
+    app.post('/api/event-keywords', handleEventKeywordsRequest);
+    app.get('/api/event-keywords', handleEventKeywordsRequest);
+
     app.post('/api/check-image-quality', upload.single('image'), async (req, res) => {
         try {
             let imagePayload: any;
