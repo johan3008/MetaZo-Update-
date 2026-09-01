@@ -51,8 +51,6 @@ export function severityFor(key: string): QcSeverity {
   const major = new Set([
     "blur",
     "out_of_focus",
-    "overexposure",
-    "underexposure",
     "flickering",
     "camera_shake",
     "motion_consistency",
@@ -60,7 +58,6 @@ export function severityFor(key: string): QcSeverity {
     "blocking",
     "banding",
     "noise",
-    "lighting",
     "artifacts",
     "sharpness"
   ]);

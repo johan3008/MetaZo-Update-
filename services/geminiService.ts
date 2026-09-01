@@ -1,4 +1,4 @@
-import { StockMetadata, ToolType, SearchGenResult } from "../types";
+import { StockMetadata, ToolType } from "../types";
 
 const ensureBase64 = async (frame: string): Promise<string> => {
   if (frame.startsWith('blob:')) {
@@ -258,22 +258,3 @@ export const fetchEventKeywords = async (eventName: string, eventDetails: string
   return response.json();
 };
 
-export const fetchSearchGenAnalysis = async (
-  query: string,
-  mediaType: string = 'all',
-  options?: ServiceOptions
-): Promise<SearchGenResult> => {
-  const response = await fetchWithRetry('/api/search-gen', {
-    method: 'POST',
-    headers: getHeaders(options),
-    body: JSON.stringify({ query, mediaType, model: options?.model })
-  }, 2);
-
-  const rawText = await response.text();
-  try {
-    return JSON.parse(rawText);
-  } catch (e) {
-    console.log('[API DEBUG] /api/search-gen JSON parse error');
-    throw new Error(`Invalid JSON response from server: ${rawText.substring(0, 150)}`);
-  }
-};

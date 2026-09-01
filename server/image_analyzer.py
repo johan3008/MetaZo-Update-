@@ -787,6 +787,244 @@ def local_region_analysis(gray, visible_mask):
     }
 
 
+def analyze_image(img, file_size_kb=0, file_path=None):
+    """Core image analysis pipeline returning forensic pixel & quality report dictionary."""
+    width, height = img.size
+    mp = (width * height) / 1_000_000.0
+    
+    rgba, rgb, alpha, visible, gray = alpha_aware_arrays(img)
+    
+    # Priority 1: ERODE visible mask to get SOLID pixels (fully inside the object boundaries)
+    # This prevents transparent borders or background compositing boundaries from leaking into Laplacian/noise stats!
+    if np.any(alpha < 255):
+        kernel_erode = np.ones((5, 5), np.uint8)
+        solid_mask = cv2.erode(visible.astype(np.uint8), kernel_erode, iterations=2).astype(bool)
+        # If eroded too aggressively and became empty, fallback to visible
+        if np.sum(solid_mask) < 200:
+            solid_mask = visible
+    else:
+        solid_mask = np.ones((height, width), dtype=bool)
+        
+    # Detect pure white/black studio backgrounds (exclude them from highlights/shadows clipping checks)
+    # Studio backgrounds are usually uniform at the borders
+    is_studio_white = False
+    is_studio_black = False
+    
+    # Check border gray levels
+    border_pixels = []
+    border_pixels.extend(gray[0, :].tolist())
+    border_pixels.extend(gray[-1, :].tolist())
+    border_pixels.extend(gray[:, 0].tolist())
+    border_pixels.extend(gray[:, -1].tolist())
+    border_pixels = np.array(border_pixels)
+    
+    if border_pixels.size > 0:
+        border_mean = np.mean(border_pixels)
+        border_std = np.std(border_pixels)
+        if border_mean >= 253 and border_std < 2.0:
+            is_studio_white = True
+        elif border_mean <= 3 and border_std < 2.0:
+            is_studio_black = True
+            
+    # Exclude pure white background from overexposure checks if it's studio white
+    exposure_mask = solid_mask.copy()
+    if is_studio_white:
+        exposure_mask = exposure_mask & (gray < 254)
+    if is_studio_black:
+        exposure_mask = exposure_mask & (gray > 2)
+        
+    visible_gray = gray[exposure_mask]
+    if visible_gray.size == 0:
+        exposure_mask = solid_mask
+        visible_gray = gray[exposure_mask]
+        
+    # Robust brightness and contrast (Priority 2)
+    p01 = safe_percentile(visible_gray, 1, 0)
+    p10 = safe_percentile(visible_gray, 10, 32)
+    p50 = safe_percentile(visible_gray, 50, 128)
+    p90 = safe_percentile(visible_gray, 90, 224)
+    p99 = safe_percentile(visible_gray, 99, 255)
+    
+    brightness_val = int(round((p50 / 255.0) * 100))
+    clipped_high_pct = float(np.mean(visible_gray >= 250) * 100.0) if not is_studio_white else 0.0
+    clipped_low_pct = float(np.mean(visible_gray <= 5) * 100.0) if not is_studio_black else 0.0
+    
+    # Realistic microstock exposure & dynamic range calibration
+    # Specular highlights (glass, liquids, metals, caramel) and natural dark elements (shadows, volcanic sand) are normal.
+    if clipped_high_pct > 22.0:
+        brightness_status = "Severe highlights clipping (blown-out)"
+    elif clipped_low_pct > 28.0:
+        brightness_status = "Severe shadow clipping (crushed)"
+    elif brightness_val > 88:
+        brightness_status = "Overexposed / Very Bright"
+    elif brightness_val < 12:
+        brightness_status = "Underexposed / Very Dark"
+    else:
+        brightness_status = "Optimal"
+        
+    robust_range = max(1.0, p90 - p10)
+    contrast_val = min(100, int(round((robust_range / 255.0) * 100)))
+    contrast_status = "High Contrast" if contrast_val > 80 else ("Low Contrast" if contrast_val < 22 else "Normal")
+    
+    # Histogram on solid_mask
+    hist, _ = np.histogram(gray[solid_mask], bins=32, range=(0, 256))
+    max_bin = float(np.max(hist)) if np.max(hist) > 0 else 1.0
+    histogram = [int(round((v / max_bin) * 100)) for v in hist]
+    
+    # Sharpness of solid parts (Priority 2 & 1)
+    ys, xs = np.where(solid_mask)
+    if len(xs) > 0:
+        x0, x1 = max(0, int(xs.min())), min(width, int(xs.max()) + 1)
+        y0, y1 = max(0, int(ys.min())), min(height, int(ys.max()) + 1)
+        focus_gray = gray[y0:y1, x0:x1]
+        focus_mask = solid_mask[y0:y1, x0:x1]
+    else:
+        focus_gray, focus_mask = gray, np.ones_like(gray, dtype=bool)
+        
+    lap = cv2.Laplacian(focus_gray, cv2.CV_64F)
+    lap_var = float(np.var(lap[focus_mask])) if np.any(focus_mask) else 0.0
+    sharpness_score = float(np.sqrt(max(0.0, lap_var)))
+    
+    # Contrast normalization: a clean flat graphic will have low raw laplacian score but is sharp.
+    # Scale sharpness score based on the contrast range of solid pixels to avoid false blurry flags on flat art.
+    contrast_factor = max(0.1, robust_range / 128.0)
+    normalized_sharpness = sharpness_score / contrast_factor
+    
+    # Map to 0-100
+    sharpness_val = min(100, int(round(normalized_sharpness * 2.8)))
+    
+    if sharpness_val < 12:
+        sharpness_status = "Extremely blurry / Out-of-focus"
+    elif sharpness_val < 22:
+        sharpness_status = "Soft focus / Out of focus — inspect at 100%"
+    elif sharpness_val < 38:
+        sharpness_status = "Acceptable sharpness"
+    else:
+        sharpness_status = "Tack-sharp / Pin-sharp"
+        
+    # Noise estimation in solid areas (Priority 2)
+    sigma = estimate_noise_cv2(gray, solid_mask)
+    noise_val = min(100, int(round((sigma / 4.5) * 100)))
+    noise_status = "High Noise / Grain" if noise_val > 65 else ("Moderate Noise" if noise_val > 30 else "Low Noise / Clean")
+    
+    # Local-region grid analysis (Priority 3)
+    local_grid = local_region_analysis(gray, solid_mask)
+    
+    # Check local sharpness variation:
+    # In professional photography with shallow DOF / macro / bokeh, background cells are naturally soft.
+    # An anomaly only exists if the entire image lacks a sharp focal area (max local sharpness is also low).
+    local_sharpness_alert = False
+    if local_grid:
+        max_local_s = local_grid.get("max_local_sharpness", 0.0)
+        min_local_s = local_grid.get("min_local_sharpness", 0.0)
+        uniformity = local_grid.get("sharpness_uniformity", 1.0)
+        # Only trigger blur anomaly if NO region in the image is sharp
+        if uniformity < 0.25 and max_local_s < 16.0 and min_local_s < 2.0:
+            local_sharpness_alert = True
+            
+    # Additional forensics (Priority 5 + Advanced Quality Assessment)
+    edges = edge_metrics(rgb, alpha, visible)
+    banding = banding_score(gray, solid_mask)
+    ext = Path(file_path).suffix.lower() if file_path else ""
+    jpeg_blocking = jpeg_blocking_score(gray, solid_mask) if ext in {".jpg", ".jpeg"} else 0.0
+    bg_edges = background_edge_analysis(gray, solid_mask)
+    ocr = ocr_analysis(img)
+    
+    # Advanced No-Reference Quality Metrics: BRISQUE & NIQE
+    brisque_score, brisque_status = calculate_brisque_score(gray)
+    niqe_score, niqe_status = calculate_niqe_score(gray)
+    
+    # Subject / Background Bokeh Segmentation
+    seg_res = segment_foreground_background(gray, rgb, alpha, solid_mask)
+    seg_info = {
+        "method": seg_res["method"],
+        "foreground_area_percent": seg_res["foreground_area_percent"],
+        "bokeh_depth_ratio": seg_res.get("bokeh_depth_ratio", 1.0),
+        "intentional_bokeh_detected": seg_res.get("intentional_bokeh_detected", False),
+        "status": seg_res.get("status", "Standard Framing")
+    }
+    
+    # Florence Dense Visual Grounding (Spatial Regional Anchors)
+    florence_res = extract_florence_visual_grounding(img, gray, rgb)
+
+    report = {
+        "resolution": f"{width} x {height} ({mp:.2f} MP)",
+        "width": width,
+        "height": height,
+        "megapixels": round(mp, 3),
+        "color_space": f"{img.mode} (Pillow decoded)",
+        "histogram": histogram,
+        "brightness": {
+            "value": brightness_val,
+            "status": brightness_status,
+            "median": round(p50, 2),
+            "p01": round(p01, 2),
+            "p99": round(p99, 2),
+            "clipped_high_percent": round(clipped_high_pct, 3),
+            "clipped_low_percent": round(clipped_low_pct, 3),
+            "is_studio_white_bg": is_studio_white,
+            "is_studio_black_bg": is_studio_black
+        },
+        "contrast": {
+            "value": contrast_val,
+            "status": contrast_status,
+            "p10": round(p10, 2),
+            "p90": round(p90, 2)
+        },
+        "sharpness": {
+            "value": sharpness_val,
+            "status": sharpness_status,
+            "raw_score": round(sharpness_score, 4),
+            "laplacian_variance": round(lap_var, 4),
+            "normalized_score": round(normalized_sharpness, 4),
+            "has_local_blur_anomaly": local_sharpness_alert
+        },
+        "noise": {
+            "value": noise_val,
+            "status": noise_status,
+            "raw_sigma": round(float(sigma), 4)
+        },
+        "brisque": {
+            "score": brisque_score,
+            "status": brisque_status,
+            "benchmark": "Ideal Stock Range: 0 - 35 (Lower = Sharper/Natural)"
+        },
+        "niqe": {
+            "score": niqe_score,
+            "status": niqe_status,
+            "benchmark": "Ideal Stock Range: 1.5 - 5.0 (Lower = Higher Natural Scene Fidelity)"
+        },
+        "segmentation": seg_info,
+        "florence_grounding": florence_res,
+        "transparency": edges,
+        "banding": {
+            "score": round(float(banding), 2),
+            "status": "Review possible banding" if banding > 65 else "No strong banding signal"
+        },
+        "jpeg_blocking": {
+            "score": round(float(jpeg_blocking), 2),
+            "status": "Strong repeated 8x8 blocking signal" if jpeg_blocking > 65 else ("Moderate blocking signal" if jpeg_blocking > 40 else "No strong blocking signal")
+        },
+        "background_edge_analysis": bg_edges,
+        "ocr": ocr,
+        "local_analysis": local_grid,
+        "visible_pixel_analysis": True,
+        "file_validation": "Valid (Passed OpenCV + BRISQUE + NIQE + Florence Visual Grounding)",
+        "file_size_kb": file_size_kb
+    }
+    return report
+
+
+def analyze_image_file(file_path):
+    """Helper for Python service to analyze an image on disk."""
+    import os
+    if not os.path.exists(file_path):
+        return {"error": f"File not found: {file_path}"}
+    file_size_kb = int(os.path.getsize(file_path) / 1024)
+    img = Image.open(file_path)
+    return analyze_image(img, file_size_kb=file_size_kb, file_path=file_path)
+
+
 def main():
     try:
         import os
@@ -809,223 +1047,7 @@ def main():
             file_size_kb = int(len(image_bytes) / 1024)
             img = Image.open(BytesIO(image_bytes))
 
-        width, height = img.size
-        mp = (width * height) / 1_000_000.0
-        
-        rgba, rgb, alpha, visible, gray = alpha_aware_arrays(img)
-        
-        # Priority 1: ERODE visible mask to get SOLID pixels (fully inside the object boundaries)
-        # This prevents transparent borders or background compositing boundaries from leaking into Laplacian/noise stats!
-        if np.any(alpha < 255):
-            kernel_erode = np.ones((5, 5), np.uint8)
-            solid_mask = cv2.erode(visible.astype(np.uint8), kernel_erode, iterations=2).astype(bool)
-            # If eroded too aggressively and became empty, fallback to visible
-            if np.sum(solid_mask) < 200:
-                solid_mask = visible
-        else:
-            solid_mask = np.ones((height, width), dtype=bool)
-            
-        # Detect pure white/black studio backgrounds (exclude them from highlights/shadows clipping checks)
-        # Studio backgrounds are usually uniform at the borders
-        is_studio_white = False
-        is_studio_black = False
-        
-        # Check border gray levels
-        border_pixels = []
-        border_pixels.extend(gray[0, :].tolist())
-        border_pixels.extend(gray[-1, :].tolist())
-        border_pixels.extend(gray[:, 0].tolist())
-        border_pixels.extend(gray[:, -1].tolist())
-        border_pixels = np.array(border_pixels)
-        
-        if border_pixels.size > 0:
-            border_mean = np.mean(border_pixels)
-            border_std = np.std(border_pixels)
-            if border_mean >= 253 and border_std < 2.0:
-                is_studio_white = True
-            elif border_mean <= 3 and border_std < 2.0:
-                is_studio_black = True
-                
-        # Exclude pure white background from overexposure checks if it's studio white
-        exposure_mask = solid_mask.copy()
-        if is_studio_white:
-            exposure_mask = exposure_mask & (gray < 254)
-        if is_studio_black:
-            exposure_mask = exposure_mask & (gray > 2)
-            
-        visible_gray = gray[exposure_mask]
-        if visible_gray.size == 0:
-            exposure_mask = solid_mask
-            visible_gray = gray[exposure_mask]
-            
-        # Robust brightness and contrast (Priority 2)
-        p01 = safe_percentile(visible_gray, 1, 0)
-        p10 = safe_percentile(visible_gray, 10, 32)
-        p50 = safe_percentile(visible_gray, 50, 128)
-        p90 = safe_percentile(visible_gray, 90, 224)
-        p99 = safe_percentile(visible_gray, 99, 255)
-        
-        brightness_val = int(round((p50 / 255.0) * 100))
-        clipped_high_pct = float(np.mean(visible_gray >= 250) * 100.0) if not is_studio_white else 0.0
-        clipped_low_pct = float(np.mean(visible_gray <= 5) * 100.0) if not is_studio_black else 0.0
-        
-        if clipped_high_pct > 4.5:
-            brightness_status = "Highlights clipping risk (blown-out)"
-        elif clipped_low_pct > 7.0:
-            brightness_status = "Shadow clipping risk (crushed)"
-        elif brightness_val > 84:
-            brightness_status = "Overexposed / Very Bright"
-        elif brightness_val < 18:
-            brightness_status = "Underexposed / Very Dark"
-        else:
-            brightness_status = "Optimal"
-            
-        robust_range = max(1.0, p90 - p10)
-        contrast_val = min(100, int(round((robust_range / 255.0) * 100)))
-        contrast_status = "High Contrast" if contrast_val > 80 else ("Low Contrast" if contrast_val < 22 else "Normal")
-        
-        # Histogram on solid_mask
-        hist, _ = np.histogram(gray[solid_mask], bins=32, range=(0, 256))
-        max_bin = float(np.max(hist)) if np.max(hist) > 0 else 1.0
-        histogram = [int(round((v / max_bin) * 100)) for v in hist]
-        
-        # Sharpness of solid parts (Priority 2 & 1)
-        ys, xs = np.where(solid_mask)
-        if len(xs) > 0:
-            x0, x1 = max(0, int(xs.min())), min(width, int(xs.max()) + 1)
-            y0, y1 = max(0, int(ys.min())), min(height, int(ys.max()) + 1)
-            focus_gray = gray[y0:y1, x0:x1]
-            focus_mask = solid_mask[y0:y1, x0:x1]
-        else:
-            focus_gray, focus_mask = gray, np.ones_like(gray, dtype=bool)
-            
-        lap = cv2.Laplacian(focus_gray, cv2.CV_64F)
-        lap_var = float(np.var(lap[focus_mask])) if np.any(focus_mask) else 0.0
-        sharpness_score = float(np.sqrt(max(0.0, lap_var)))
-        
-        # Contrast normalization: a clean flat graphic will have low raw laplacian score but is sharp.
-        # Scale sharpness score based on the contrast range of solid pixels to avoid false blurry flags on flat art.
-        contrast_factor = max(0.1, robust_range / 128.0)
-        normalized_sharpness = sharpness_score / contrast_factor
-        
-        # Map to 0-100
-        sharpness_val = min(100, int(round(normalized_sharpness * 2.8)))
-        
-        if sharpness_val < 15:
-            sharpness_status = "Extremely blurry / Out-of-focus"
-        elif sharpness_val < 26:
-            sharpness_status = "Soft focus / Out of focus — inspect at 100%"
-        elif sharpness_val < 42:
-            sharpness_status = "Acceptable sharpness"
-        else:
-            sharpness_status = "Tack-sharp / Pin-sharp"
-            
-        # Noise estimation in solid areas (Priority 2)
-        sigma = estimate_noise_cv2(gray, solid_mask)
-        noise_val = min(100, int(round((sigma / 4.5) * 100)))
-        noise_status = "High Noise / Grain" if noise_val > 55 else ("Moderate Noise" if noise_val > 25 else "Low Noise / Clean")
-        
-        # Local-region grid analysis (Priority 3)
-        local_grid = local_region_analysis(gray, solid_mask)
-        
-        # Check local sharpness variation
-        local_sharpness_alert = False
-        if local_grid and local_grid.get("sharpness_uniformity", 1.0) < 0.35:
-            # High local sharpness variance indicates a partially blurry image
-            # Let's check if the min local sharpness is extremely low
-            if local_grid.get("min_local_sharpness", 0.0) < 3.0:
-                local_sharpness_alert = True
-        # Additional forensics (Priority 5 + Advanced Quality Assessment)
-        edges = edge_metrics(rgb, alpha, visible)
-        banding = banding_score(gray, solid_mask)
-        ext = Path(file_path).suffix.lower() if file_path else ""
-        jpeg_blocking = jpeg_blocking_score(gray, solid_mask) if ext in {".jpg", ".jpeg"} else 0.0
-        bg_edges = background_edge_analysis(gray, solid_mask)
-        ocr = ocr_analysis(img)
-        
-        # Advanced No-Reference Quality Metrics: BRISQUE & NIQE
-        brisque_score, brisque_status = calculate_brisque_score(gray)
-        niqe_score, niqe_status = calculate_niqe_score(gray)
-        
-        # Subject / Background Bokeh Segmentation
-        seg_res = segment_foreground_background(gray, rgb, alpha, solid_mask)
-        seg_info = {
-            "method": seg_res["method"],
-            "foreground_area_percent": seg_res["foreground_area_percent"],
-            "bokeh_depth_ratio": seg_res.get("bokeh_depth_ratio", 1.0),
-            "intentional_bokeh_detected": seg_res.get("intentional_bokeh_detected", False),
-            "status": seg_res.get("status", "Standard Framing")
-        }
-        
-        # Florence Dense Visual Grounding (Spatial Regional Anchors)
-        florence_res = extract_florence_visual_grounding(img, gray, rgb)
-
-        report = {
-            "resolution": f"{width} x {height} ({mp:.2f} MP)",
-            "width": width,
-            "height": height,
-            "megapixels": round(mp, 3),
-            "color_space": f"{img.mode} (Pillow decoded)",
-            "histogram": histogram,
-            "brightness": {
-                "value": brightness_val,
-                "status": brightness_status,
-                "median": round(p50, 2),
-                "p01": round(p01, 2),
-                "p99": round(p99, 2),
-                "clipped_high_percent": round(clipped_high_pct, 3),
-                "clipped_low_percent": round(clipped_low_pct, 3),
-                "is_studio_white_bg": is_studio_white,
-                "is_studio_black_bg": is_studio_black
-            },
-            "contrast": {
-                "value": contrast_val,
-                "status": contrast_status,
-                "p10": round(p10, 2),
-                "p90": round(p90, 2)
-            },
-            "sharpness": {
-                "value": sharpness_val,
-                "status": sharpness_status,
-                "raw_score": round(sharpness_score, 4),
-                "laplacian_variance": round(lap_var, 4),
-                "normalized_score": round(normalized_sharpness, 4),
-                "has_local_blur_anomaly": local_sharpness_alert
-            },
-            "noise": {
-                "value": noise_val,
-                "status": noise_status,
-                "raw_sigma": round(float(sigma), 4)
-            },
-            "brisque": {
-                "score": brisque_score,
-                "status": brisque_status,
-                "benchmark": "Ideal Stock Range: 0 - 35 (Lower = Sharper/Natural)"
-            },
-            "niqe": {
-                "score": niqe_score,
-                "status": niqe_status,
-                "benchmark": "Ideal Stock Range: 1.5 - 5.0 (Lower = Higher Natural Scene Fidelity)"
-            },
-            "segmentation": seg_info,
-            "florence_grounding": florence_res,
-            "transparency": edges,
-            "banding": {
-                "score": round(float(banding), 2),
-                "status": "Review possible banding" if banding > 65 else "No strong banding signal"
-            },
-            "jpeg_blocking": {
-                "score": round(float(jpeg_blocking), 2),
-                "status": "Strong repeated 8x8 blocking signal" if jpeg_blocking > 65 else ("Moderate blocking signal" if jpeg_blocking > 40 else "No strong blocking signal")
-            },
-            "background_edge_analysis": bg_edges,
-            "ocr": ocr,
-            "local_analysis": local_grid,
-            "visible_pixel_analysis": True,
-            "file_validation": "Valid (Passed OpenCV + BRISQUE + NIQE + Florence Visual Grounding)",
-            "file_size_kb": file_size_kb
-        }
-
+        report = analyze_image(img, file_size_kb=file_size_kb, file_path=file_path)
         print(json.dumps(report, ensure_ascii=False))
 
     except Exception as e:
