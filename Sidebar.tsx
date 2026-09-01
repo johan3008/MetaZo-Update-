@@ -311,16 +311,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {!sidebarCollapsed && <span>{t.sidebar_calendar_gen}</span>}
             </a>
 
-            <a href={toolToPath[ToolType.SEARCH_GEN]} onClick={(e) => handleNavClick(e, ToolType.SEARCH_GEN)}
-              className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
-                activeTool === ToolType.SEARCH_GEN 
-                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-indigo-500" 
-                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              <Compass size={16} className={activeTool === ToolType.SEARCH_GEN ? "text-indigo-400 animate-spin" : "text-slate-400"} style={activeTool === ToolType.SEARCH_GEN ? { animationDuration: '6s' } : undefined} />
-              {!sidebarCollapsed && <span>{t.sidebar_search_gen || "Search Gen"}</span>}
-            </a>
 
             <a href={toolToPath[ToolType.MUTE_VIDEO]} onClick={(e) => handleNavClick(e, ToolType.MUTE_VIDEO)}
               className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
@@ -369,8 +359,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {!sidebarCollapsed && <span>{t.sidebar_ftp_uploader || "FTP Auto Uploader"}</span>}
               </div>
               {!sidebarCollapsed && (
-                <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  PRO
+                <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center space-x-1 ${
+                  isLicensed
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                }`}>
+                  {!isLicensed && <Lock size={9} />}
+                  <span>PRO</span>
                 </span>
               )}
             </a>
@@ -742,16 +737,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <Calendar size={14} className={activeTool === ToolType.CALENDAR_GEN ? "text-emerald-400" : "text-slate-400"} />
                       <span>{t.sidebar_calendar_gen}</span></button>
 
-                    <button 
-                      onClick={() => { setActiveTool(ToolType.SEARCH_GEN); setSidebarOpen(false); }}
-                      className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
-                        activeTool === ToolType.SEARCH_GEN 
-                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-indigo-500" 
-                          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                      }`}
-                    >
-                      <Compass size={14} className={activeTool === ToolType.SEARCH_GEN ? "text-indigo-400 animate-spin" : "text-slate-400"} />
-                      <span>{t.sidebar_search_gen || "Search Gen"}</span></button>
 
                     <button 
                       onClick={() => { setActiveTool(ToolType.MUTE_VIDEO); setSidebarOpen(false); }}
@@ -800,8 +785,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <UploadCloud size={14} className={activeTool === ToolType.FTP_UPLOADER ? "text-violet-400" : "text-slate-400"} />
                         <span>{t.sidebar_ftp_uploader || "FTP Auto Uploader"}</span>
                       </div>
-                      <span className="text-[7.5px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                        PRO
+                      <span className={`text-[7.5px] font-black uppercase px-1.5 py-0.5 rounded-full flex items-center space-x-1 ${
+                        isLicensed
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                      }`}>
+                        {!isLicensed && <Lock size={9} />}
+                        <span>PRO</span>
                       </span>
                     </button>
                   </nav>

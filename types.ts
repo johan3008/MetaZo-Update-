@@ -11,7 +11,6 @@ export enum ToolType {
   PROMPT_VIDEO_CHECK = 'prompt_video_check',
   VECTOR_EPS = 'vector_eps',
   CALENDAR_GEN = 'calendar_gen',
-  SEARCH_GEN = 'search_gen',
   MUTE_VIDEO = 'mute_video',
   MOTION_GEN = 'motion_gen',
   ANTI_SPAM = 'anti_spam',
@@ -31,7 +30,6 @@ export const toolToPath: Record<ToolType, string> = {
   [ToolType.PROMPT_VIDEO_CHECK]: '/AiVideoQualityCheck',
   [ToolType.VECTOR_EPS]: '/EpsConverter',
   [ToolType.CALENDAR_GEN]: '/NicheCalendar',
-  [ToolType.SEARCH_GEN]: '/SearchGen',
   [ToolType.MUTE_VIDEO]: '/MuteVideoGen',
   [ToolType.MOTION_GEN]: '/MotionGen',
   [ToolType.ANTI_SPAM]: '/SimilarContentChecker',
@@ -181,32 +179,6 @@ export interface ContentGapItem {
   competitionNotes: string;
 }
 
-export interface SearchGenResult {
-  query: string;
-  category: string;
-  opportunityScore: number; // 0 - 100
-  statusBadge: 'GOLDEN_NICHE' | 'HIGH_OPPORTUNITY' | 'MODERATE' | 'OVERSATURATED';
-  metrics: {
-    totalEstimatedAssets: number;
-    competitionLevel: 'Ultra Low' | 'Low' | 'Medium' | 'High' | 'Saturated';
-    demandVelocity: 'Trending (+200%)' | 'Rising (+120%)' | 'Steady' | 'Declining';
-    demandType: 'Evergreen' | 'Seasonal' | 'Emerging Tech';
-    targetBuyers: string[];
-    commercialUseCases: string[];
-  };
-  contentGaps: ContentGapItem[];
-  readyPrompts: {
-    imagePrompt: string;
-    videoPrompt: string;
-    isometricOr3dPrompt?: string;
-  };
-  readyKeywords: string[];
-  topReferenceAssets?: {
-    id: string;
-    title: string;
-    imageUrl: string;
-    detailUrl?: string;
-  }[];
-}
+
 
 
