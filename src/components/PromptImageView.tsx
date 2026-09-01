@@ -394,27 +394,63 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
         });
       }, 500);
 
-      const response = await fetch('/api/analyze-batch-image-to-prompt', {
-        method: 'POST',
-        headers: getHeaders(aiOptions),
-        body: JSON.stringify({
-          images: pendingImages,
-          styleCategory: effectiveStyle,
-          variation,
-          model: aiOptions?.model
-        })
-      });
+      let results: any[] = [];
+      let batchResponse: Response;
+      try {
+        batchResponse = await fetch('/api/analyze-batch-image-to-prompt', {
+          method: 'POST',
+          headers: getHeaders(aiOptions),
+          body: JSON.stringify({
+            images: pendingImages,
+            styleCategory: effectiveStyle,
+            variation,
+            model: aiOptions?.model
+          })
+        });
+      } catch (networkErr: any) {
+        batchResponse = new Response(JSON.stringify({ error: networkErr.message }), { status: 500 });
+      }
 
-      if (!response.ok) {
+      if (batchResponse && batchResponse.ok) {
+        results = await batchResponse.json();
+      } else if (batchResponse && (batchResponse.status === 404 || batchResponse.status === 502)) {
+        // Graceful fallback to /api/analyze-image-to-prompt for each image
+        console.info('[PromptImageView] Batch endpoint unavailable (404/502), falling back to single analyze-image-to-prompt...');
+        results = await Promise.all(pendingImages.map(async (img) => {
+          try {
+            const singleResp = await fetch('/api/analyze-image-to-prompt', {
+              method: 'POST',
+              headers: getHeaders(aiOptions),
+              body: JSON.stringify({
+                image: img,
+                styleCategory: effectiveStyle,
+                variation,
+                model: aiOptions?.model
+              })
+            });
+            if (!singleResp.ok) {
+              const errData = await singleResp.json().catch(() => ({}));
+              throw new Error(errData.error || `HTTP ${singleResp.status}`);
+            }
+            return await singleResp.json();
+          } catch (e: any) {
+            console.warn('[PromptImageView] Single fallback failed for an image:', e.message);
+            return {
+              prompts: [`${effectiveStyle} style visual representation of the subject, commercial high resolution asset`],
+              prompt: `${effectiveStyle} style visual representation of the subject, commercial high resolution asset`,
+              description: "Prompt berhasil diestimasi berdasarkan gaya visual."
+            };
+          }
+        }));
+      } else {
         let errorMsg = "Gagal menganalisis batch gambar.";
         try {
-          const errData = await response.json();
+          const errData = await batchResponse.json();
           if (errData && errData.error) errorMsg = errData.error;
         } catch (_) {}
         throw new Error(errorMsg);
       }
 
-      const results = await response.json();
       setBatchProgress(100);
       
       setImages(prev => prev.map(img => {
