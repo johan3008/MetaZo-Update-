@@ -25,7 +25,6 @@ import { PromptVideoView } from './src/components/PromptVideoView';
 import { ImageCheckView } from './src/components/ImageCheckView';
 import { VideoQualityCheck } from './src/components/VideoQualityCheck';
 import { CalendarGenView } from './src/components/CalendarGenView';
-import { SearchGenView } from './src/components/SearchGenView';
 import { MuteVideoView } from './src/components/MuteVideoView';
 import { MotionGenView } from './src/components/MotionGenView';
 import { AntiSpamView } from './src/components/AntiSpamView';
@@ -998,8 +997,6 @@ const extractVideoHybrid = async (file: File): Promise<string[]> => {
     }
 };
 
-
-
 const getToolFromPath = (path: string): ToolType | null => {
   const normalized = path.toLowerCase().replace(/^\/+/g, '').trim();
   switch (normalized) {
@@ -1011,11 +1008,9 @@ const getToolFromPath = (path: string): ToolType | null => {
     case 'imagetoprompt': return ToolType.PROMPT_IMAGE;
     case 'videokeywordanalyzer': return ToolType.PROMPT_VIDEO;
     case 'aiqualitycheck': return ToolType.PROMPT_IMAGE_CHECK;
-    
     case 'aivideoqualitycheck': return ToolType.PROMPT_VIDEO_CHECK;
     case 'epsconverter': return ToolType.VECTOR_EPS;
     case 'nichecalendar': return ToolType.CALENDAR_GEN;
-    case 'searchgen': return ToolType.SEARCH_GEN;
     case 'mutevideogen': return ToolType.MUTE_VIDEO;
     case 'motiongen': return ToolType.MOTION_GEN;
     case 'removalgen': return ToolType.REMOVAL_GEN;
@@ -1618,9 +1613,7 @@ const App: React.FC = () => {
       ToolType.PROMPT_VIDEO,
       ToolType.PROMPT_IMAGE_CHECK,
       ToolType.PROMPT_VIDEO_CHECK,
-      ToolType.PROMPT_VIDEO_CHECK,
       ToolType.CALENDAR_GEN,
-      ToolType.SEARCH_GEN,
       ToolType.MUTE_VIDEO,
       ToolType.MOTION_GEN
     ];
@@ -1642,7 +1635,6 @@ const App: React.FC = () => {
       [ToolType.PROMPT_VIDEO_CHECK]: getDailyCount(ToolType.PROMPT_VIDEO_CHECK),
       [ToolType.VECTOR_EPS]: 0,
       [ToolType.CALENDAR_GEN]: getDailyCount(ToolType.CALENDAR_GEN),
-      [ToolType.SEARCH_GEN]: getDailyCount(ToolType.SEARCH_GEN),
       [ToolType.MUTE_VIDEO]: getDailyCount(ToolType.MUTE_VIDEO),
       [ToolType.MOTION_GEN]: getDailyCount(ToolType.MOTION_GEN)
     });
@@ -1885,7 +1877,6 @@ const App: React.FC = () => {
             ToolType.PROMPT_VIDEO,
             ToolType.PROMPT_IMAGE_CHECK,
             ToolType.CALENDAR_GEN,
-            ToolType.SEARCH_GEN,
             ToolType.MUTE_VIDEO,
             ToolType.MOTION_GEN
           ];
@@ -4922,20 +4913,7 @@ const App: React.FC = () => {
               }}
               aiOptions={commonAiOptions}
             />
-          ) : activeTool === ToolType.SEARCH_GEN ? (
-            <SearchGenView 
-              t={t}
-              onSendToPrompt={(text) => {
-                setPrefilledSubject(text);
-                handleSetActiveTool(ToolType.PROMPT_GEN);
-              }}
-              onSendToMetadata={(keywords, title) => {
-                if (title) setCustomPrompt(title);
-                handleSetActiveTool(ToolType.IMAGE);
-              }}
-              aiOptions={commonAiOptions}
-            />
-          ) : activeTool === ToolType.MUTE_VIDEO ? (
+) : activeTool === ToolType.MUTE_VIDEO ? (
             <MuteVideoView 
               t={t} 
               isLicensed={isMzLicensed}
@@ -4977,6 +4955,7 @@ const App: React.FC = () => {
               isLicensed={isMzLicensed}
               onNavigateToMetadata={() => handleSetActiveTool(ToolType.IMAGE)}
               uiLanguage={uiLanguage}
+              setShowActivationModal={setShowActivationModal}
             />
           ) : (
             <>
@@ -4989,7 +4968,6 @@ const App: React.FC = () => {
                     style={{ width: `${(progressInfo.current / progressInfo.total) * 100}%` }}
                   />
                 )}
-                
                 <div>
                   <div className="flex items-center gap-4">
                     <h2 className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tighter flex items-center gap-3">

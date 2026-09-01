@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Server, UploadCloud, CheckCircle2, AlertCircle, Loader2, Play, Trash2, 
+  Crown, Server, UploadCloud, CheckCircle2, AlertCircle, Loader2, Play, Trash2, 
   Key, Lock, Unlock, Globe, RefreshCw, FileUp, FileText, Check, X, 
   ExternalLink, ShieldCheck, Eye, EyeOff, HelpCircle, FolderUp, 
   HardDrive, Sparkles, Layers, ArrowRight, ShieldAlert, FileImage, 
@@ -15,6 +15,7 @@ interface FtpUploaderViewProps {
   isLicensed?: boolean;
   onNavigateToMetadata?: () => void;
   uiLanguage?: 'id' | 'en';
+  setShowActivationModal?: (show: boolean) => void;
 }
 
 export const DEFAULT_FTP_ACCOUNTS: FtpAccountConfig[] = [
@@ -158,9 +159,10 @@ const AGENCY_META: Record<string, { badgeColor: string; textColor: string; borde
 
 export const FtpUploaderView: React.FC<FtpUploaderViewProps> = ({
   t,
-  isLicensed = true,
+  isLicensed = false,
   onNavigateToMetadata,
-  uiLanguage = 'id'
+  uiLanguage = 'id',
+  setShowActivationModal
 }) => {
   const isIndo = uiLanguage === 'id';
   
@@ -238,6 +240,10 @@ export const FtpUploaderView: React.FC<FtpUploaderViewProps> = ({
 
   // Test FTP Connection
   const handleTestConnection = async (acc: FtpAccountConfig) => {
+    if (!isLicensed) {
+      setShowActivationModal?.(true);
+      return;
+    }
     if (!acc.host || !acc.username || !acc.password) {
       setTestingMap(prev => ({ ...prev, [acc.id]: 'error' }));
       setTestMessageMap(prev => ({ 
@@ -632,6 +638,94 @@ export const FtpUploaderView: React.FC<FtpUploaderViewProps> = ({
 
       {/* 3. TAB CONTENT */}
       <AnimatePresence mode="wait">
+      {/* PRO / SUBSCRIPTION ACTIVATION GATE */}
+      {!isLicensed && activeTab !== 'guide' ? (
+        <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-b from-slate-900/95 via-slate-900 to-indigo-950/80 dark:from-slate-900 dark:via-slate-900 dark:to-violet-950/60 p-8 sm:p-12 border border-amber-500/30 shadow-2xl text-center space-y-8">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="relative z-10 max-w-2xl mx-auto space-y-6">
+            <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-black uppercase tracking-wider shadow-sm">
+              <Crown size={14} className="text-amber-400 animate-bounce" />
+              <span>{isIndo ? 'Fitur Eksklusif PRO & Berlangganan' : 'Exclusive PRO & Subscriber Feature'}</span>
+            </div>
+
+            <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-amber-500 via-amber-400 to-amber-600 flex items-center justify-center shadow-2xl shadow-amber-500/30 text-slate-950 ring-8 ring-amber-500/10">
+              <Lock size={36} strokeWidth={2.5} />
+            </div>
+
+            <div className="space-y-2.5">
+              <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight">
+                {isIndo ? 'Akses Auto FTP & SFTP Uploader Terkunci' : 'FTP & SFTP Auto Uploader Locked'}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed max-w-xl mx-auto">
+                {isIndo
+                  ? 'Otomatisasi pengiriman aset visual (Foto, Video 4K, Vektor EPS/SVG, & File CSV) langsung ke Adobe Stock (SFTP Port 22), Shutterstock, Freepik, dan agensi lainnya secara paralel hanya tersedia untuk pengguna Akun Pro / Berlangganan.'
+                  : 'Automated direct multi-agency uploading (Photos, 4K Footage, Vectors, & CSV) to Adobe Stock (SFTP Port 22), Shutterstock, Freepik, and other stock portals is exclusively available for Pro accounts.'}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs">
+                  <Zap size={14} />
+                  <span>{isIndo ? 'Multi-Agency Concurrent Upload' : 'Multi-Agency Upload'}</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  {isIndo ? 'Kirim batch file ke banyak agensi sekaligus dalam 1 kali klik.' : 'Dispatch batch files to multiple agencies simultaneously.'}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <div className="flex items-center space-x-2 text-emerald-400 font-bold text-xs">
+                  <ShieldCheck size={14} />
+                  <span>{isIndo ? 'Dukungan SFTP Port 22 & TLS' : 'SFTP Port 22 & TLS Support'}</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  {isIndo ? 'Kompatibel penuh dengan SFTP Adobe Stock & FTP TLS Shutterstock.' : 'Fully compatible with Adobe Stock SFTP & Shutterstock TLS.'}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <div className="flex items-center space-x-2 text-violet-400 font-bold text-xs">
+                  <Layers size={14} />
+                  <span>{isIndo ? 'Antrean Batch Tanpa Batas' : 'Unlimited Batch Queue'}</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  {isIndo ? 'Upload puluhan hingga ratusan aset tanpa kuota harian.' : 'Upload large batches without daily limits.'}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <div className="flex items-center space-x-2 text-cyan-400 font-bold text-xs">
+                  <Key size={14} />
+                  <span>{isIndo ? 'Kredensial Aman di Komputer Anda' : 'Secure Local Credentials'}</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  {isIndo ? 'Password dan host tersimpan lokal dengan keamanan terenkripsi.' : 'Credentials securely stored on your local device.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => setShowActivationModal?.(true)}
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider shadow-xl shadow-amber-500/25 flex items-center justify-center space-x-2 transition-all transform active:scale-95 cursor-pointer"
+              >
+                <Crown size={16} />
+                <span>{isIndo ? 'Aktivasi Lisensi PRO Sekarang' : 'Activate PRO License Now'}</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('guide')}
+                className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider border border-white/10 flex items-center justify-center space-x-2 transition-all cursor-pointer"
+              >
+                <HelpCircle size={15} />
+                <span>{isIndo ? 'Baca Panduan Kredensial FTP' : 'Read FTP Setup Guide'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (<>
         
         {/* ======================= TAB 1: BATCH AUTO UPLOADER ======================= */}
         {activeTab === 'upload' && (
@@ -1171,7 +1265,8 @@ export const FtpUploaderView: React.FC<FtpUploaderViewProps> = ({
             </div>
           </motion.div>
         )}
-
+        </>
+      )}
       </AnimatePresence>
 
       {/* Custom Server Modal */}
