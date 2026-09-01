@@ -231,30 +231,32 @@ export const generateMotionCode = async (
 };
 
 export const fetchCalendarEvents = async (month: string, options?: ServiceOptions): Promise<{ events: any[] }> => {
-  const response = await fetch('/api/generate-calendar-events', {
+  const response = await fetchWithRetry('/api/generate-calendar-events', {
     method: 'POST',
     headers: getHeaders(options),
     body: JSON.stringify({ month, model: options?.model })
   });
 
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || "Failed to fetch calendar events");
+  const rawText = await response.text();
+  try {
+    return JSON.parse(rawText);
+  } catch (e) {
+    throw new Error(`Invalid response from server: ${rawText.substring(0, 100)}`);
   }
-  return response.json();
 };
 
 export const fetchEventKeywords = async (eventName: string, eventDetails: string, options?: ServiceOptions): Promise<{ keywords: string[] }> => {
-  const response = await fetch('/api/generate-event-keywords', {
+  const response = await fetchWithRetry('/api/generate-event-keywords', {
     method: 'POST',
     headers: getHeaders(options),
     body: JSON.stringify({ eventName, eventDetails, model: options?.model })
   });
 
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || "Failed to fetch event keywords");
+  const rawText = await response.text();
+  try {
+    return JSON.parse(rawText);
+  } catch (e) {
+    throw new Error(`Invalid response from server: ${rawText.substring(0, 100)}`);
   }
-  return response.json();
 };
 

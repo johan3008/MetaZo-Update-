@@ -405,10 +405,13 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
         })
       });
 
-      clearInterval(progressInterval);
-
       if (!response.ok) {
-        throw new Error("Gagal menganalisis batch gambar.");
+        let errorMsg = "Gagal menganalisis batch gambar.";
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) errorMsg = errData.error;
+        } catch (_) {}
+        throw new Error(errorMsg);
       }
 
       const results = await response.json();
