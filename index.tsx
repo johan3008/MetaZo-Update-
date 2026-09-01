@@ -3,51 +3,56 @@ import ReactDOM from 'react-dom/client';
 import { Analytics } from '@vercel/analytics/react';
 import App from './App';
 
-// Intercept all local fetch requests to inject custom Provider API Keys if defined by user
-const originalFetch = window.fetch;
+// Safely intercept local /api/ fetch requests to inject custom Provider API Keys
+if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+  const originalFetch = window.fetch.bind(window);
 
-function injectProviderHeaders(init: any, url: any) {
-  if (url && (typeof url === 'string') && (url.startsWith('/api/') || url.includes('/api/'))) {
-    const geminiKey = localStorage.getItem('gemini_api_key') || '';
-    const groqKey = localStorage.getItem('groq_api_key') || '';
-    const mistralKey = localStorage.getItem('mistral_api_key') || '';
-    const zaiKey = localStorage.getItem('zai_api_key') || '';
-    const provider = localStorage.getItem('ai_provider') || 'gemini';
+  window.fetch = function(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    try {
+      let urlStr = '';
+      if (typeof input === 'string') {
+        urlStr = input;
+      } else if (input instanceof URL) {
+        urlStr = input.toString();
+      } else if (input && typeof (input as any).url === 'string') {
+        urlStr = (input as any).url;
+      }
 
-    init = init || {};
-    const headers = new Headers(init.headers || {});
-    if (geminiKey) headers.set('x-gemini-key', geminiKey);
-    if (groqKey) headers.set('x-groq-key', groqKey);
-    if (mistralKey) headers.set('x-mistral-key', mistralKey);
-    if (zaiKey) headers.set('x-zai-key', zaiKey);
-    headers.set('x-ai-provider', provider);
-    init.headers = headers;
-  }
-  return init;
-}
+      // Only modify internal /api/ requests, leave Supabase and external calls 100% untouched
+      if (urlStr && (urlStr.startsWith('/api/') || urlStr.includes('/api/'))) {
+        const geminiKey = localStorage.getItem('gemini_api_key') || '';
+        const groqKey = localStorage.getItem('groq_api_key') || '';
+        const mistralKey = localStorage.getItem('mistral_api_key') || '';
+        const zaiKey = localStorage.getItem('zai_api_key') || '';
+        const provider = localStorage.getItem('ai_provider') || 'gemini';
 
-try {
-  Object.defineProperty(window, 'fetch', {
-    configurable: true,
-    enumerable: true,
-    writable: true,
-    value: function(input: any, init: any) {
-      const url = typeof input === 'string' ? input : (input && (input as any).url);
-      init = injectProviderHeaders(init, url);
-      return originalFetch.call(this, input, init);
+        const customHeaders: Record<string, string> = {
+          'x-ai-provider': provider
+        };
+        if (geminiKey) customHeaders['x-gemini-key'] = geminiKey;
+        if (groqKey) customHeaders['x-groq-key'] = groqKey;
+        if (mistralKey) customHeaders['x-mistral-key'] = mistralKey;
+        if (zaiKey) customHeaders['x-zai-key'] = zaiKey;
+
+        if (!init) {
+          init = { headers: customHeaders };
+        } else if (init.headers instanceof Headers) {
+          for (const [k, v] of Object.entries(customHeaders)) {
+            init.headers.set(k, v);
+          }
+        } else if (Array.isArray(init.headers)) {
+          for (const [k, v] of Object.entries(customHeaders)) {
+            init.headers.push([k, v]);
+          }
+        } else {
+          init.headers = { ...(init.headers || {}), ...customHeaders };
+        }
+      }
+    } catch (e) {
+      console.warn('[fetch interceptor] Non-fatal header injection error:', e);
     }
-  });
-} catch (e) {
-  console.error('[fetch interceptor] Object.defineProperty failed, trying direct property definition', e);
-  try {
-    (window as any).fetch = function(input: any, init: any) {
-      const url = typeof input === 'string' ? input : (input && (input as any).url);
-      init = injectProviderHeaders(init, url);
-      return originalFetch.call(this, input, init);
-    };
-  } catch (err) {
-    console.error('[fetch interceptor] All attempts to intercept window.fetch failed', err);
-  }
+    return originalFetch(input, init);
+  };
 }
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: any }> {
