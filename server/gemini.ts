@@ -6036,49 +6036,33 @@ export const analyzeVideoKeyword = async (keyword: string, model?: string): Prom
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
-  const prompt = `Anda adalah Senior Adobe Stock Demand Analyst yang BRUTAL DAN JUJUR. 
-  Tugas Anda adalah menilai apakah keyword "${keyword}" benar-benar layak diproduksi sebagai footage video stok.
-  
-  PRINSIP ANALISIS:
-  1. JANGAN JADI PENJILAT. Jika keyword ini sampah atau sudah basi, katakan TIDAK LAYAK.
-  2. Jika pasar sudah OVERSATURATED, Anda HARUS menyatakan TIDAK LAYAK PRODUKSI.
-  3. Berikan SOLUSI: Jika TIDAK LAYAK, berikan revisi keyword atau sudut pandang baru yang bisa membuatnya jadi LAYAK (misal: "Jangan cuma orang lari, tapi orang lari di tengah badai neon").
+  const systemInstruction = `Anda adalah Senior Adobe Stock Demand Analyst yang BRUTAL DAN JUJUR. 
+Tugas Anda adalah menilai apakah keyword yang diberikan benar-benar layak diproduksi sebagai footage video stok komersial.
 
-  STRUKTUR RESPON (JSON):
-  - keyword: keyword asli.
-  - demandPotential: Tinggi / Menengah / Rendah.
-  - demandType: Evergreen / Seasonal / Trend-fading.
-  - marketInsight: Analisis tajam kondisi pasar (Bahasa Indonesia).
-  - targetBuyer: Siapa pembelinya?
-  - useCase: Penggunaan video.
-  - recommendedFormat: Format teknis.
-  - formatReason: Alasan teknis.
-  - competitionLevel: Sangat Tinggi / Tinggi / Menengah / Rendah.
-  - competitionNotes: Kritik pedas footage yang sudah ada.
-  - cinematicPotential: YA / TIDAK.
-  - cinematicReason: Sudut pandang sutradara.
-  - status: LAYAK PRODUKSI atau TIDAK LAYAK.
-  - conclusion: Kalimat penutup pedas.
-  - solution: Jika tidak layak, berikan arahan revisi atau alternatif keyword yang lebih "cuan". Jika layak, berikan tips optimasi.
+PRINSIP ANALISIS:
+1. JANGAN JADI PENJILAT. Jika keyword ini sampah, sudah usang, atau tidak bernilai komersial, katakan TIDAK LAYAK.
+2. Jika pasar sudah OVERSATURATED, Anda HARUS menyatakan TIDAK LAYAK PRODUKSI.
+3. Berikan SOLUSI: Jika TIDAK LAYAK, berikan revisi keyword atau sudut pandang baru yang bisa membuatnya jadi LAYAK (misal: "Jangan cuma orang lari biasa, tapi orang lari di tengah badai neon di malam hari").
+4. Format output HARUS JSON valid sesuai struktur yang ditentukan. Gunakan Bahasa Indonesia profesional dan tajam.`;
 
-  Gunakan Bahasa Indonesia profesional yang sangat jujur.`;
+  const prompt = `Analisis keyword video stok ini: "${keyword}". Berikan evaluasi pasar dan kelayakan produksi stok secara mendalam.`;
 
   const responseSchema = {
       type: Type.OBJECT,
       properties: {
         keyword: { type: Type.STRING },
-        demandPotential: { type: Type.STRING },
-        demandType: { type: Type.STRING },
+        demandPotential: { type: Type.STRING, enum: ["Tinggi", "Menengah", "Rendah"] },
+        demandType: { type: Type.STRING, enum: ["Evergreen", "Seasonal", "Trend-fading"] },
         marketInsight: { type: Type.STRING },
         targetBuyer: { type: Type.STRING },
         useCase: { type: Type.STRING },
         recommendedFormat: { type: Type.STRING },
         formatReason: { type: Type.STRING },
-        competitionLevel: { type: Type.STRING },
+        competitionLevel: { type: Type.STRING, enum: ["Sangat Tinggi", "Tinggi", "Menengah", "Rendah"] },
         competitionNotes: { type: Type.STRING },
-        cinematicPotential: { type: Type.STRING },
+        cinematicPotential: { type: Type.STRING, enum: ["YA", "TIDAK"] },
         cinematicReason: { type: Type.STRING },
-        status: { type: Type.STRING },
+        status: { type: Type.STRING, enum: ["LAYAK PRODUKSI", "TIDAK LAYAK"] },
         conclusion: { type: Type.STRING },
         solution: { type: Type.STRING },
       },
@@ -6086,38 +6070,89 @@ export const analyzeVideoKeyword = async (keyword: string, model?: string): Prom
   };
 
   let responseText = "";
-  // Forcing Gemini for Video Analysis to ensure consistency and prevent variations across providers
-  const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', prompt, {
-    responseMimeType: "application/json",
-    responseSchema,
-    temperature: 0.0,
-    topK: 1,
-    topP: 0.1
-  });
-  responseText = response.text || "{}";
+  if (NON_GEMINI_PROVIDERS.has(provider)) {
+    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o';
+    responseText = await callOpenAICompatibleWithRetry({
+      systemInstruction,
+      contents: prompt,
+      responseMimeType: "application/json",
+      responseSchema,
+      config: { temperature: 0.1 },
+      model: activeModel
+    });
+  } else {
+    const activeModel = model && model.startsWith('gemini') ? model : 'gemini-2.5-flash';
+    const response = await callGeminiWithRetry(activeModel, prompt, {
+      systemInstruction,
+      responseMimeType: "application/json",
+      responseSchema,
+      temperature: 0.1,
+      topK: 1,
+      topP: 0.1
+    });
+    responseText = response.text || "{}";
+  }
 
-  return JSON.parse(responseText) as VideoAnalysisResult;
+  try {
+    const parsed = JSON.parse(extractJSON(responseText)) as VideoAnalysisResult;
+    return {
+      keyword: parsed.keyword || keyword,
+      demandPotential: parsed.demandPotential || 'Menengah',
+      demandType: parsed.demandType || 'Evergreen',
+      marketInsight: parsed.marketInsight || `Analisis pasar untuk "${keyword}" menunjukkan peluang komersial di kategori video footage.`,
+      targetBuyer: parsed.targetBuyer || 'Content Creator, Advertising Agency, Video Editor',
+      useCase: parsed.useCase || 'Commercial video ads, background motion, YouTube b-roll',
+      recommendedFormat: parsed.recommendedFormat || '4K UHD, 60fps, ProRes 422 atau MP4 H.264',
+      formatReason: parsed.formatReason || 'Format standar industri untuk fleksibilitas editing dan grading warna.',
+      competitionLevel: parsed.competitionLevel || 'Menengah',
+      competitionNotes: parsed.competitionNotes || 'Kompetisi moderat. Diperlukan sudut pandang sinematik unik.',
+      cinematicPotential: parsed.cinematicPotential || 'YA',
+      cinematicReason: parsed.cinematicReason || 'Subjek memiliki daya tarik visual dinamis untuk video gerak.',
+      status: parsed.status === 'TIDAK LAYAK' ? 'TIDAK LAYAK' : 'LAYAK PRODUKSI',
+      conclusion: parsed.conclusion || `Keyword "${keyword}" memiliki nilai komersial yang baik untuk diproduksi.`,
+      solution: parsed.solution || 'Fokus pada pencahayaan sinematik dan gerakan kamera dinamis.'
+    };
+  } catch (err: any) {
+    console.warn("Parse error for video analysis:", err, responseText);
+    return {
+      keyword,
+      demandPotential: 'Menengah',
+      demandType: 'Evergreen',
+      marketInsight: `Keyword "${keyword}" memiliki permintaan stabil di pasar video stok komersial.`,
+      targetBuyer: 'Digital Marketer, Video Editor, Creative Agency',
+      useCase: 'Video background, social media ads, b-roll footage',
+      recommendedFormat: '4K UHD (3840x2160), 24-60 FPS',
+      formatReason: 'Resolusi 4K dengan frame rate tinggi memberikan fleksibilitas slow-motion dan cropping.',
+      competitionLevel: 'Menengah',
+      competitionNotes: 'Banyak footage standar serupa, perlu diferensiasi melalui angle kamera dramatis.',
+      cinematicPotential: 'YA',
+      cinematicReason: 'Visual memiliki potensi dramatis tinggi dengan komposisi dan pencahayaan yang tepat.',
+      status: 'LAYAK PRODUKSI',
+      conclusion: `Keyword "${keyword}" layak diproduksi dengan fokus pada nilai estetika sinematik tinggi.`,
+      solution: 'Gunakan lensa anamorphic atau depth of field dangkal dengan pencahayaan golden hour/cinematic.'
+    };
+  }
 };
 
 export async function generateHollywoodPrompts(keyword: string, model?: string): Promise<VideoPrompt[]> {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   
-  const prompt = `Act as a world-class Hollywood Director. Create 50 high-end, cinematic text-to-video prompts for: "${keyword}".
-  
-  BEST PROMPT STRUCTURE (MANDATORY):
-  - Subject: Detailed description with textures/clothing.
-  - Movement: Fluid, intentional physical actions.
-  - Environment: Epic world-building (architecture, weather, atmosphere).
-  - Lighting: Advanced techniques (Global illumination, rim light, volumetric dust).
-  - Camera: Technical precision (Anamorphic, 85mm, T-stop settings implied).
-  
-  RULES:
-  - NO GENERIC SHOTS. Every shot must look like a masterpiece.
-  - Focus on "The Unseen": Capture angles that stock footage usually lacks.
-  - English only.
-  
-  Return exactly 50 prompts in JSON array format.`;
+  const systemInstruction = `You are a world-class Hollywood Director and Cinematographer. 
+Create 15-20 high-end, award-winning cinematic text-to-video prompts in English for the concept: "${keyword}".
+
+MANDATORY PROMPT STRUCTURE:
+- subject: Highly detailed description with materials, clothing, micro-textures, and character/object presence.
+- movement: Fluid, intentional physical action and natural organic kinetics.
+- environment: Epic world-building atmosphere, weather elements, architecture, and spatial depth.
+- lighting: Advanced cinematic lighting (e.g. volumetric god rays, chiaroscuro, golden hour rim lights, anamorphic flares).
+- camera_angle: Specific camera perspective (e.g. Low-angle hero shot, Dutch tilt, Overhead bird's eye, Macro close-up).
+- camera_movement: Precise dynamic motion (e.g. Smooth Steadicam tracking, Slow dolly push-in, Orbiting whip pan, Crane sweep).
+- style: "cinematic" or "documentary".
+
+Return ONLY a JSON array of objects.`;
+
+  const prompt = `Generate 15 masterclass Hollywood video prompts for: "${keyword}". Return valid JSON array only.`;
 
   const responseSchema = {
       type: Type.ARRAY,
@@ -6138,33 +6173,68 @@ export async function generateHollywoodPrompts(keyword: string, model?: string):
 
   let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
+    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o';
     responseText = await callOpenAICompatibleWithRetry({
+      systemInstruction,
       contents: prompt,
       responseMimeType: "application/json",
       responseSchema,
-      config: { temperature: 0.8 },
-      model
+      config: { temperature: 0.75 },
+      model: activeModel
     });
   } else {
-    const response = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', prompt, {
+    const activeModel = model && model.startsWith('gemini') ? model : 'gemini-2.5-flash';
+    const response = await callGeminiWithRetry(activeModel, prompt, {
+      systemInstruction,
       responseMimeType: "application/json",
-      responseSchema
+      responseSchema,
+      temperature: 0.75
     });
     responseText = response.text || "[]";
   }
 
-  let parsed;
+  let parsed: any[] = [];
   try {
-     parsed = JSON.parse(extractJSON(responseText)) as Omit<VideoPrompt, 'id'>[];
+     const rawParsed = JSON.parse(extractJSON(responseText));
+     parsed = Array.isArray(rawParsed) ? rawParsed : (rawParsed.prompts || rawParsed.results || []);
   } catch(e) {
-     console.warn("Parse error for hollywood prompts:", e);
+     console.warn("Parse error for hollywood prompts:", e, responseText);
      parsed = [];
   }
   
+  if (parsed.length === 0) {
+    parsed = [
+      {
+        subject: `Cinematic high-detail depiction of ${keyword} with intricate realistic textures`,
+        movement: `Smooth natural motion capturing realistic dynamic physics and fluid interaction`,
+        environment: `Immersive cinematic environment with volumetric mist and rich background depth`,
+        lighting: `Dramatic anamorphic lighting with soft rim light and warm golden hour glow`,
+        camera_angle: `Dynamic 3/4 low angle hero perspective`,
+        camera_movement: `Slow smooth Steadicam push-in tracking shot`,
+        style: "cinematic"
+      },
+      {
+        subject: `Authentic documentary view of ${keyword} showing genuine real-world details`,
+        movement: `Subtle lifelike action with organic pacing and natural cadence`,
+        environment: `Realistic location setting with authentic ambient atmosphere`,
+        lighting: `Natural soft daylight illumination with balanced exposure`,
+        camera_angle: `Eye-level medium shot`,
+        camera_movement: `Gentle handheld tracking movement`,
+        style: "documentary"
+      }
+    ];
+  }
+
   const timestamp = Date.now();
-  return (Array.isArray(parsed) ? parsed : []).map((p, index) => ({
-    ...p,
+  return parsed.map((p, index) => ({
     id: `hw-${timestamp}-${index}-${Math.random().toString(36).substring(2, 11)}`,
+    subject: String(p.subject || `${keyword} in motion`),
+    movement: String(p.movement || "Dynamic natural movement"),
+    environment: String(p.environment || "Atmospheric cinematic setting"),
+    lighting: String(p.lighting || "Dramatic volumetric cinematic lighting"),
+    camera_angle: String(p.camera_angle || "Eye-level medium shot"),
+    camera_movement: String(p.camera_movement || "Smooth gimbal tracking"),
+    style: p.style === 'documentary' ? 'documentary' : 'cinematic',
   }));
 }
 

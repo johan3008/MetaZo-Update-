@@ -142,15 +142,10 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
     if (e) e.preventDefault();
     if (!keyword.trim() || isAnalyzing) return;
 
-    if (!isLicensed) {
+    if (!isLicensed && dailyGenCount >= getDailyLimit()) {
       setError(uiLanguage === 'id' 
-        ? "Fitur 'Analisis Gerak' hanya tersedia untuk pengguna Premium/Langganan. Silakan upgrade akun Anda!" 
-        : "The 'Analyze Motion' feature is only available for Premium/Subscription users. Please upgrade your account!");
-      return;
-    }
-
-    if (!isLicensed && dailyGenCount >= 30) {
-      setError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, 30 - dailyGenCount)} kali generate.`);
+        ? `Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, getDailyLimit() - dailyGenCount)} kali generate.` 
+        : `Trial limit exceeded. Your remaining quota today is ${Math.max(0, getDailyLimit() - dailyGenCount)} generations.`);
       if (setShowLimitModal) {
         setShowLimitModal(true);
       }
@@ -180,7 +175,12 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
       clearInterval(progressInterval);
 
       if (!response.ok) {
-        throw new Error(t.video_studio_error_fail);
+        let errMessage = t.video_studio_error_fail;
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) errMessage = errData.error;
+        } catch (_) {}
+        throw new Error(errMessage);
       }
 
       const data = await response.json();
@@ -305,8 +305,10 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
   const handleGenerateHollywoodPrompts = async () => {
     if (!keyword.trim() || isGeneratingPrompts) return;
 
-    if (!isLicensed && dailyGenCount >= 30) {
-      setError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, 30 - dailyGenCount)} kali generate.`);
+    if (!isLicensed && dailyGenCount >= getDailyLimit()) {
+      setError(uiLanguage === 'id' 
+        ? `Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, getDailyLimit() - dailyGenCount)} kali generate.` 
+        : `Trial limit exceeded. Your remaining quota today is ${Math.max(0, getDailyLimit() - dailyGenCount)} generations.`);
       if (setShowLimitModal) {
         setShowLimitModal(true);
       }
@@ -334,7 +336,12 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
       clearInterval(progressInterval);
 
       if (!response.ok) {
-        throw new Error('Gagal menghasilkan Hollywood prompts. Coba lagi nanti.');
+        let errMessage = uiLanguage === 'id' ? 'Gagal menghasilkan Hollywood prompts. Coba lagi nanti.' : 'Failed to generate Hollywood prompts. Please try again later.';
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) errMessage = errData.error;
+        } catch (_) {}
+        throw new Error(errMessage);
       }
 
       const data = await response.json();
@@ -465,19 +472,13 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
-                  disabled={isAnalyzing || isGeneratingPrompts || (isLicensed && !keyword.trim())}
+                  disabled={isAnalyzing || isGeneratingPrompts || !keyword.trim() || (!isLicensed && dailyGenCount >= getDailyLimit())}
                   onClick={(e) => { 
                     e.preventDefault(); 
-                    if (!isLicensed) {
-                      setError(uiLanguage === 'id' 
-                        ? "Fitur 'Analisis Gerak' hanya tersedia untuk pengguna Premium/Langganan. Silakan upgrade akun Anda!" 
-                        : "The 'Analyze Motion' feature is only available for Premium/Subscription users. Please upgrade your account!");
-                      return;
-                    }
                     handleAnalyze(); 
                   }}
                   className={`h-12 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest transition-all flex items-center justify-center space-x-2 ${
-                    !isLicensed 
+                    !isLicensed && dailyGenCount >= getDailyLimit()
                       ? 'bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-600/20 active:scale-95 cursor-pointer border border-amber-500/35'
                       : 'bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 shadow-lg shadow-violet-600/20 active:scale-95'
                   }`}
@@ -490,13 +491,13 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
                   ) : (
                     <>
                       <ShieldAlert size={16} />
-                      <span>{t.video_studio_btn_analyze} {!isLicensed && '🔒'}</span>
+                      <span>{t.video_studio_btn_analyze}</span>
                     </>
                   )}
                 </button>
                 <button
                   type="button"
-                  disabled={isAnalyzing || isGeneratingPrompts || !keyword.trim()}
+                  disabled={isAnalyzing || isGeneratingPrompts || !keyword.trim() || (!isLicensed && dailyGenCount >= getDailyLimit())}
                   onClick={(e) => { e.preventDefault(); handleGenerateHollywoodPrompts(); }}
                   className="h-12 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center justify-center space-x-2"
                 >
