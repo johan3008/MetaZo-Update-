@@ -234,8 +234,15 @@ const startTabKeepAlive = () => {
         const canvasStream = keepAliveCanvas.captureStream(1) as any;
 
         // Web Audio API Keep-Alive untuk disambungkan ke canvas Stream
-        if (!keepAliveAudioCtx) {
-            keepAliveAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        if (!keepAliveAudioCtx && typeof window !== 'undefined') {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            if (AudioCtx) {
+                try {
+                    keepAliveAudioCtx = new AudioCtx();
+                } catch (e) {
+                    console.warn("AudioContext init failed", e);
+                }
+            }
         }
         if (keepAliveAudioCtx.state === 'suspended') {
             keepAliveAudioCtx.resume();
@@ -1421,7 +1428,10 @@ const App: React.FC = () => {
   // Standard crystal-clear procedural sound synthesizer
   const playNotificationChime = useCallback(() => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (typeof window === 'undefined') return;
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const audioCtx = new AudioCtx();
       const playTone = (frequency: number, startTime: number, duration: number) => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
