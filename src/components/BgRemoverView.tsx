@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Scissors, Upload, Download, Sparkles, CheckCircle2, Trash2, Eye, 
   RefreshCcw, AlertCircle, Loader2, ArrowRight, Layers, Palette, 
-  Maximize2, Image as ImageIcon, Sliders, Check, ExternalLink, ShieldCheck
+  Maximize2, Image as ImageIcon, Sliders, Check, ExternalLink, ShieldCheck,
+  Paintbrush, Eraser, Undo2, RotateCcw, SlidersHorizontal, Sparkle, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { removeBackground } from '@imgly/background-removal';
@@ -24,6 +25,8 @@ interface BgItem {
   originalUrl: string;
   resultUrl: string | null;
   resultBlob: Blob | null;
+  rawBlob?: Blob | null;
+  rawUrl?: string | null;
   status: 'idle' | 'processing' | 'done' | 'error';
   progress: number;
   progressText?: string;
@@ -31,6 +34,130 @@ interface BgItem {
 }
 
 type BgMode = 'transparent' | 'white' | 'black' | 'custom' | 'blur';
+
+// Algoritma High-Precision Edge Refinement (Choke, Feathering & Color Decontamination)
+const refineCutoutEdge = (
+  originalUrl: string,
+  cutoutBlob: Blob,
+  chokePx: number = 1.0,
+  smoothPx: number = 0.5
+): Promise<Blob> => {
+  return new Promise((resolve) => {
+    const imgCutout = new Image();
+    imgCutout.crossOrigin = 'anonymous';
+
+    imgCutout.onload = () => {
+      const width = imgCutout.naturalWidth || imgCutout.width;
+      const height = imgCutout.naturalHeight || imgCutout.height;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) {
+        resolve(cutoutBlob);
+        return;
+      }
+
+      ctx.drawImage(imgCutout, 0, 0, width, height);
+      const imgData = ctx.getImageData(0, 0, width, height);
+      const data = imgData.data;
+
+      // 1. Choke / Morphological Erosion on Alpha (Memotong halo warna latar belakang lama yang bocor di tepi)
+      if (chokePx > 0) {
+        const alphaCopy = new Uint8Array(width * height);
+        for (let i = 0; i < width * height; i++) {
+          alphaCopy[i] = data[i * 4 + 3];
+        }
+
+        const radius = Math.max(1, Math.min(4, Math.round(chokePx)));
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = y * width + x;
+            const currentAlpha = alphaCopy[idx];
+            if (currentAlpha === 0) continue;
+
+            let minNeighbor = currentAlpha;
+            for (let dy = -radius; dy <= radius; dy++) {
+              const ny = y + dy;
+              if (ny < 0 || ny >= height) continue;
+              for (let dx = -radius; dx <= radius; dx++) {
+                if (dx * dx + dy * dy > radius * radius) continue;
+                const nx = x + dx;
+                if (nx < 0 || nx >= width) continue;
+                const nAlpha = alphaCopy[ny * width + nx];
+                if (nAlpha < minNeighbor) {
+                  minNeighbor = nAlpha;
+                }
+              }
+            }
+            data[idx * 4 + 3] = minNeighbor;
+          }
+        }
+      }
+
+      // 2. Feathering & Anti-Aliasing (Menghaluskan tepi potongan agar bebas dari gerigi/pixelated)
+      if (smoothPx > 0) {
+        const alphaCopy = new Uint8Array(width * height);
+        for (let i = 0; i < width * height; i++) {
+          alphaCopy[i] = data[i * 4 + 3];
+        }
+
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const idx = y * width + x;
+            const a = alphaCopy[idx];
+            if (a > 0 && a < 255) {
+              let sum = 0;
+              for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                  sum += alphaCopy[(y + dy) * width + (x + dx)];
+                }
+              }
+              data[idx * 4 + 3] = Math.round(sum / 9);
+            }
+          }
+        }
+      }
+
+      // 3. Color Decontamination (Menetralkan discolorasi halo pada helai rambut dan kain)
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const idx = (y * width + x) * 4;
+          const a = data[idx + 3];
+          if (a > 0 && a < 210) {
+            let found = false;
+            for (let r = 1; r <= 3 && !found; r++) {
+              for (let dy = -r; dy <= r && !found; dy++) {
+                for (let dx = -r; dx <= r && !found; dx++) {
+                  const ny = y + dy;
+                  const nx = x + dx;
+                  if (ny < 0 || ny >= height || nx < 0 || nx >= width) continue;
+                  const nIdx = (ny * width + nx) * 4;
+                  if (data[nIdx + 3] >= 240) {
+                    data[idx] = data[nIdx];
+                    data[idx + 1] = data[nIdx + 1];
+                    data[idx + 2] = data[nIdx + 2];
+                    found = true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      ctx.putImageData(imgData, 0, 0);
+
+      canvas.toBlob((blob) => {
+        resolve(blob || cutoutBlob);
+      }, 'image/png', 1.0);
+    };
+
+    imgCutout.onerror = () => resolve(cutoutBlob);
+    imgCutout.src = URL.createObjectURL(cutoutBlob);
+  });
+};
 
 export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
   t,
@@ -51,6 +178,22 @@ export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
   const [bgMode, setBgMode] = useState<BgMode>('transparent');
   const [customBgColor, setCustomBgColor] = useState<string>('#3b82f6');
   const [isDragging, setIsDragging] = useState(false);
+
+  // Model Quality & Edge Refinement States
+  const [modelQuality, setModelQuality] = useState<'ultra' | 'balanced'>('ultra');
+  const [edgeChoke, setEdgeChoke] = useState<number>(1.0); // 0 sampai 3 px
+  const [edgeSmooth, setEdgeSmooth] = useState<number>(0.5); // 0 sampai 2 px
+  const [isApplyingEdge, setIsApplyingEdge] = useState(false);
+
+  // Manual Touch-Up Studio States
+  const [isTouchUpOpen, setIsTouchUpOpen] = useState(false);
+  const [touchUpTool, setTouchUpTool] = useState<'erase' | 'restore'>('erase');
+  const [brushSize, setBrushSize] = useState<number>(30);
+  const [touchUpHistory, setTouchUpHistory] = useState<ImageData[]>([]);
+  const touchUpCanvasRef = useRef<HTMLCanvasElement>(null);
+  const touchUpOriginalImgRef = useRef<HTMLImageElement | null>(null);
+  const isDrawingRef = useRef(false);
+  const lastPosRef = useRef<{ x: number; y: number } | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sliderContainerRef = useRef<HTMLDivElement>(null);
@@ -66,6 +209,9 @@ export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
         try { URL.revokeObjectURL(it.originalUrl); } catch (_) {}
         if (it.resultUrl) {
           try { URL.revokeObjectURL(it.resultUrl); } catch (_) {}
+        }
+        if (it.rawUrl) {
+          try { URL.revokeObjectURL(it.rawUrl); } catch (_) {}
         }
       });
     };
@@ -89,6 +235,8 @@ export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
       originalUrl: URL.createObjectURL(file),
       resultUrl: null,
       resultBlob: null,
+      rawBlob: null,
+      rawUrl: null,
       status: 'idle',
       progress: 0,
       progressText: isIndonesian ? 'Menunggu antrean...' : 'Waiting in queue...'
@@ -118,11 +266,14 @@ export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
     }
   };
 
-  // Process a single item
-  const processItem = async (item: BgItem): Promise<{ blob: Blob; url: string }> => {
+  // Process a single item with Ultra IS-Net & automatic Edge De-haloing
+  const processItem = async (item: BgItem): Promise<{ blob: Blob; url: string; rawBlob: Blob; rawUrl: string }> => {
     return new Promise(async (resolve, reject) => {
       try {
         const config = {
+          model: modelQuality === 'ultra' ? ('isnet' as const) : ('isnet_fp16' as const),
+          rescale: true,
+          device: 'gpu' as const,
           progress: (key: string, current: number, total: number) => {
             if (total > 0) {
               const pct = Math.min(100, Math.round((current / total) * 100));
@@ -130,7 +281,7 @@ export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
                 if (it.id === item.id) {
                   let text = isIndonesian ? `Memproses AI (${pct}%)...` : `Processing AI (${pct}%)...`;
                   if (key.includes('fetch')) {
-                    text = isIndonesian ? `Mengunduh model (${pct}%)...` : `Loading AI model (${pct}%)...`;
+                    text = isIndonesian ? `Mengunduh model Ultra IS-Net (${pct}%)...` : `Loading AI model (${pct}%)...`;
                   }
                   return { ...it, progress: pct, progressText: text };
                 }
@@ -144,14 +295,39 @@ export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
           }
         };
 
-        const resultBlob = await removeBackground(item.file, config);
-        const resultUrl = URL.createObjectURL(resultBlob);
-        resolve({ blob: resultBlob, url: resultUrl });
+        const rawResultBlob = await removeBackground(item.file, config);
+        const rawUrl = URL.createObjectURL(rawResultBlob);
+
+        // Langsung terapkan penyempurnaan tepi dan penghilangan halo otomatis
+        const refinedBlob = await refineCutoutEdge(item.originalUrl, rawResultBlob, edgeChoke, edgeSmooth);
+        const resultUrl = URL.createObjectURL(refinedBlob);
+        
+        resolve({ blob: refinedBlob, url: resultUrl, rawBlob: rawResultBlob, rawUrl });
       } catch (err: any) {
         console.error('[BackgroundRemover] Error processing image:', err);
         reject(err);
       }
     });
+  };
+
+  // Terapkan penyesuaian tepi (Edge Choke / Feathering) ulang ke item aktif
+  const handleApplyEdgeRefinement = async () => {
+    if (!activeItem || (!activeItem.rawBlob && !activeItem.resultBlob)) return;
+    setIsApplyingEdge(true);
+    try {
+      const sourceBlob = activeItem.rawBlob || activeItem.resultBlob!;
+      const refined = await refineCutoutEdge(activeItem.originalUrl, sourceBlob, edgeChoke, edgeSmooth);
+      const url = URL.createObjectURL(refined);
+      setItems(prev => prev.map(it => it.id === activeItem.id ? {
+        ...it,
+        resultBlob: refined,
+        resultUrl: url
+      } : it));
+    } catch (e) {
+      console.warn('Failed to refine edge:', e);
+    } finally {
+      setIsApplyingEdge(false);
+    }
   };
 
   // Run batch processing
@@ -173,14 +349,16 @@ export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
       setItems(prev => prev.map(it => it.id === item.id ? { ...it, status: 'processing', progress: 5, progressText: isIndonesian ? 'Menginisialisasi AI...' : 'Initializing AI...' } : it));
 
       try {
-        const { blob, url } = await processItem(item);
+        const { blob, url, rawBlob, rawUrl } = await processItem(item);
         setItems(prev => prev.map(it => it.id === item.id ? {
           ...it,
           status: 'done',
           progress: 100,
           progressText: isIndonesian ? 'Selesai' : 'Done',
           resultBlob: blob,
-          resultUrl: url
+          resultUrl: url,
+          rawBlob,
+          rawUrl
         } : it));
 
         incrementDailyCount?.(1);
@@ -206,13 +384,15 @@ export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
     setItems(prev => prev.map(it => it.id === itemId ? { ...it, status: 'processing', progress: 5, error: undefined } : it));
 
     try {
-      const { blob, url } = await processItem(item);
+      const { blob, url, rawBlob, rawUrl } = await processItem(item);
       setItems(prev => prev.map(it => it.id === itemId ? {
         ...it,
         status: 'done',
         progress: 100,
         resultBlob: blob,
-        resultUrl: url
+        resultUrl: url,
+        rawBlob,
+        rawUrl
       } : it));
       incrementDailyCount?.(1);
     } catch (err: any) {
@@ -299,6 +479,148 @@ export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
       window.removeEventListener('touchmove', handleTouchMove);
     };
   }, [handleSliderMove]);
+
+  // Start Touch-Up Modal
+  const handleOpenTouchUp = () => {
+    if (!activeItem || !activeItem.resultUrl) return;
+    setIsTouchUpOpen(true);
+  };
+
+  // Initialize Touch-Up Canvas when modal opens
+  useEffect(() => {
+    if (!isTouchUpOpen || !activeItem || !activeItem.resultUrl) return;
+
+    const canvas = touchUpCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+
+    const imgCutout = new Image();
+    const imgOrig = new Image();
+    let count = 0;
+
+    const setup = () => {
+      count++;
+      if (count < 2) return;
+
+      canvas.width = imgCutout.naturalWidth || imgCutout.width;
+      canvas.height = imgCutout.naturalHeight || imgCutout.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(imgCutout, 0, 0);
+
+      touchUpOriginalImgRef.current = imgOrig;
+      setTouchUpHistory([ctx.getImageData(0, 0, canvas.width, canvas.height)]);
+    };
+
+    imgCutout.crossOrigin = 'anonymous';
+    imgOrig.crossOrigin = 'anonymous';
+    imgCutout.onload = setup;
+    imgOrig.onload = setup;
+    imgCutout.src = activeItem.resultUrl;
+    imgOrig.src = activeItem.originalUrl;
+  }, [isTouchUpOpen, activeItemId]);
+
+  const paintStroke = (x: number, y: number) => {
+    const canvas = touchUpCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+
+    ctx.save();
+    if (touchUpTool === 'erase') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (touchUpTool === 'restore' && touchUpOriginalImgRef.current) {
+      ctx.beginPath();
+      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(touchUpOriginalImgRef.current, 0, 0, canvas.width, canvas.height);
+    }
+    ctx.restore();
+  };
+
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    isDrawingRef.current = true;
+    const canvas = touchUpCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    lastPosRef.current = { x, y };
+    paintStroke(x, y);
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current) return;
+    const canvas = touchUpCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    if (lastPosRef.current) {
+      const dist = Math.hypot(x - lastPosRef.current.x, y - lastPosRef.current.y);
+      const step = Math.max(1, brushSize / 4);
+      const steps = Math.ceil(dist / step);
+      for (let i = 1; i <= steps; i++) {
+        const ix = lastPosRef.current.x + (x - lastPosRef.current.x) * (i / steps);
+        const iy = lastPosRef.current.y + (y - lastPosRef.current.y) * (i / steps);
+        paintStroke(ix, iy);
+      }
+    } else {
+      paintStroke(x, y);
+    }
+    lastPosRef.current = { x, y };
+  };
+
+  const handleCanvasMouseUp = () => {
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+    lastPosRef.current = null;
+    const canvas = touchUpCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+    const currentData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    setTouchUpHistory(prev => [...prev.slice(-15), currentData]);
+  };
+
+  const handleUndoTouchUp = () => {
+    if (touchUpHistory.length <= 1) return;
+    const newHistory = [...touchUpHistory];
+    newHistory.pop();
+    const prevState = newHistory[newHistory.length - 1];
+    setTouchUpHistory(newHistory);
+
+    const canvas = touchUpCanvasRef.current;
+    if (!canvas || !prevState) return;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.putImageData(prevState, 0, 0);
+    }
+  };
+
+  const handleSaveTouchUp = () => {
+    const canvas = touchUpCanvasRef.current;
+    if (!canvas || !activeItem) return;
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      setItems(prev => prev.map(it => it.id === activeItem.id ? {
+        ...it,
+        resultBlob: blob,
+        resultUrl: url
+      } : it));
+      setIsTouchUpOpen(false);
+    }, 'image/png', 1.0);
+  };
 
   // Export composite or transparent PNG
   const handleDownload = async (item: BgItem) => {
@@ -439,8 +761,54 @@ export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
       {/* Main Grid: Upload & Queue (Left) vs Interactive Before/After Studio (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* Left Column: Upload & Queue (4 cols) */}
+        {/* Left Column: Upload & Queue (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
+          {/* Model Quality Mode Toggle */}
+          <div className="bg-white dark:bg-slate-900 p-3.5 rounded-3xl border border-slate-200 dark:border-white/10 flex items-center justify-between gap-2 shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-violet-500/10 text-violet-500 border border-violet-500/20 flex items-center justify-center">
+                <Sparkle size={16} />
+              </div>
+              <div>
+                <div className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-tight">
+                  {isIndonesian ? 'Model AI Presisi' : 'AI Precision Engine'}
+                </div>
+                <div className="text-[10px] text-slate-400 font-semibold">
+                  {modelQuality === 'ultra' 
+                    ? (isIndonesian ? 'IS-Net FP32 (Presisi Studio Tertinggi)' : 'IS-Net FP32 (Highest Studio Detail)')
+                    : (isIndonesian ? 'IS-Net FP16 (Cepat & Seimbang)' : 'IS-Net FP16 (Fast & Balanced)')}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200/60 dark:border-white/5 text-[10px] font-black uppercase">
+              <button
+                type="button"
+                onClick={() => setModelQuality('ultra')}
+                title="Model 32-bit presisi maksimal untuk helai rambut dan serat mikro"
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  modelQuality === 'ultra'
+                    ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Ultra FP32
+              </button>
+              <button
+                type="button"
+                onClick={() => setModelQuality('balanced')}
+                title="Model 16-bit cepat dan hemat memori"
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  modelQuality === 'balanced'
+                    ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Balanced
+              </button>
+            </div>
+          </div>
+
           {/* Upload Dropzone */}
           <div
             onDragOver={handleDragOver}
@@ -724,6 +1092,89 @@ export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
                 </div>
               </div>
 
+              {/* Edge Refinement & Touch-Up Toolbar */}
+              {activeItem.status === 'done' && (
+                <div className="bg-slate-50 dark:bg-white/[0.03] p-4 rounded-2xl border border-slate-200 dark:border-white/10 space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-violet-500/10 text-violet-500 flex items-center justify-center">
+                        <SlidersHorizontal size={14} />
+                      </div>
+                      <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-tight">
+                        {isIndonesian ? 'Sempurnakan Tepi (Anti-Halo)' : 'Edge Refinement (De-halo)'}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleOpenTouchUp}
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md shadow-violet-500/20 cursor-pointer active:scale-95"
+                    >
+                      <Paintbrush size={13} />
+                      <span>{isIndonesian ? 'Kuas Touch-Up Manual 🖌️' : 'Manual Touch-Up Brush 🖌️'}</span>
+                    </button>
+                  </div>
+
+                  {/* Sliders Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                    {/* Choke Slider */}
+                    <div className="space-y-1.5 bg-white dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-200/60 dark:border-white/5">
+                      <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                        <span>{isIndonesian ? 'Potong Sisa Halo (Choke):' : 'Trim Edge Halo (Choke):'}</span>
+                        <span className="font-mono text-violet-500 font-black">{edgeChoke.toFixed(1)} px</span>
+                      </div>
+                      <input 
+                        type="range"
+                        min="0"
+                        max="3"
+                        step="0.5"
+                        value={edgeChoke}
+                        onChange={(e) => setEdgeChoke(parseFloat(e.target.value))}
+                        className="w-full accent-violet-600 cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg"
+                      />
+                      <p className="text-[9px] text-slate-400">
+                        {isIndonesian ? 'Memotong piksel tepi agar warna background lama tidak bocor.' : 'Shrinks alpha mask to cut off leaked background color fringe.'}
+                      </p>
+                    </div>
+
+                    {/* Smooth Slider */}
+                    <div className="space-y-1.5 bg-white dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-200/60 dark:border-white/5">
+                      <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                        <span>{isIndonesian ? 'Kehalusan Tepi (Feather):' : 'Edge Smoothness:'}</span>
+                        <span className="font-mono text-violet-500 font-black">{edgeSmooth.toFixed(1)} px</span>
+                      </div>
+                      <input 
+                        type="range"
+                        min="0"
+                        max="2"
+                        step="0.5"
+                        value={edgeSmooth}
+                        onChange={(e) => setEdgeSmooth(parseFloat(e.target.value))}
+                        className="w-full accent-violet-600 cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg"
+                      />
+                      <p className="text-[9px] text-slate-400">
+                        {isIndonesian ? 'Menghaluskan tepi potongan agar tidak bergerigi/kaku.' : 'Softens cut edges to eliminate jagged pixelation.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-slate-400 font-medium italic">
+                      {isIndonesian ? '💡 Geser slider lalu klik "Terapkan" untuk memperbarui potongan' : '💡 Adjust sliders then click "Apply" to refine'}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isApplyingEdge}
+                      onClick={handleApplyEdgeRefinement}
+                      className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-md shadow-violet-500/20 cursor-pointer active:scale-95"
+                    >
+                      {isApplyingEdge ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                      <span>{isIndonesian ? 'Terapkan Tepi Bersih' : 'Apply Clean Edge'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Before / After Split Comparison Canvas */}
               <div 
                 ref={sliderContainerRef}
@@ -866,6 +1317,137 @@ export const BgRemoverView: React.FC<BgRemoverViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Interactive Touch-Up Studio Modal */}
+      <AnimatePresence>
+        {isTouchUpOpen && activeItem && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-between p-3 sm:p-5"
+          >
+            {/* Modal Top Bar */}
+            <div className="w-full max-w-6xl bg-slate-900/95 border border-white/10 rounded-2xl px-5 py-3 flex items-center justify-between gap-4 shadow-2xl flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-violet-600/20 text-violet-400 border border-violet-500/30 flex items-center justify-center">
+                  <Paintbrush size={18} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-white uppercase tracking-tight flex items-center gap-2">
+                    <span>{isIndonesian ? 'Studio Touch-Up Kuas Manual' : 'Manual Touch-Up Studio'}</span>
+                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 font-bold">
+                      PIXEL PRECISION
+                    </span>
+                  </h4>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    {isIndonesian ? 'Sapukan kuas untuk menghapus sisa background atau pulihkan bagian yang terpotong' : 'Paint to erase background leftovers or restore clipped parts'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Tools Switcher (Erase vs Restore) */}
+              <div className="flex items-center gap-1.5 bg-slate-800/80 p-1 rounded-xl border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setTouchUpTool('erase')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
+                    touchUpTool === 'erase'
+                      ? 'bg-rose-500 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Eraser size={14} />
+                  <span>{isIndonesian ? 'Hapus (Erase)' : 'Erase'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTouchUpTool('restore')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
+                    touchUpTool === 'restore'
+                      ? 'bg-emerald-500 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Paintbrush size={14} />
+                  <span>{isIndonesian ? 'Pulihkan (Restore)' : 'Restore'}</span>
+                </button>
+              </div>
+
+              {/* Brush Size Slider */}
+              <div className="flex items-center gap-2.5 bg-slate-800/60 px-3 py-1.5 rounded-xl border border-white/5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">
+                  {isIndonesian ? 'Ukuran Kuas:' : 'Brush Size:'}
+                </span>
+                <input
+                  type="range"
+                  min="5"
+                  max="120"
+                  value={brushSize}
+                  onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                  className="w-24 sm:w-32 accent-violet-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                />
+                <span className="text-xs font-mono font-black text-violet-400 w-8 text-right">
+                  {brushSize}px
+                </span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleUndoTouchUp}
+                  disabled={touchUpHistory.length <= 1}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 transition-all border border-white/5 cursor-pointer"
+                  title="Undo"
+                >
+                  <Undo2 size={16} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsTouchUpOpen(false)}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all border border-white/5 cursor-pointer"
+                >
+                  {isIndonesian ? 'Batal' : 'Cancel'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveTouchUp}
+                  className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-500/20 cursor-pointer active:scale-95"
+                >
+                  <Check size={14} />
+                  <span>{isIndonesian ? 'Simpan Perubahan' : 'Save Cutout'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Canvas Center */}
+            <div className="flex-1 w-full max-w-6xl my-3 rounded-3xl overflow-hidden border border-white/10 flex items-center justify-center relative bg-[#0a0a0a] shadow-inner p-2">
+              {/* Checkerboard Pattern */}
+              <div 
+                className="absolute inset-0 opacity-40 pointer-events-none" 
+                style={{
+                  backgroundImage: 'linear-gradient(45deg, #222 25%, transparent 25%), linear-gradient(-45deg, #222 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #222 75%), linear-gradient(-45deg, transparent 75%, #222 75%)',
+                  backgroundSize: '16px 16px',
+                  backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px'
+                }}
+              />
+
+              <canvas
+                ref={touchUpCanvasRef}
+                onMouseDown={handleCanvasMouseDown}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseUp={handleCanvasMouseUp}
+                onMouseLeave={handleCanvasMouseUp}
+                className="relative z-10 max-h-[72vh] max-w-full object-contain cursor-crosshair shadow-2xl rounded-lg"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

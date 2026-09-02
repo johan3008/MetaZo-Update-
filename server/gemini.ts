@@ -208,26 +208,334 @@ function containsKeywordConnector(phrase: string): boolean {
   return words.some(word => KEYWORD_CONNECTOR_WORDS.has(word));
 }
 
+export const ADOBE_STOCK_IP_REPLACEMENTS: Record<string, string> = {
+  // Apple / iOS
+  'iphone': 'smartphone',
+  'ipad': 'tablet computer',
+  'macbook': 'laptop',
+  'macbook pro': 'laptop computer',
+  'macbook air': 'ultraportable laptop',
+  'imac': 'all-in-one desktop',
+  'airpods': 'wireless earbuds',
+  'apple watch': 'smartwatch',
+  'iwatch': 'smartwatch',
+  'ipod': 'digital audio player',
+  'apple': 'consumer tech',
+  'ios': 'mobile operating system',
+  'macos': 'operating system',
+  'siri': 'virtual assistant',
+
+  // Google / Android
+  'android': 'mobile operating system',
+  'pixel phone': 'smartphone',
+  'google pixel': 'smartphone',
+  'google': 'search engine technology',
+  'chromebook': 'laptop',
+  'youtube': 'video streaming platform',
+  'gmail': 'electronic mail',
+
+  // Microsoft
+  'microsoft': 'software technology',
+  'windows 11': 'operating system',
+  'windows 10': 'operating system',
+  'windows': 'operating system',
+  'xbox': 'gaming console',
+  'surface pro': 'convertible tablet laptop',
+
+  // Sony / Gaming
+  'playstation 5': 'gaming console',
+  'playstation': 'gaming console',
+  'ps5': 'gaming console',
+  'ps4': 'gaming console',
+  'sony': 'electronics brand',
+  'nintendo switch': 'handheld console',
+  'nintendo': 'video game company',
+  'game boy': 'retro handheld console',
+  'walkman': 'portable cassette player',
+
+  // Other Tech / Cameras
+  'samsung galaxy': 'mobile device',
+  'samsung': 'electronics brand',
+  'galaxy s23': 'smartphone',
+  'galaxy s24': 'smartphone',
+  'thinkpad': 'business laptop',
+  'dell': 'computer hardware',
+  'lenovo': 'computer hardware',
+  'canon eos': 'dslr camera',
+  'canon': 'dslr camera',
+  'nikon z': 'mirrorless camera',
+  'nikon': 'dslr camera',
+  'sony alpha': 'mirrorless camera',
+  'fujifilm': 'digital camera',
+  'leica': 'rangefinder camera',
+  'gopro': 'action camera',
+  'dji mavic': 'quadcopter drone',
+  'dji': 'camera drone',
+
+  // Social Media & Web
+  'facebook': 'social network',
+  'metaverse': 'virtual reality world',
+  'meta': 'technology platform',
+  'instagram': 'photo sharing app',
+  'tiktok': 'short form video app',
+  'whatsapp': 'instant messaging app',
+  'twitter': 'microblogging social network',
+  'snapchat': 'multimedia messaging app',
+  'telegram': 'cloud messaging app',
+  'discord': 'communication app',
+  'netflix': 'streaming service',
+  'spotify': 'music streaming app',
+  'amazon': 'online marketplace',
+
+  // AI Platforms
+  'midjourney': 'generative artificial intelligence',
+  'dall-e': 'synthetic image generation',
+  'dalle': 'synthetic image generation',
+  'chatgpt': 'conversational artificial intelligence',
+  'openai': 'artificial intelligence',
+  'firefly': 'generative visual model',
+  'stable diffusion': 'diffusion model',
+  'stablediffusion': 'diffusion model',
+  'flux': 'generative visual model',
+  'piclumen': 'generative visual software',
+
+  // Automotive
+  'ferrari': 'luxury sports car',
+  'lamborghini': 'supercar',
+  'porsche': 'sports automobile',
+  'bmw': 'luxury sedan',
+  'mercedes-benz': 'luxury vehicle',
+  'mercedes': 'luxury automobile',
+  'audi': 'executive automobile',
+  'volkswagen': 'compact vehicle',
+  'vw': 'automobile',
+  'tesla cybertruck': 'futuristic electric pickup',
+  'tesla': 'electric vehicle',
+  'mustang': 'muscle car',
+  'chevrolet corvette': 'sports car',
+  'corvette': 'sports car',
+  'harley-davidson': 'cruiser motorcycle',
+  'harley': 'motorcycle',
+  'vespa': 'classic motor scooter',
+  'toyota': 'automobile',
+  'honda': 'passenger car',
+
+  // Sportswear & Fashion Brands
+  'air jordan': 'basketball sneakers',
+  'jordan sneakers': 'athletic sneakers',
+  'swoosh': 'sportswear emblem',
+  'nike': 'athletic footwear',
+  'adidas': 'sportswear apparel',
+  'yeezy': 'lifestyle sneakers',
+  'puma': 'athletic trainers',
+  'reebok': 'fitness sneakers',
+  'under armour': 'performance activewear',
+  'new balance': 'running sneakers',
+  'converse all star': 'canvas sneakers',
+  'converse': 'canvas sneakers',
+  'vans': 'skateboarding shoes',
+  'gucci': 'designer fashion',
+  'louis vuitton': 'luxury leather goods',
+  'chanel': 'luxury fashion house',
+  'prada': 'high-end fashion',
+  'hermes': 'luxury artisan leather',
+  'birkin bag': 'designer tote handbag',
+  'birkin': 'designer tote handbag',
+  'rolex': 'luxury chronometer wristwatch',
+  'cartier': 'fine jewelry timekeeper',
+  'dior': 'couture fashion apparel',
+  'balenciaga': 'avant-garde fashion',
+  'versace': 'luxury designer wear',
+  'burberry': 'designer fashion apparel',
+  'ray-ban': 'classic sunglasses eyewear',
+  'rayban': 'eyewear sunglasses',
+  'oakley': 'sports eyewear',
+  'crocs': 'foam clog footwear',
+  "levi's": 'denim jeans trousers',
+  'levis': 'denim jeans trousers',
+
+  // Food & Beverage
+  'coca-cola': 'cola soft drink',
+  'cocacola': 'carbonated cola beverage',
+  'coke': 'soda pop drink',
+  'pepsi': 'carbonated cola soft drink',
+  'starbucks': 'specialty coffeehouse drink',
+  "mcdonald's": 'fast food meal',
+  'mcdonalds': 'fast food meal',
+  'burger king': 'fast food hamburger',
+  'kfc': 'crispy fried chicken',
+  'subway sandwich': 'submarine sandwich meal',
+  'subway': 'submarine sandwich meal',
+  'red bull': 'caffeinated energy drink',
+  'monster energy': 'energy beverage',
+  'nutella': 'hazelnut cocoa spread',
+  'oreo': 'chocolate sandwich cookie',
+  'kitkat': 'chocolate wafer bar',
+
+  // Famous Artists (Strict Adobe Policy: Cannot use artist names or 'in the style of')
+  'vincent van gogh': 'post-impressionist painting',
+  'van gogh': 'post-impressionist art',
+  'pablo picasso': 'cubist expressionist painting',
+  'picasso': 'cubist modern art',
+  'andy warhol': 'pop art silkscreen design',
+  'salvador dali': 'surrealist dreamscape art',
+  'dali': 'surrealist painting',
+  'leonardo da vinci': 'classical renaissance art',
+  'da vinci': 'renaissance fine art',
+  'michelangelo': 'renaissance sculpture painting',
+  'claude monet': 'impressionist landscape painting',
+  'monet': 'impressionist oil artwork',
+  'rembrandt': 'chiaroscuro baroque painting',
+  'frida kahlo': 'symbolic magical realist portrait',
+  'gustav klimt': 'symbolist golden decorative art',
+  'klimt': 'symbolist decorative art',
+  'banksy': 'stencil street graffiti art',
+  'basquiat': 'neo-expressionist street art',
+  'keith haring': 'pop graffiti line art',
+
+  // Fictional Characters & Franchises
+  'mickey mouse': 'cheerful cartoon mouse mascot',
+  'donald duck': 'whimsical cartoon duck character',
+  'disney': 'fairytale family entertainment',
+  'marvel': 'comic book superhero franchise',
+  'spider-man': 'masked web-spinning superhero',
+  'spiderman': 'masked superhero vigilante',
+  'iron man': 'armored high-tech superhero',
+  'batman': 'masked dark vigilante hero',
+  'superman': 'caped heroic savior',
+  'joker': 'comic book clown villain',
+  'star wars': 'space fantasy adventure saga',
+  'darth vader': 'dark galactic sci-fi warlord',
+  'yoda': 'wise alien sci-fi master',
+  'baby yoda': 'small green alien child',
+  'grogu': 'small green alien creature',
+  'lightsaber': 'glowing plasma energy sword',
+  'jedi': 'cosmic energy warrior knight',
+  'pokemon': 'fantasy creature',
+  'pikachu': 'electric fantasy rodent creature',
+  'dragon ball': 'martial arts anime adventure',
+  'goku': 'martial arts anime warrior',
+  'naruto': 'ninja anime hero character',
+  'barbie doll': 'glamorous fashion doll figurine',
+  'barbie': 'fashion doll figurine',
+  'lego blocks': 'interlocking plastic toy bricks',
+  'lego': 'plastic building blocks',
+  'transformers': 'shape-shifting robotic beings',
+  'harry potter': 'magical wizard student',
+  'hogwarts': 'ancient gothic wizard academy',
+
+  // Restricted Landmarks
+  'hollywood sign': 'iconic hillside billboard landmark',
+  'eiffel tower at night': 'illuminated wrought-iron lattice tower',
+  'eiffel tower': 'historic wrought-iron lattice tower',
+  'sydney opera house': 'sculptural sail-roof performance venue',
+  'burj khalifa': 'modern skyscraper spire',
+  'empire state building': 'art deco skyscraper landmark',
+  'louvre pyramid': 'glass geometric museum entrance',
+  'mount rushmore': 'granite mountain monument',
+
+  // Agencies & Badges
+  'nasa': 'aerospace research agency',
+  'fbi': 'federal law enforcement investigation',
+  'cia': 'intelligence agency',
+  'interpol': 'international police organization',
+  'red cross': 'humanitarian medical aid emblem',
+  'olympic games': 'international athletic games',
+  'olympics': 'international athletic championship'
+};
+
 const PROHIBITED_KEYWORDS_SET = new Set([
-  'apple', 'iphone', 'ipad', 'macbook', 'mac', 'ios', 'android', 'microsoft', 'windows', 'xbox', 'playstation', 
-  'sony', 'samsung', 'nike', 'adidas', 'gucci', 'rolex', 'cocacola', 'coca-cola', 'pepsi', 'starbucks', 'amazon', 
-  'google', 'meta', 'facebook', 'instagram', 'twitter', 'tiktok', 'netflix', 'disney', 'marvel', 'canon', 'nikon', 
-  'adobe', 'shutterstock', 'getty', 'midjourney', 'firefly', 'stablediffusion', 'dalle', 'llama', 'chatgpt', 'openai',
-  'instagram', 'youtube', 'whatsapp', 'brand', 'trademark', 'logo', 'copyright', 'intellectual', 'property'
+  // Brands & Companies
+  'apple', 'iphone', 'ipad', 'macbook', 'mac', 'imac', 'airpods', 'iwatch', 'ipod', 'ios', 'macos', 'siri',
+  'google', 'android', 'pixel', 'chromebook', 'youtube', 'gmail',
+  'microsoft', 'windows', 'xbox', 'surface',
+  'sony', 'playstation', 'ps4', 'ps5', 'nintendo', 'switch', 'walkman',
+  'samsung', 'galaxy', 'dell', 'lenovo', 'thinkpad', 'canon', 'nikon', 'fujifilm', 'leica', 'gopro', 'dji', 'mavic',
+  'meta', 'facebook', 'instagram', 'tiktok', 'whatsapp', 'twitter', 'snapchat', 'telegram', 'discord', 'netflix', 'spotify', 'amazon', 'ebay',
+  'adobe', 'shutterstock', 'getty', 'istock', 'freepik', 'midjourney', 'firefly', 'stablediffusion', 'dalle', 'llama', 'chatgpt', 'openai', 'flux', 'piclumen',
+  
+  // Automotive
+  'ferrari', 'lamborghini', 'porsche', 'bmw', 'mercedes', 'audi', 'volkswagen', 'vw', 'tesla', 'cybertruck', 'mustang', 'corvette', 'chevrolet', 'ford', 'toyota', 'honda', 'harley', 'vespa',
+  
+  // Fashion / Luxury
+  'nike', 'jordan', 'swoosh', 'adidas', 'yeezy', 'puma', 'reebok', 'converse', 'vans', 'gucci', 'prada', 'chanel', 'hermes', 'birkin', 'rolex', 'cartier', 'dior', 'balenciaga', 'versace', 'burberry', 'rayban', 'oakley', 'crocs', 'levis',
+  
+  // Food
+  'cocacola', 'coca-cola', 'coke', 'pepsi', 'starbucks', 'mcdonalds', 'kfc', 'nutella', 'oreo', 'kitkat',
+  
+  // Artists
+  'gogh', 'picasso', 'warhol', 'dali', 'vinci', 'michelangelo', 'monet', 'rembrandt', 'kahlo', 'klimt', 'banksy', 'basquiat', 'haring', 'murakami', 'kusama',
+  
+  // Characters & Franchises
+  'disney', 'marvel', 'spiderman', 'batman', 'superman', 'joker', 'yoda', 'grogu', 'lightsaber', 'jedi', 'pokemon', 'pikachu', 'goku', 'naruto', 'barbie', 'lego', 'transformers', 'hogwarts',
+  
+  // Restricted Sites & Agencies
+  'nasa', 'fbi', 'cia', 'interpol', 'olympics', 'olympic',
+  
+  // Generic legal & spam terms
+  'brand', 'trademark', 'logo', 'copyright', 'intellectual', 'property',
+  'high quality', 'high-quality', 'premium quality', '4k', '8k', 'trending', 'masterpiece', 'award winning', 'bestseller', 'photorealistic'
 ]);
 
 /**
+ * Sanitizes any text string (Title, Description, Prompt) by replacing trademarked
+ * brand names, protected characters, restricted monuments, and artist styles
+ * with clean, microstock-compliant generic equivalents according to Adobe Stock IP guidelines.
+ * Reference: https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html
+ */
+export function sanitizeTextForAdobeStockIP(text: string): string {
+  if (!text || typeof text !== 'string') return '';
+  let result = text;
+
+  // 1. Remove artist phrases: "in the style of [artist]", "style of [artist]", "inspired by [artist]"
+  result = result.replace(/\b(?:in the style of|in style of|style of|inspired by|in the manner of|influenced by)\s+[a-zA-Z\s'-]+/gi, 'in artistic aesthetic style');
+
+  // 2. Sort replacement keys by descending length so multi-word matches take precedence
+  const sortedKeys = Object.keys(ADOBE_STOCK_IP_REPLACEMENTS).sort((a, b) => b.length - a.length);
+
+  for (const term of sortedKeys) {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp('\\b' + escaped + '\\b', 'gi');
+    if (regex.test(result)) {
+      result = result.replace(regex, ADOBE_STOCK_IP_REPLACEMENTS[term]);
+    }
+  }
+
+  // 3. Fix indefinite articles after replacement (e.g. "an smartphone" -> "a smartphone")
+  result = result
+    .replace(/\ban\s+([bcdfghjklmnpqrstvwxyz])/gi, 'a $1')
+    .replace(/\ba\s+([aeio])/gi, 'an $1');
+
+  // 4. Remove banned microstock spam buzzwords
+  const spamBuzzwords = [
+    'high quality', 'high-quality', 'premium quality', 'ultra hd', '4k', '8k', 'trending on artstation',
+    'masterpiece', 'award winning', 'award-winning', 'bestseller', 'photorealistic'
+  ];
+  for (const buzz of spamBuzzwords) {
+    const escaped = buzz.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp('\\b' + escaped + '\\b', 'gi');
+    result = result.replace(regex, '').replace(/\s+/g, ' ').trim();
+  }
+
+  return result.replace(/\s+/g, ' ').trim();
+}
+
+/**
  * Enforces the keyword IP/brand/name exclusion at the application layer.
- * The AI prompt remains the primary semantic rule; this is a safety net for
- * known protected terms that should never survive into final keywords.
+ * Strictly complies with Adobe Stock Content Refusal Guidelines for IP & Non-compliance.
  */
 function isProhibitedKeyword(word: string): boolean {
   const normalized = String(word || '').trim().toLowerCase();
   if (!normalized) return true;
 
+  if (PROHIBITED_KEYWORDS_SET.has(normalized)) return true;
+  if (Object.prototype.hasOwnProperty.call(ADOBE_STOCK_IP_REPLACEMENTS, normalized)) return true;
+
   const tokens = normalized.split(/\s+/).filter(Boolean);
-  return tokens.some(token => PROHIBITED_KEYWORDS_SET.has(token)) ||
-         PROHIBITED_KEYWORDS_SET.has(normalized);
+  if (tokens.some(token => PROHIBITED_KEYWORDS_SET.has(token))) return true;
+  if (tokens.some(token => Object.prototype.hasOwnProperty.call(ADOBE_STOCK_IP_REPLACEMENTS, token))) return true;
+
+  return false;
 }
 
 export function getHeuristicCategories(title: string, keywords: string[]): {
@@ -448,6 +756,9 @@ export function ensureTitleLength(title: string, keywords: string[], description
   // Guarantee absolute removal of any commas, periods, double spaces
   cleanedTitle = cleanedTitle.replace(/,/g, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
 
+  // Strict Adobe Stock IP / HKI & Anti-Spam Sanitation (Removes/Replaces trademarks, artists, franchises)
+  cleanedTitle = sanitizeTextForAdobeStockIP(cleanedTitle);
+
   // Sentence case capitalisation
   if (cleanedTitle.length > 0) {
     cleanedTitle = cleanedTitle.charAt(0).toUpperCase() + cleanedTitle.slice(1);
@@ -481,18 +792,19 @@ export function ensureDescription(description: string, title: string, keywords: 
     if (title && title.trim().length > 5) {
       const cleanTitle = title.replace(/write a descriptive/gi, '').replace(/<generate/gi, '').replace(/highly descriptive/gi, '').trim();
       if (cleanTitle.length > 5) {
-        return `Visual media showcasing ${cleanTitle.toLowerCase()}, designed for commercial, editorial, and creative projects.`;
+        return sanitizeTextForAdobeStockIP(`Visual media showcasing ${cleanTitle.toLowerCase()}, designed for commercial, editorial, and creative projects.`);
       }
     }
     
     if (keywords && keywords.length >= 3) {
-      return `Visual content featuring ${keywords.slice(0, 5).join(', ')}, suitable for advertising, marketing, and editorial purposes.`;
+      return sanitizeTextForAdobeStockIP(`Visual content featuring ${keywords.slice(0, 5).join(', ')}, suitable for advertising, marketing, and editorial purposes.`);
     }
     
     return "Digital media asset designed for commercial, editorial, or creative projects.";
   }
   
-  const cleaned = description.trim().replace(/\s+/g, ' ');
+  // Strict Adobe Stock IP Sanitation for description
+  let cleaned = sanitizeTextForAdobeStockIP(description.trim().replace(/\s+/g, ' '));
   if (cleaned.length <= 200) return cleaned;
 
   const truncated = cleaned.slice(0, 200);
@@ -1669,7 +1981,7 @@ const ADOBE_KEYWORD_FILLER = new Set([
 ]);
 
 const ADOBE_KEYWORD_IP_PATTERN =
-  /\b(google|apple|microsoft|amazon|facebook|instagram|youtube|nike|adidas|coca[\s-]?cola|pepsi|disney|netflix|openai|tesla)\b/i;
+  /\b(google|apple|iphone|ipad|macbook|ios|android|microsoft|windows|xbox|surface|sony|playstation|ps4|ps5|nintendo|switch|samsung|galaxy|dell|lenovo|canon|nikon|leica|gopro|dji|amazon|meta|facebook|instagram|tiktok|whatsapp|twitter|netflix|spotify|openai|chatgpt|midjourney|firefly|nike|adidas|jordan|yeezy|puma|reebok|gucci|prada|chanel|hermes|birkin|rolex|cartier|coca[\s-]?cola|pepsi|starbucks|mcdonalds|ferrari|lamborghini|porsche|bmw|mercedes|audi|tesla|cybertruck|disney|marvel|spiderman|batman|superman|star[\s-]?wars|pokemon|pikachu|barbie|lego|transformers|harry[\s-]?potter|van[\s-]?gogh|picasso|warhol|dali|nasa|fbi|cia|interpol|olympics)\b/i;
 
 const ADOBE_KEYWORD_TECHNICAL_PATTERN =
   /\b(?:iso|f\/?\d+(?:\.\d+)?|1\/\d+s|\d+(?:\.\d+)?\s*mm|megapixel|megapixels|fps|4k|8k|hd|uhd|jpeg|jpg|png|raw|tiff|psd|ai|eps|svg|mb|gb)\b/i;
@@ -3813,17 +4125,23 @@ OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE T
 
 ${mediaContext}${customPromptCommand}${exifInstruction}
 
-CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
-1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
+CRITICAL RULES FOR TITLES, DESCRIPTIONS & KEYWORDS (MUST FOLLOW STRICTLY):
+1. ZERO-TOLERANCE INTELLECTUAL PROPERTY (IP) & TRADEMARK POLICY (Strict compliance with Adobe Stock Refusal Guidelines - https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
+   - NEVER use brand names, company names, trademarks, or identifiable product packaging (e.g., Apple, Nike, iPhone, MacBook, Samsung, Coca-Cola, Starbucks, Sony, Gucci, Rolex). Use purely generic descriptions (e.g., "smartphone", "laptop", "athletic shoes", "cola drink", "coffeehouse", "luxury wristwatch").
+   - NEVER name commercial products with distinctive designs (e.g., Barbie, Lego, Rubik's cube, Polaroid, Crocs, Vespa, Birkin bag). Use generic equivalents (e.g., "fashion doll", "plastic building blocks", "puzzle cube", "instant camera", "foam clogs", "motor scooter", "designer handbag").
+   - NEVER include trademarked terms that have become genericized (e.g., "Popsicle" -> "ice pop", "Velcro" -> "hook and loop fastener", "Band-Aid" -> "adhesive bandage", "Post-it" -> "sticky note", "Frisbee" -> "flying disc").
+   - NEVER name restricted landmarks, monuments, or modern architecture without property releases (e.g., Eiffel Tower at night, Hollywood sign, Sydney Opera House, Burj Khalifa, Empire State Building, Louvre Pyramid). Use generic descriptions (e.g., "illuminated historic wrought iron tower", "famous hillside sign", "coastal sail-roof opera house", "modern skyscraper").
+   - NEVER include government agencies, military seals, or protected emblems (e.g., NASA, FBI, CIA, Interpol, Red Cross emblem, Olympic rings).
 2. NO FAMOUS PEOPLE, ARTISTS, OR CHARACTERS (STRICT ADOBE STOCK CONTENT POLICY COMPLIANCE - Based on https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
    - You must NEVER submit or include names of real, known people (including celebrities, politicians, athletes, public figures, or historical figures) in the Title, Description, or Keywords.
-   - You must NEVER include names of fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Harry Potter, etc.).
-   - You must NEVER include specific artist names (living or deceased) whose work is protected by copyright in your titles, descriptions, or keywords (e.g., "in the style of Van Gogh", "drawn by Picasso", "inspired by Andy Warhol").
+   - You must NEVER include names of fictional characters or franchises from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Pokemon, Pikachu, Harry Potter, Star Wars, Darth Vader, etc.).
+   - You must NEVER include specific artist names (living or deceased) whose work is protected by copyright in your titles, descriptions, or keywords (e.g., "in the style of Van Gogh", "drawn by Picasso", "inspired by Andy Warhol", "Banksy").
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
-4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of" with respect to copyrighted artists. Style descriptions must remain completely generic.
+4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of" with respect to copyrighted artists. Style descriptions must remain completely generic (e.g., "post-impressionist painting", "cubist abstract artwork", "pop art silkscreen").
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
+7. NO MARKETING BUZZWORDS OR QUALITY SPAM: NEVER include words like "high quality", "high-quality", "premium", "masterpiece", "trending", "wallpaper", "bestseller", "award winning", "4k", "8k", "photorealistic" in titles, descriptions, or keywords. Adobe Stock automatically rejects metadata containing spam quality claims.
 
 
 Rules for Titles:
@@ -6353,12 +6671,12 @@ async function generateHighResolutionAuditCrops(buffer: Buffer): Promise<{ label
       sharp(buffer).extract({ left: z5X, top: z5Y, width: z5W, height: z5H }).jpeg({ quality: 92 }).toBuffer().catch(() => null)
     ]);
 
-    const result: { label: string; inlineData: { mimeType: string; data: string } }[] = [];
-    if (z1Buf) result.push({ label: "ZONA 1 — DETAIL TANGAN KIRI, JARI & CANGKIR KOPI (CROP 100% ZOOM)", inlineData: { mimeType: "image/jpeg", data: z1Buf.toString('base64') } });
-    if (z2Buf) result.push({ label: "ZONA 2 — DETAIL TANGAN GESTUR & PEGANGAN TANGAN KANAN (CROP 100% ZOOM)", inlineData: { mimeType: "image/jpeg", data: z2Buf.toString('base64') } });
-    if (z3Buf) result.push({ label: "ZONA 3 — DETAIL WAJAH, SENYUM, GIGI & TELINGA (CROP 100% ZOOM)", inlineData: { mimeType: "image/jpeg", data: z3Buf.toString('base64') } });
-    if (z4Buf) result.push({ label: "ZONA 4 — DETAIL KAKI, SEPATU, ANKLE & PERMUKAAN LANTAI (CROP 100% ZOOM)", inlineData: { mimeType: "image/jpeg", data: z4Buf.toString('base64') } });
-    if (z5Buf) result.push({ label: "ZONA 5 — DETAIL LATAR BELAKANG & ORANG KEJAUHAN (CROP 100% ZOOM)", inlineData: { mimeType: "image/jpeg", data: z5Buf.toString('base64') } });
+    const result: { label: string; part: { inlineData: { mimeType: string; data: string } } }[] = [];
+    if (z1Buf) result.push({ label: "ZONA 1 — DETAIL TANGAN KIRI, JARI & CANGKIR KOPI (CROP 100% ZOOM)", part: { inlineData: { mimeType: "image/jpeg", data: z1Buf.toString('base64') } } });
+    if (z2Buf) result.push({ label: "ZONA 2 — DETAIL TANGAN GESTUR & PEGANGAN TANGAN KANAN (CROP 100% ZOOM)", part: { inlineData: { mimeType: "image/jpeg", data: z2Buf.toString('base64') } } });
+    if (z3Buf) result.push({ label: "ZONA 3 — DETAIL WAJAH, SENYUM, GIGI & TELINGA (CROP 100% ZOOM)", part: { inlineData: { mimeType: "image/jpeg", data: z3Buf.toString('base64') } } });
+    if (z4Buf) result.push({ label: "ZONA 4 — DETAIL KAKI, SEPATU, ANKLE & PERMUKAAN LANTAI (CROP 100% ZOOM)", part: { inlineData: { mimeType: "image/jpeg", data: z4Buf.toString('base64') } } });
+    if (z5Buf) result.push({ label: "ZONA 5 — DETAIL LATAR BELAKANG & ORANG KEJAUHAN (CROP 100% ZOOM)", part: { inlineData: { mimeType: "image/jpeg", data: z5Buf.toString('base64') } } });
 
     return result;
   } catch (err: any) {
@@ -6386,26 +6704,53 @@ export async function checkImageQuality(
     metadataInstruction = `\n\n---\n[DATA PENGUKURAN TEKNIS OBJEKTIF & PIXEL FORENSIK]\nHasil analisis OpenCV / BRISQUE / NIQE pada file asli:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nPETUNJUK ANALISIS PIKSEL & TEKNIKAL:\n1. Skor BRISQUE > 52 atau NIQE > 6.2: Indikasi kuat degradasi spasial / blur ekstrem / over-smoothing AI sintetis. Skor di bawah 45 adalah rentang normal fotografi komersial.\n2. has_local_blur_anomaly = true: Hanya jika seluruh gambar tidak memiliki fokus tajam. Jika subjek utama tajam dan latar belakang blur karena bokeh optik, nilai PASS.\n3. Pantulan kilau (specular highlights pada saus/cairan/gelas/logam) dan bayangan alami adalah pencahayaan normal komersial dan BUKAN cacat.\n4. Gunakan data numerik bersama inspeksi visual crop 100% untuk menetapkan penilaian akurat dan proporsional.`;
   }
 
-  const systemInstruction = `Anda adalah "AI Quality Inspector & Stock Curator" profesional tingkat tinggi yang bertugas mengaudit aset visual (Foto, AI Generation, 3D Render, Ilustrasi) sesuai standar penolakan & penerimaan resmi Adobe Stock, Shutterstock, dan Getty Images ("Quality Issues", "Technical Issues", "IP / Legal").
+  const systemInstruction = `Anda adalah "AI Quality Inspector & Stock Curator" profesional tingkat tinggi yang bertugas mengaudit aset visual (Foto, AI Generation, 3D Render, Ilustrasi) secara ketat dan presisi berdasarkan Kebijakan Standar Kualitas & Penolakan Teknis Resmi Adobe Stock (Quality and Technical Standards - Reasons for Content Refusal: https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
 
 TUGAS UTAMA:
-Lakukan inspeksi visual dan piksel secara SANGAT TELITI, TAJAM, dan OBJEKTIF seolah-olah Anda memeriksa gambar pada 100%–200% ZOOM CROP. Temukan segala jenis cacat kualitas gambar, artefak generatif AI, mutasi anatomi, distorsi orang latar belakang, kerusakan struktur gadget/objek mekanis, keburaman (blur), noise digital berlebih, dan pelanggaran IP.
+Lakukan inspeksi visual dan piksel secara SANGAT TELITI, TAJAM, dan OBJEKTIF seolah-olah Anda memeriksa gambar pada 100%–200% ZOOM CROP. Temukan segala jenis cacat kualitas gambar, artefak generatif AI, mutasi anatomi, distorsi orang latar belakang, kerusakan struktur gadget/objek mekanis, keburaman (blur), noise digital berlebih, sensor dust, eksposur ekstrem, dan pelanggaran IP.
 
-PANDUAN PEMERIKSAAN SETIAP KATEGORI (STANDAR RESMI ADOBE STOCK & MICROSTOCK INTERNASIONAL):
+PANDUAN PEMERIKSAAN SETIAP KATEGORI (STANDAR RESMI ADOBE STOCK QUALITY & TECHNICAL REFUSAL REASONS):
 
-1. KETAJAMAN & FOKUS (blur):
-   - WAJIB PASS: Subjek utama tajam dan fokus (tack-sharp pada area fokus utama: mata, wajah model, tekstur pakaian, produk, atau objek utama). Latar belakang/depan yang blur karena depth of field optik (bokeh kamera bukaan lensa lebar f/1.4, f/1.8, f/2.8) adalah TEKNIK FOTOGRAFI PROFESIONAL STANDAR dan bernilai artistik tinggi. JANGAN menandai bokeh optik latar belakang sebagai blur cacat KECUALI subjek utamanya sendiri yang buram/out of focus.
-   - WAJIB FAIL: Subjek utama yang menjadi pusat perhatian mengalami out of focus, soft focus yang merusak detail penting, motion blur kamera yang tidak disengaja, atau detail subjek kabur/meleleh.
+1. KETAJAMAN & FOKUS PADA 100% ZOOM (Optimize sharpness and focus):
+   - WAJIB PASS: Subjek utama tajam, renyah, dan fokus (tack-sharp pada area fokus utama: mata, pupil, wajah model, tekstur pakaian, produk, atau objek utama). Latar belakang/depan yang blur karena depth of field optik (bokeh kamera bukaan lensa lebar f/1.4, f/1.8, f/2.8) adalah TEKNIK FOTOGRAFI PROFESIONAL STANDAR dan bernilai artistik tinggi. JANGAN menandai bokeh optik latar belakang sebagai blur cacat KECUALI subjek utamanya sendiri yang buram/out of focus.
+   - WAJIB FAIL: 
+     * Subjek utama yang menjadi pusat perhatian mengalami out of focus, soft focus, berkabut/hazy yang merusak detail penting.
+     * Motion blur kamera yang tidak disengaja (accidental camera shake). Motion blur hanya boleh jika subjek utama tetap tajam dan terdefinisi jelas.
 
-2. ARTEFAK AI GENERATIF (ai_artifacts):
+2. EDITING, NOISE & DEBU SENSOR (Edit with intention & Noise / Artifacts):
+   - WAJIB FAIL:
+     * Over-sharpening: Munculnya garis putih halo (sharpening halos) atau pixel ringing di sepanjang tepi batas kontras tinggi.
+     * Over-smoothing / AI Denoiser berlebihan: Kulit tampak seperti lilin/plastik sintetis (waxy AI skin) yang menghilangkan seluruh tekstur pori-pori mikro alami.
+     * Debu Sensor (Sensor dust spots): Adanya bercak gelap/lingkaran kotor akibat debu sensor kamera pada langit, dinding, atau background solid.
+     * Noise: Chromatic noise (bintik warna acak merah/hijau/biru) pada area bayangan gelap akibat ISO tinggi yang tidak terkontrol.
+   - WAJIB PASS: Grain halus alami fotografi (fine ISO grain) yang menjaga struktur detail tetap tajam.
+
+3. PENCAHAYAAN & KESEIMBANGAN EKSPOSUR (Balanced lights and proper exposure):
+   - WAJIB FAIL:
+     * Blown-out highlights: Area putih terpotong (clipped pure white #FFFFFF) di mana detail wajah, dahi, pakaian, atau langit hilang permanen.
+     * Crushed shadows: Area hitam pekat terpotong (clipped pure black #000000) di mana detail gelap tenggelam total tanpa informasi visual.
+     * Kontras ekstrem yang merusak gradasi tonal alami.
+   - WAJIB PASS: Gradasi dinamis seimbang dari highlight hingga shadow dengan transisi pencahayaan natural.
+
+4. WARNA, CHROMATIC ABERRATION & MASKING (Color balance & Precision edits):
+   - WAJIB FAIL:
+     * Chromatic Aberration: Garis pinggiran warna ungu (purple fringing), hijau, atau magenta di sepanjang batas kontras tinggi.
+     * Color Cast: Semburat warna tidak wajar (misalnya kulit manusia berwarna kehijauan, ungu, atau over-saturated neon).
+     * Selection/Masking Errors: Garis potongan kasar bergerigi atau sisa halo putih dari pemotongan background yang tidak rapi.
+   - WAJIB PASS: Nada kulit (skin tones) alami dan white balance akurat.
+
+5. KOMPOSISI & PEMOTONGAN (Composition and leveling):
+   - WAJIB FAIL: Garis horizon jalanan/pantai yang miring secara tidak disengaja, atau pemotongan canggung yang memotong sendi pergelangan tangan/kaki atau kepala secara janggal.
+   - WAJIB PASS: Framing rapi, komposisi proporsional, dan ruang negatif (copy space) yang memadai.
+
+6. ARTEFAK AI GENERATIF (Generative AI Quality Standards):
    - WAJIB FAIL (PENYEBAB UTAMA PENOLAKAN ADOBE STOCK):
      * Tekstur meleleh (melted textures) pada pakaian, sepatu, paving jalanan, daun, atau background.
      * Objek yang menyatu secara tidak wajar tanpa batas fisik (misalnya tali tas selempang yang tembus menembus jas/blazer tanpa kerutan realistis atau gesper mengambang).
      * Paving stone, ubin, atau garis arsitektur jalanan yang melengkung aneh atau distorsi perspektif tidak logis.
      * Gumpalan piksel yang smudged/mushy/berantakan atau halusinasi sintetis AI.
-   - WAJIB PASS: Foto asli/riil, lanskap, render 3D, atau seni digital yang bersih, terdefinisi rapi, dan konsisten secara visual.
 
-3. ANATOMI & FISIK MANUSIA (anatomical_errors) — [KRITIS UNTUK ADOBE STOCK]:
+7. ANATOMI & FISIK MANUSIA (anatomical_errors) — [KRITIS UNTUK ADOBE STOCK]:
    - WAJIB FAIL JIKA DITEMUKAN CACAT BERIKUT:
      a. TANGAN, JARI & KUKU SUBJEK UTAMA:
         - Jumlah jari bukan 5, jari bertambah/bercabang/melebur/fused fingers.
@@ -6426,7 +6771,7 @@ PANDUAN PEMERIKSAAN SETIAP KATEGORI (STANDAR RESMI ADOBE STOCK & MICROSTOCK INTE
         - Jika terdeteksi figur orang latar belakang yang terdistorsi/mutan, Anda WAJIB menandai anatomical_errors atau ai_artifacts sebagai FAIL!
    - WAJIB PASS: Seluruh manusia (baik subjek utama maupun latar belakang) memiliki anatomi normal dan alami, atau latar belakang bebas dari figur manusia yang bermutasi.
 
-4. CACAT STRUKTURAL & MEKANIS (structural_defects) — [GADGET, SMARTPHONE, WATCH, PROPS]:
+8. CACAT STRUKTURAL & MEKANIS (structural_defects) — [GADGET, SMARTPHONE, WATCH, PROPS]:
    - WAJIB FAIL JIKA DITEMUKAN CACAT BERIKUT:
      * CANGKIR KOPI & PERLENGKAPAN MAKAN: Cangkir kopi meleleh ke jari tangan, bibir cangkir meliuk bergelombang, piring cangkir (saucer) melayang atau bertumpuk ganjil di ujung meja.
      * SMARTPHONE & TABLET: Bezel smartphone yang bergelombang/bengkok (wobbly bezel), bingkai asimetris, sudut melengkung tidak rata, kamera depan/notch meleleh.
@@ -6434,21 +6779,6 @@ PANDUAN PEMERIKSAAN SETIAP KATEGORI (STANDAR RESMI ADOBE STOCK & MICROSTOCK INTE
      * SMARTWATCH & JAM TANGAN: Dial/bezel jam yang tidak bulat sempurna, bengkok, jarum jam/angka acak kabur, atau tali jam menyatu ke kulit pergelangan tangan secara abnormal.
      * KACAMATA, TAS & AKSESORI: Gagang kacamata tidak menyambung ke telinga, tali tas selempang menembus baju (clipping), resleting/gesper melayang tanpa fisik logis.
    - WAJIB PASS: Benda buatan manusia yang utuh, simetris, dan memiliki logika fisik manufaktur yang benar.
-
-5. TEKSTUR LILIN / OVER-EDITED (over_edited):
-   - WAJIB FAIL jika kulit subjek tampak seperti lilin/plastik sintetis (waxy AI skin) akibat denoiser/AI smoothing berlebihan yang memusnahkan seluruh pori-pori dan tekstur alami mikro kulit asli, atau jenggot/rambut tampak seperti sapuan cat smudge.
-   - WAJIB PASS jika terdapat pori-pori kulit mikro, tekstur serat kain blazer/jas, dan helai rambut realistis.
-
-6. PROPORSI & PERSPEKTIF (proportion_defects):
-   - WAJIB FAIL jika terjadi distorsi perspektif sintetis yang merusak proporsi tubuh, ukuran kepala terhadap badan tidak wajar, atau skala objek/kaki/sepatu yang salah parah.
-
-7. NOISE, GRAIN & SENSOR (noise, sensor_issues):
-   - WAJIB PASS jika terdapat grain halus alami fotografi (fine ISO grain) yang mempertahankan detail.
-   - WAJIB FAIL jika chromatic noise parah atau artefak kompresi blocking 8x8.
-
-8. PENCAHAYAAN & EKSPOSUR (lighting, exposure):
-   - WAJIB PASS: Pencahayaan alami luar ruangan, golden hour, backlight hangat, rim lighting, dan bayangan alami.
-   - WAJIB FAIL jika blown-out highlights ekstrem yang merusak detail wajah atau crushed shadows di mana subjek tenggelam.
 
 9. TEKS & TIPOGRAFI (text):
    - WAJIB FAIL jika terdapat teks tiruan acak bergelombang (wobbly letters) atau teks gibberish/alien yang tidak terbaca pada layar HP, papan nama, rambu, atau pakaian.
@@ -6466,6 +6796,7 @@ PANDUAN PENILAIAN TOLERANSI:
     - Kaki / ankle / hak sepatu bengkok / rusak
     - Orang di latar belakang berwajah meleleh / mutan
     - Smartphone bengkok / tali tas clipping
+    - Over-sharpening halo / debu sensor mencolok / chromatic fringing parah
     -> WAJIB FAIL (Skor 38-48, recommendation: "FAIL", anatomical_errors: "FAIL", ai_artifacts: "FAIL")!
   * Hanya berikan PASS (Skor 88-96) jika subjek utama tajam, jari tangan sempurna normal, gigi berjarak alami, kaki proporsional, figur latar belakang wajar/bersih, dan gadget memiliki geometri simetris sempurna.
 - LOOSE: Hanya cacat fatal ekstrim yang menjadi FAIL.
@@ -6559,7 +6890,7 @@ Pastikan output berupa JSON valid sesuai skema.` + metadataInstruction;
 
   const baseImageParts = await Promise.all((Array.isArray(image) ? image : [image]).map(img => resolveImagePart(img)));
   
-  let highResCrops: { label: string; inlineData: { mimeType: string; data: string } }[] = [];
+  let highResCrops: { label: string; part: { inlineData: { mimeType: string; data: string } } }[] = [];
   if (mainBuffer) {
     highResCrops = await generateHighResolutionAuditCrops(mainBuffer);
   }
@@ -6567,11 +6898,17 @@ Pastikan output berupa JSON valid sesuai skema.` + metadataInstruction;
   // Rakit konten multi-part: Tampilan Penuh + Semua Crop Zona 100% Zoom
   const allVisualParts: any[] = [];
   allVisualParts.push({ text: "GAMBAR KESELURUHAN (FULL VIEW SCENE):" });
-  allVisualParts.push(...baseImageParts);
+  for (const part of baseImageParts) {
+    if (part && part.inlineData && typeof part.inlineData.data === 'string' && part.inlineData.data.length > 50) {
+      allVisualParts.push(part);
+    }
+  }
 
   for (const crop of highResCrops) {
-    allVisualParts.push({ text: `\nINSPEKSI FORENSIK 100% ZOOM — ${crop.label}:` });
-    allVisualParts.push(crop.inlineData);
+    if (crop && crop.part && crop.part.inlineData && typeof crop.part.inlineData.data === 'string' && crop.part.inlineData.data.length > 50) {
+      allVisualParts.push({ text: `\nINSPEKSI FORENSIK 100% ZOOM — ${crop.label}:` });
+      allVisualParts.push(crop.part);
+    }
   }
   
   // QC routing: use original model configuration
