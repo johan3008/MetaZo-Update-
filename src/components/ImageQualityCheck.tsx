@@ -1466,6 +1466,15 @@ export const ImageQualityCheck: React.FC<{
                            <p className="text-[11px] font-bold text-rose-700 dark:text-rose-300 leading-relaxed italic">
                              {r.detailed_feedback}
                            </p>
+                           {Array.isArray(r.technical_issues) && r.technical_issues.length > 0 && (
+                             <div className="mt-3 pt-3 border-t border-rose-500/10 flex flex-wrap gap-1.5">
+                               {r.technical_issues.map((issue: string, idx: number) => (
+                                 <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[9px] font-bold">
+                                   ⚠️ {issue}
+                                 </span>
+                               ))}
+                             </div>
+                           )}
                         </div>
                       )}
 

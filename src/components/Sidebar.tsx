@@ -5,7 +5,7 @@ import {
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
   Calendar, CreditCard, Info, Receipt, VolumeX, Video, Star, CopyCheck, UploadCloud, Maximize2, Compass,
-  Lock
+  Lock, Scissors
 } from 'lucide-react';
 import { ToolType, GenerationMode, toolToPath } from '@/types';
 
@@ -322,6 +322,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <VolumeX size={16} className={activeTool === ToolType.MUTE_VIDEO ? "text-rose-400" : "text-slate-400"} />
               {!sidebarCollapsed && <span>{t.sidebar_mute_video || "Mute Video Gen"}</span>}
+            </a>
+
+            <a href={toolToPath[ToolType.BG_REMOVER]} onClick={(e) => handleNavClick(e, ToolType.BG_REMOVER)}
+              className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
+                activeTool === ToolType.BG_REMOVER 
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-violet-500" 
+                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Scissors size={16} className={activeTool === ToolType.BG_REMOVER ? "text-violet-400" : "text-slate-400"} />
+              {!sidebarCollapsed && <span>{t.sidebar_bg_remover || "Background Remover"}</span>}
             </a>
 
             <button

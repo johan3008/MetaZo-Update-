@@ -411,16 +411,25 @@ export async function getDoc(docRef: SupabaseDocRef): Promise<DocumentSnapshot> 
     const found = list.find(item => (docRef.table === 'keys' ? item.key : item.id) === docRef.id);
     return new DocumentSnapshot(docRef.id, found || null);
   }
-  const { data, error } = await supabase
-    .from(docRef.table)
-    .select('*')
-    .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
-    .single();
-  if (error && error.code !== 'PGRST116') {
-    console.error('[Supabase] getDoc error:', error);
-    throw error;
+  try {
+    const { data, error } = await supabase
+      .from(docRef.table)
+      .select('*')
+      .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
+      .single();
+    if (error && error.code !== 'PGRST116') {
+      console.warn('[Supabase] getDoc error, falling back to local cache:', error.message);
+      const list = getEmulatedTable(docRef.table);
+      const found = list.find(item => (docRef.table === 'keys' ? item.key : item.id) === docRef.id);
+      return new DocumentSnapshot(docRef.id, found || null);
+    }
+    return new DocumentSnapshot(docRef.id, data || null);
+  } catch (err: any) {
+    console.warn('[Supabase] getDoc exception, falling back to local cache:', err);
+    const list = getEmulatedTable(docRef.table);
+    const found = list.find(item => (docRef.table === 'keys' ? item.key : item.id) === docRef.id);
+    return new DocumentSnapshot(docRef.id, found || null);
   }
-  return new DocumentSnapshot(docRef.id, data || null);
 }
 
 // --- LIGHTWEIGHT PUBSUB SUBSCRIPTION FOR REALTIME SYNC ---
@@ -475,7 +484,20 @@ export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merg
   }
   
   try {
-    const { error } = await supabase.from(docRef.table).upsert(processedData);
+    let finalData = processedData;
+    if (options?.merge) {
+      try {
+        const { data: existing } = await supabase
+          .from(docRef.table)
+          .select('*')
+          .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
+          .single();
+        if (existing) {
+          finalData = { ...existing, ...processedData };
+        }
+      } catch (e) {}
+    }
+    const { error } = await supabase.from(docRef.table).upsert(finalData);
     if (error) {
       console.warn(`[Supabase] setDoc to ${docRef.table} failed, falling back to local:`, error.message);
       const list = getEmulatedTable(docRef.table);
@@ -524,10 +546,19 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
             if (!current[parts[i]] || typeof current[parts[i]] !== 'object') current[parts[i]] = {};
             current = current[parts[i]];
           }
-          current[parts[parts.length - 1]] = value;
+          const leafKey = parts[parts.length - 1];
+          if (value && typeof value === 'object' && (value as any).__deleteField) {
+            delete current[leafKey];
+          } else {
+            current[leafKey] = value;
+          }
           topLevelUpdates[topKey] = mergedData[topKey];
         } else {
-          topLevelUpdates[key] = value;
+          if (value && typeof value === 'object' && (value as any).__deleteField) {
+            topLevelUpdates[key] = null;
+          } else {
+            topLevelUpdates[key] = value;
+          }
         }
       }
     } else {
@@ -537,7 +568,7 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
     topLevelUpdates = { ...data };
   }
 
-  // Remove deleteField
+  // Remove deleteField at top level
   for (const [key, value] of Object.entries(topLevelUpdates)) {
     if (value && typeof value === 'object' && (value as any).__deleteField) {
       topLevelUpdates[key] = null;

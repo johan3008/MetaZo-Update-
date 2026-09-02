@@ -99,7 +99,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
   const [batchProgress, setBatchProgress] = useState(0);
   const [styleCategory, setStyleCategory] = useState('Default');
   const [noStyle, setNoStyle] = useState(false);
-  const [variation, setVariation] = useState<number>(5);
+  const [variation, setVariation] = useState<number>(10);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -602,30 +602,52 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                 />
               </div>
 
-              {/* 🎚️ Variation Slider (5 - 15) */}
+              {/* 🎚️ Variation Slider (5 - 100) */}
               <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-white/5 rounded-2xl space-y-3 shadow-inner">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                     <Sliders size={13} className="text-emerald-500" />
                     <span>Jumlah Variasi Prompt</span>
                   </label>
-                  <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-black">
-                    {variation} Variasi
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-black">
+                      {variation} Variasi
+                    </span>
+                  </div>
                 </div>
+
+                {/* Quick Presets */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[5, 10, 25, 50, 75, 100].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setVariation(preset)}
+                      className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
+                        variation === preset
+                          ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-500/20'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-emerald-500/30 hover:text-emerald-500'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+
                 <input
                   type="range"
                   min={5}
-                  max={15}
-                  step={1}
+                  max={100}
+                  step={5}
                   value={variation}
-                  onChange={(e) => setVariation(parseInt(e.target.value))}
-                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                  onChange={(e) => setVariation(parseInt(e.target.value, 10))}
+                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500 focus:outline-none"
                 />
                 <div className="flex justify-between text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                   <span>5 (Min)</span>
-                  <span>10 (Ideal)</span>
-                  <span>15 (Max)</span>
+                  <span>25 (Standard)</span>
+                  <span>50 (Pro)</span>
+                  <span>100 (Max)</span>
                 </div>
               </div>
             </div>
@@ -973,7 +995,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                     </label>
                                   </div>
                                   
-                                  <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
+                                  <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
                                     {(item.result.prompts && item.result.prompts.length > 0 
                                       ? item.result.prompts 
                                       : [item.result.prompt || '']

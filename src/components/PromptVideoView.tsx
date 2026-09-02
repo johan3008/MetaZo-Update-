@@ -20,7 +20,8 @@ import {
   Copy,
   Download,
   Terminal,
-  Camera
+  Camera,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VideoAnalysisResult, VideoPrompt } from '../../types';
@@ -140,17 +141,18 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
 
   const handleAnalyze = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!keyword.trim() || isAnalyzing) return;
 
-    if (!isLicensed && dailyGenCount >= getDailyLimit()) {
+    if (!isLicensed) {
       setError(uiLanguage === 'id' 
-        ? `Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, getDailyLimit() - dailyGenCount)} kali generate.` 
-        : `Trial limit exceeded. Your remaining quota today is ${Math.max(0, getDailyLimit() - dailyGenCount)} generations.`);
+        ? 'Fitur "Analisis Gerak" terkunci untuk Free Trial dan hanya dapat diakses oleh pengguna berlisensi Pro. Silakan upgrade akun Anda ke Pro!' 
+        : 'The "Motion Analysis" feature is locked for Free Trial and only available for Pro licensed users. Please upgrade your account to Pro!');
       if (setShowLimitModal) {
         setShowLimitModal(true);
       }
       return;
     }
+
+    if (!keyword.trim() || isAnalyzing) return;
 
     setIsAnalyzing(true);
     setAnalysisProgress(0);
@@ -472,18 +474,36 @@ export const PromptVideoView: React.FC<PromptVideoViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
-                  disabled={isAnalyzing || isGeneratingPrompts || !keyword.trim() || (!isLicensed && dailyGenCount >= getDailyLimit())}
+                  disabled={isAnalyzing || isGeneratingPrompts || (!isLicensed ? false : !keyword.trim())}
                   onClick={(e) => { 
                     e.preventDefault(); 
+                    if (!isLicensed) {
+                      setError(uiLanguage === 'id' 
+                        ? 'Fitur "Analisis Gerak" terkunci untuk Free Trial dan hanya dapat diakses oleh pengguna berlisensi Pro. Silakan upgrade akun Anda ke Pro!' 
+                        : 'The "Motion Analysis" feature is locked for Free Trial and only available for Pro licensed users. Please upgrade your account to Pro!');
+                      if (setShowLimitModal) {
+                        setShowLimitModal(true);
+                      }
+                      return;
+                    }
                     handleAnalyze(); 
                   }}
-                  className={`h-12 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest transition-all flex items-center justify-center space-x-2 ${
-                    !isLicensed && dailyGenCount >= getDailyLimit()
-                      ? 'bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-600/20 active:scale-95 cursor-pointer border border-amber-500/35'
-                      : 'bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 shadow-lg shadow-violet-600/20 active:scale-95'
+                  title={!isLicensed ? "Fitur Analisis Gerak terkunci untuk Free Trial. Khusus pengguna Pro." : t.video_studio_btn_analyze}
+                  className={`h-12 font-black rounded-2xl text-[10px] uppercase tracking-widest transition-all flex items-center justify-center space-x-2 ${
+                    !isLicensed
+                      ? 'bg-gradient-to-r from-amber-600/90 via-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white shadow-lg shadow-amber-600/20 active:scale-95 cursor-pointer border border-amber-400/40'
+                      : 'bg-violet-600 hover:bg-violet-700 text-white disabled:bg-slate-300 dark:disabled:bg-slate-800 shadow-lg shadow-violet-600/20 active:scale-95'
                   }`}
                 >
-                  {isAnalyzing ? (
+                  {!isLicensed ? (
+                    <>
+                      <Lock size={15} className="text-amber-300" />
+                      <span>{t.video_studio_btn_analyze}</span>
+                      <span className="px-1.5 py-0.5 rounded-md bg-amber-400/20 text-amber-200 text-[9px] font-black tracking-wider border border-amber-400/30">
+                        PRO
+                      </span>
+                    </>
+                  ) : isAnalyzing ? (
                     <>
                       <Loader2 className="animate-spin" size={16} />
                       <span>{Math.round(analysisProgress)}%</span>

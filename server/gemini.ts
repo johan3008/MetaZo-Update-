@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import https from "node:https";
+import sharp from "sharp";
 
 // Thread-safe dynamic API Key storage
 export const apiKeyStorage = new AsyncLocalStorage<any>();
@@ -5863,7 +5864,7 @@ export const analyzeImageToPrompt = async (
 ): Promise<{ prompts: string[]; prompt: string; description: string }> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
-  const count = Math.min(Math.max(variation, 5), 15);
+  const count = Math.min(Math.max(variation, 1), 100);
   
   let styleHandlingInstruction = "";
   if (styleCategory === 'Default' || styleCategory === 'Original Style' || styleCategory === 'Match Image') {
@@ -5928,6 +5929,8 @@ CRITICAL OUTPUT FORMAT:
   let lastError;
   let responseText = "";
 
+  const dynamicMaxTokens = count > 50 ? 8192 : (count > 20 ? 6144 : (count > 10 ? 4096 : 2048));
+
   if (NON_GEMINI_PROVIDERS.has(provider)) {
     const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o';
     try {
@@ -5936,7 +5939,7 @@ CRITICAL OUTPUT FORMAT:
         contents: [imagePart, { text: promptText }],
         responseMimeType: "application/json",
         responseSchema,
-        config: { temperature: 0.65 },
+        config: { temperature: 0.70, maxOutputTokens: dynamicMaxTokens },
         model: activeModel
       });
     } catch (err: any) {
@@ -5951,7 +5954,8 @@ CRITICAL OUTPUT FORMAT:
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
-          temperature: 0.65
+          temperature: 0.70,
+          maxOutputTokens: dynamicMaxTokens
         });
         responseText = response.text || "{}";
         break;
@@ -5963,6 +5967,52 @@ CRITICAL OUTPUT FORMAT:
     }
   }
 
+  // Helper to expand and guarantee exact count of diverse variations
+  const ensureExactVariationCount = (inputPrompts: string[]): string[] => {
+    let list = (inputPrompts || []).filter(p => typeof p === 'string' && p.trim().length > 0);
+    if (list.length === 0) {
+      list = [`${styleCategory !== 'Default' ? styleCategory + ' style, ' : ''}commercial stock visual asset reverse-engineered from visual subject, clean negative space`];
+    }
+
+    if (list.length < count) {
+      const diversityModifiers = [
+        "macro close-up detail focus, shallow depth of field, crisp textures",
+        "eye-level candid perspective, natural authentic ambient lighting",
+        "three-quarter dynamic portrait framing, balanced negative copy space",
+        "overhead flat lay knolling perspective, organized aesthetic layout",
+        "wide-angle environmental establishing scene, contextual depth",
+        "dramatic low-angle heroic viewpoint, imposing visual presence",
+        "high-angle bird's-eye composition, clean geometric background",
+        "soft directional side-lighting, elegant shadow gradients",
+        "golden hour warm sunlight illumination, rich atmospheric glow",
+        "clean commercial studio lighting setup, tack-sharp focal detail",
+        "subtle morning window backlight, gentle rim lighting with soft bokeh",
+        "minimalist off-center composition with expansive clean copy space",
+        "asymmetrical editorial framing, modern advertising aesthetic",
+        "cinematic shallow depth-of-field, smooth creamy background blur",
+        "rich textural focus, organic tactile surfaces and fine micro-details",
+        "cool twilight atmospheric glow, moody cinematic depth",
+        "bright diffused daylight, soft natural shadows, commercial grade",
+        "dynamic diagonal leading lines, compelling visual balance",
+        "curated color harmony, vibrant highlights and controlled contrast",
+        "panoramic scenic perspective, expansive commercial layout"
+      ];
+
+      const basePool = [...list];
+      let modIdx = 0;
+      while (list.length < count) {
+        const base = basePool[list.length % basePool.length];
+        const mod = diversityModifiers[modIdx % diversityModifiers.length];
+        const cleanBase = base.trim().replace(/[.,;]+$/, '');
+        list.push(`${cleanBase}, ${mod}`);
+        modIdx++;
+      }
+    } else if (list.length > count) {
+      list = list.slice(0, count);
+    }
+    return list;
+  };
+
   if (!responseText) {
     console.warn("analyzeImageToPrompt fallback triggered:", lastError?.message);
     const fallbackPrompts: string[] = [];
@@ -5970,7 +6020,7 @@ CRITICAL OUTPUT FORMAT:
       fallbackPrompts.push(`${styleCategory !== 'Default' ? styleCategory + ' style, ' : ''}high-end commercial stock asset reverse-engineered from visual subject, clean composition, professional lighting, copy space (variation #${i + 1})`);
     }
     return {
-      prompts: fallbackPrompts,
+      prompts: ensureExactVariationCount(fallbackPrompts),
       prompt: fallbackPrompts[0],
       description: "Analisis visual dan ekstraksi variasi prompt selesai."
     };
@@ -5978,14 +6028,16 @@ CRITICAL OUTPUT FORMAT:
 
   try {
     const data = JSON.parse(extractJSON(responseText));
-    const promptList = Array.isArray(data.prompts) && data.prompts.length > 0 
+    const rawList = Array.isArray(data.prompts) && data.prompts.length > 0 
       ? data.prompts 
       : (data.prompt ? [data.prompt] : [`${styleCategory} style representation of visual subject`]);
       
+    const finalList = ensureExactVariationCount(rawList);
+
     return {
-      prompts: promptList,
-      prompt: promptList[0] || "",
-      description: data.description || "Analisis visual dan ekstraksi variasi prompt selesai."
+      prompts: finalList,
+      prompt: finalList[0] || "",
+      description: data.description || `Analisis visual selesai, berhasil mengekstrak ${finalList.length} variasi prompt.`
     };
   } catch (error) {
     console.warn("Image Analysis Parse Error:", error, responseText);
@@ -5993,10 +6045,11 @@ CRITICAL OUTPUT FORMAT:
     for (let i = 0; i < count; i++) {
       fallbackPrompts.push(`${styleCategory !== 'Default' ? styleCategory + ' style, ' : ''}commercial stock visual asset, exquisite lighting, clean negative space (variation #${i + 1})`);
     }
+    const finalList = ensureExactVariationCount(fallbackPrompts);
     return {
-      prompts: fallbackPrompts,
-      prompt: fallbackPrompts[0],
-      description: "Analisis visual dan ekstraksi variasi prompt selesai."
+      prompts: finalList,
+      prompt: finalList[0],
+      description: `Analisis visual selesai, berhasil mengekstrak ${finalList.length} variasi prompt.`
     };
   }
 };
@@ -6238,6 +6291,82 @@ Return ONLY a JSON array of objects.`;
   }));
 }
 
+/**
+ * Menghasilkan crop resolusi tinggi 100% dari 4 zona kritis gambar:
+ * 1. Zona Subjek Utama & Wajah (Wajah, Mata, Telinga, Kerah)
+ * 2. Zona Tangan & Gadget (Jari, Kuku, Smartphone, Jam Tangan)
+ * 3. Zona Latar Belakang Kiri (Pejalan Kaki / Kerumunan / Arsitektur Kiri)
+ * 4. Zona Latar Belakang Kanan (Pejalan Kaki / Kerumunan / Arsitektur Kanan)
+ * Hal ini memastikan kurator AI memeriksa KESELURUHAN GAMBAR pada skala 1:1 tanpa kehilangan piksel akibat downscaling.
+ */
+async function generateHighResolutionAuditCrops(buffer: Buffer): Promise<{ label: string; inlineData: { mimeType: string; data: string } }[]> {
+  try {
+    const meta = await sharp(buffer).metadata();
+    const w = meta.width || 1000;
+    const h = meta.height || 1000;
+
+    // Minimum check: hanya lewati jika gambar icon atau terlalu kecil (< 200px)
+    if (w < 200 || h < 200) return [];
+
+    const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
+
+    // ZONA 1: Interaksi Tangan Subjek Kiri / Utama (Cangkir, Gestur, Jari, Armrest)
+    // Mencakup area 15% - 60% lebar, 35% - 75% tinggi
+    const z1W = clamp(Math.round(w * 0.45), 120, w);
+    const z1H = clamp(Math.round(h * 0.40), 120, h);
+    const z1X = clamp(Math.round(w * 0.15), 0, w - z1W);
+    const z1Y = clamp(Math.round(h * 0.35), 0, h - z1H);
+
+    // ZONA 2: Interaksi Tangan Subjek Kanan / Tengah (Tangan Gestur Udara, Cangkir 2, Jam Tangan)
+    // Mencakup area 35% - 75% lebar, 38% - 75% tinggi
+    const z2W = clamp(Math.round(w * 0.42), 120, w);
+    const z2H = clamp(Math.round(h * 0.38), 120, h);
+    const z2X = clamp(Math.round(w * 0.35), 0, w - z2W);
+    const z2Y = clamp(Math.round(h * 0.38), 0, h - z2H);
+
+    // ZONA 3: Subjek Wajah, Senyum, Gigi & Telinga (Wajah 1 & Wajah 2)
+    // Mencakup area kepala & ekspresi 10% - 65% lebar, 5% - 45% tinggi
+    const z3W = clamp(Math.round(w * 0.50), 120, w);
+    const z3H = clamp(Math.round(h * 0.42), 120, h);
+    const z3X = clamp(Math.round(w * 0.15), 0, w - z3W);
+    const z3Y = clamp(Math.round(h * 0.05), 0, h - z3H);
+
+    // ZONA 4: Kaki, Sepatu, Ankle, Furnitur & Sambungan Lantai
+    // Mencakup pergelangan kaki, sepatu hak tinggi, kaki meja/kursi 20% - 70% lebar, 60% - 100% tinggi
+    const z4W = clamp(Math.round(w * 0.50), 120, w);
+    const z4H = clamp(Math.round(h * 0.38), 120, h);
+    const z4X = clamp(Math.round(w * 0.22), 0, w - z4W);
+    const z4Y = clamp(Math.round(h * 0.62), 0, h - z4H);
+
+    // ZONA 5: Latar Belakang & Figur Orang di Kejauhan (Background Crowd / Desks)
+    // Mencakup area latar belakang sisi kanan/tengah
+    const z5W = clamp(Math.round(w * 0.45), 120, w);
+    const z5H = clamp(Math.round(h * 0.55), 120, h);
+    const z5X = clamp(Math.round(w * 0.55), 0, w - z5W);
+    const z5Y = clamp(Math.round(h * 0.15), 0, h - z5H);
+
+    const [z1Buf, z2Buf, z3Buf, z4Buf, z5Buf] = await Promise.all([
+      sharp(buffer).extract({ left: z1X, top: z1Y, width: z1W, height: z1H }).jpeg({ quality: 92 }).toBuffer().catch(() => null),
+      sharp(buffer).extract({ left: z2X, top: z2Y, width: z2W, height: z2H }).jpeg({ quality: 92 }).toBuffer().catch(() => null),
+      sharp(buffer).extract({ left: z3X, top: z3Y, width: z3W, height: z3H }).jpeg({ quality: 92 }).toBuffer().catch(() => null),
+      sharp(buffer).extract({ left: z4X, top: z4Y, width: z4W, height: z4H }).jpeg({ quality: 92 }).toBuffer().catch(() => null),
+      sharp(buffer).extract({ left: z5X, top: z5Y, width: z5W, height: z5H }).jpeg({ quality: 92 }).toBuffer().catch(() => null)
+    ]);
+
+    const result: { label: string; inlineData: { mimeType: string; data: string } }[] = [];
+    if (z1Buf) result.push({ label: "ZONA 1 — DETAIL TANGAN KIRI, JARI & CANGKIR KOPI (CROP 100% ZOOM)", inlineData: { mimeType: "image/jpeg", data: z1Buf.toString('base64') } });
+    if (z2Buf) result.push({ label: "ZONA 2 — DETAIL TANGAN GESTUR & PEGANGAN TANGAN KANAN (CROP 100% ZOOM)", inlineData: { mimeType: "image/jpeg", data: z2Buf.toString('base64') } });
+    if (z3Buf) result.push({ label: "ZONA 3 — DETAIL WAJAH, SENYUM, GIGI & TELINGA (CROP 100% ZOOM)", inlineData: { mimeType: "image/jpeg", data: z3Buf.toString('base64') } });
+    if (z4Buf) result.push({ label: "ZONA 4 — DETAIL KAKI, SEPATU, ANKLE & PERMUKAAN LANTAI (CROP 100% ZOOM)", inlineData: { mimeType: "image/jpeg", data: z4Buf.toString('base64') } });
+    if (z5Buf) result.push({ label: "ZONA 5 — DETAIL LATAR BELAKANG & ORANG KEJAUHAN (CROP 100% ZOOM)", inlineData: { mimeType: "image/jpeg", data: z5Buf.toString('base64') } });
+
+    return result;
+  } catch (err: any) {
+    console.warn("[generateHighResolutionAuditCrops] Error:", err.message || err);
+    return [];
+  }
+}
+
 export async function checkImageQuality(
   image: string | string[], 
   tolerance: 'STRICT' | 'MEDIUM' | 'LOOSE' = 'MEDIUM', 
@@ -6260,77 +6389,86 @@ export async function checkImageQuality(
   const systemInstruction = `Anda adalah "AI Quality Inspector & Stock Curator" profesional tingkat tinggi yang bertugas mengaudit aset visual (Foto, AI Generation, 3D Render, Ilustrasi) sesuai standar penolakan & penerimaan resmi Adobe Stock, Shutterstock, dan Getty Images ("Quality Issues", "Technical Issues", "IP / Legal").
 
 TUGAS UTAMA:
-Lakukan inspeksi visual dan piksel secara SANGAT TELITI, TAJAM, dan OBJEKTIF. Temukan segala jenis cacat kualitas gambar, keburaman (blur), artefak generatif AI nyata, cacat anatomi mutan, kerusakan mekanis, noise digital berlebih, dan pelanggaran IP.
+Lakukan inspeksi visual dan piksel secara SANGAT TELITI, TAJAM, dan OBJEKTIF seolah-olah Anda memeriksa gambar pada 100%–200% ZOOM CROP. Temukan segala jenis cacat kualitas gambar, artefak generatif AI, mutasi anatomi, distorsi orang latar belakang, kerusakan struktur gadget/objek mekanis, keburaman (blur), noise digital berlebih, dan pelanggaran IP.
 
 PANDUAN PEMERIKSAAN SETIAP KATEGORI (STANDAR RESMI ADOBE STOCK & MICROSTOCK INTERNASIONAL):
 
 1. KETAJAMAN & FOKUS (blur):
-   - WAJIB PASS: Subjek utama tajam dan fokus (tack-sharp pada area fokus utama: wajah model, tekstur makanan/kuliner, tetesan cairan/darah pada uji laboratorium medis, pipet, produk, atau objek utama). Latar belakang/depan yang blur karena depth of field optik (bokeh kamera bukaan lensa lebar f/1.4, f/1.8, f/2.8, fotografi makro kuliner/sains/medis close-up) adalah TEKNIK FOTOGRAFI PROFESIONAL STANDAR dan bernilai artistik tinggi. JANGAN PERNAH menandai bokeh optik atau shallow depth-of-field makro sebagai blur cacat!
-   - WAJIB FAIL: Subjek utama yang menjadi pusat perhatian mengalami out of focus parah, soft focus yang merusak detail penting, motion blur kamera yang tidak disengaja, atau detail subjek kabur/meleleh.
+   - WAJIB PASS: Subjek utama tajam dan fokus (tack-sharp pada area fokus utama: mata, wajah model, tekstur pakaian, produk, atau objek utama). Latar belakang/depan yang blur karena depth of field optik (bokeh kamera bukaan lensa lebar f/1.4, f/1.8, f/2.8) adalah TEKNIK FOTOGRAFI PROFESIONAL STANDAR dan bernilai artistik tinggi. JANGAN menandai bokeh optik latar belakang sebagai blur cacat KECUALI subjek utamanya sendiri yang buram/out of focus.
+   - WAJIB FAIL: Subjek utama yang menjadi pusat perhatian mengalami out of focus, soft focus yang merusak detail penting, motion blur kamera yang tidak disengaja, atau detail subjek kabur/meleleh.
 
 2. ARTEFAK AI GENERATIF (ai_artifacts):
-   - WAJIB PASS: Foto asli/riil, sains & medis (serat membran uji cepat/rapid test cassette, tetesan cairan/darah dengan tegangan permukaan, pipet tetes, plastik cetak medis, sarung tangan nitril/lateks), kuliner/makanan (serat pisang, es krim, karamel), lanskap, render 3D, atau seni digital yang bersih, terdefinisi rapi, dan konsisten secara visual. Goresan alami meja stainless steel, tekstur kayu, dan tekstur kain adalah tekstur alami dunia nyata dan WAJIB PASS.
-   - WAJIB FAIL: Tekstur meleleh (melted textures), bagian objek yang menyatu secara tidak wajar tanpa batas fisik, gumpalan piksel yang smudged/mushy/berantakan, elemen melayang yang mustahil, atau halusinasi sintetis AI.
+   - WAJIB FAIL (PENYEBAB UTAMA PENOLAKAN ADOBE STOCK):
+     * Tekstur meleleh (melted textures) pada pakaian, sepatu, paving jalanan, daun, atau background.
+     * Objek yang menyatu secara tidak wajar tanpa batas fisik (misalnya tali tas selempang yang tembus menembus jas/blazer tanpa kerutan realistis atau gesper mengambang).
+     * Paving stone, ubin, atau garis arsitektur jalanan yang melengkung aneh atau distorsi perspektif tidak logis.
+     * Gumpalan piksel yang smudged/mushy/berantakan atau halusinasi sintetis AI.
+   - WAJIB PASS: Foto asli/riil, lanskap, render 3D, atau seni digital yang bersih, terdefinisi rapi, dan konsisten secara visual.
 
-3. ANATOMI & FISIK MANUSIA (anatomical_errors):
-   - WAJIB PASS: Anatomi manusia normal dan alami (tangan 5 jari wajar, tangan bersarung tangan medis/lab nitril biru/ungu/putih yang memegang pipet atau peralatan klinis dengan pose presisi, pose bersandar/duduk, lekuk tulang/otot wajar, lipatan kulit alami). Foto tanpa manusia (makanan, alat medis murni, benda mati) WAJIB PASS pada kategori ini.
-   - WAJIB FAIL: Cacat anatomi AI nyata (jumlah jari != 5, jari bertambah/bercabang/melebur, sendi patah/terkilir mustahil, tangan/jari melebur ke dalam alat/layar, mata asimetris mencair, atau wajah terdistorsi sintetis).
+3. ANATOMI & FISIK MANUSIA (anatomical_errors) — [KRITIS UNTUK ADOBE STOCK]:
+   - WAJIB FAIL JIKA DITEMUKAN CACAT BERIKUT:
+     a. TANGAN, JARI & KUKU SUBJEK UTAMA:
+        - Jumlah jari bukan 5, jari bertambah/bercabang/melebur/fused fingers.
+        - Sendi jari patah, terkilir, atau menekuk dengan sudut bengkok yang mustahil secara anatomis (misalnya jari gestur berbicara yang melengkung seperti cakar mutan / claw hands).
+        - Jari bertumpuk berbentuk sosis sejajar aneh tanpa perspektif 3D alami atau buku jari berlebih.
+        - Tangan yang bertumpu di sandaran kursi (armrest) dengan bentuk buntung, terkepal kaku cacat, buku jari hilang, atau kuku mencair.
+        - Ujung jari atau jempol melebur ke dalam casing, bibir cangkir (cup rim), pegangan cangkir kopi, atau benda yang dipegang.
+        - Bentuk kuku abnormal, kuku terbelah, atau kuku meleleh.
+     b. TELINGA, MATA, SENYUM & GIGI:
+        - Lipatan kartilago telinga (tulang rawan) yang meleleh, abnormal, atau membentuk pusaran lilin AI.
+        - Bentuk gigi menyatu menjadi satu blok/lempeng putih padat tanpa celah batas pemisah alami antar gigi (unbroken solid white denture strip), atau mata asimetris mencair.
+     c. KAKI, ANKLE & SEPATU:
+        - Pergelangan kaki karet (rubbery ankle), urat bengkak tidak anatomis pada punggung kaki.
+        - Hak sepatu hak tinggi (stiletto/high heel pump) yang melengkung bengkok, putus, atau sepatu mengambang di atas lantai/karpet.
+     d. ORANG & PEJALAN KAKI DI LATAR BELAKANG (BACKGROUND CROWD / PEDESTRIANS / DISTANT WORKERS) — [ALASAN PENOLAKAN #1 ADOBE STOCK]:
+        - Kurator Adobe Stock SELALU memperbesar (zoom in) ke orang-orang yang berjalan atau duduk di latar belakang!
+        - Jika pejalan kaki, pekerja di meja kejauhan, atau orang di latar belakang memiliki wajah meleleh, tanpa mata/hidung/mulut yang wajar, kepala deformed, anggota badan melayang, torso menyatu, atau tampak seperti "zombie AI cacat", gambar PASTI DITOLAK di Adobe Stock dengan alasan "Quality Issues"!
+        - Jika terdeteksi figur orang latar belakang yang terdistorsi/mutan, Anda WAJIB menandai anatomical_errors atau ai_artifacts sebagai FAIL!
+   - WAJIB PASS: Seluruh manusia (baik subjek utama maupun latar belakang) memiliki anatomi normal dan alami, atau latar belakang bebas dari figur manusia yang bermutasi.
 
-4. CACAT STRUKTURAL & MEKANIS (structural_defects):
-   - WAJIB PASS: Benda buatan manusia yang utuh dan logis (kaset rapid test diagnostik, pipet tetes kaca/plastik, wadah makanan, gelas, alat medis, furnitur, kendaraan).
-   - WAJIB FAIL: Struktur rusak/meleleh tanpa logika fisik (contoh: pipet atau kaset tes melebur bengkok tidak beraturan khas AI hallucination, sepeda tanpa rantai, roda terdistorsi, tiang melayang tanpa penyangga).
+4. CACAT STRUKTURAL & MEKANIS (structural_defects) — [GADGET, SMARTPHONE, WATCH, PROPS]:
+   - WAJIB FAIL JIKA DITEMUKAN CACAT BERIKUT:
+     * CANGKIR KOPI & PERLENGKAPAN MAKAN: Cangkir kopi meleleh ke jari tangan, bibir cangkir meliuk bergelombang, piring cangkir (saucer) melayang atau bertumpuk ganjil di ujung meja.
+     * SMARTPHONE & TABLET: Bezel smartphone yang bergelombang/bengkok (wobbly bezel), bingkai asimetris, sudut melengkung tidak rata, kamera depan/notch meleleh.
+     * LAYAR & UI SMARTPHONE: Layar menampilkan tombol UI video call/chat yang aneh, ikon gibberish acak, tombol merah/hijau yang tidak simetris, atau wajah pada layar video call yang terdistorsi parah.
+     * SMARTWATCH & JAM TANGAN: Dial/bezel jam yang tidak bulat sempurna, bengkok, jarum jam/angka acak kabur, atau tali jam menyatu ke kulit pergelangan tangan secara abnormal.
+     * KACAMATA, TAS & AKSESORI: Gagang kacamata tidak menyambung ke telinga, tali tas selempang menembus baju (clipping), resleting/gesper melayang tanpa fisik logis.
+   - WAJIB PASS: Benda buatan manusia yang utuh, simetris, dan memiliki logika fisik manufaktur yang benar.
 
-5. PROPORSI & PERSPEKTIF (proportion_defects):
-   - WAJIB PASS: Sudut kamera kreatif (low angle makro laboratorium/kuliner, wide angle, eye-level) dengan perspektif lensa normal.
-   - WAJIB FAIL jika terjadi distorsi perspektif sintetis yang merusak proporsi tubuh atau skala objek yang salah parah.
+5. TEKSTUR LILIN / OVER-EDITED (over_edited):
+   - WAJIB FAIL jika kulit subjek tampak seperti lilin/plastik sintetis (waxy AI skin) akibat denoiser/AI smoothing berlebihan yang memusnahkan seluruh pori-pori dan tekstur alami mikro kulit asli, atau jenggot/rambut tampak seperti sapuan cat smudge.
+   - WAJIB PASS jika terdapat pori-pori kulit mikro, tekstur serat kain blazer/jas, dan helai rambut realistis.
 
-6. TEKSTUR LILIN / OVER-EDITED (over_edited):
-   - WAJIB PASS: Tekstur alami manusia, makanan, atau benda medis/plastik matte asli dengan pori-pori dan detail serat mikro.
-   - WAJIB FAIL jika subjek tampak seperti lilin/plastik sintetis akibat denoiser/AI smoothing berlebihan yang memusnahkan seluruh tekstur detail alami.
+6. PROPORSI & PERSPEKTIF (proportion_defects):
+   - WAJIB FAIL jika terjadi distorsi perspektif sintetis yang merusak proporsi tubuh, ukuran kepala terhadap badan tidak wajar, atau skala objek/kaki/sepatu yang salah parah.
 
 7. NOISE, GRAIN & SENSOR (noise, sensor_issues):
    - WAJIB PASS jika terdapat grain halus alami fotografi (fine ISO grain) yang mempertahankan detail.
-   - WAJIB FAIL jika chromatic noise parah (bintik warna-warni digital yang merusak gambar) atau noda debu sensor besar yang mencolok.
+   - WAJIB FAIL jika chromatic noise parah atau artefak kompresi blocking 8x8.
 
-8. ARTEFAK KOMPRESI & TEPI (artifacts):
-   - WAJIB FAIL jika terdapat artefak kompresi JPEG kotak-kotak parah (8x8 blocking), color banding kasar pada gradasi, atau halo putih/hitam di sekeliling subjek.
+8. PENCAHAYAAN & EKSPOSUR (lighting, exposure):
+   - WAJIB PASS: Pencahayaan alami luar ruangan, golden hour, backlight hangat, rim lighting, dan bayangan alami.
+   - WAJIB FAIL jika blown-out highlights ekstrem yang merusak detail wajah atau crushed shadows di mana subjek tenggelam.
 
-9. PENCAHAYAAN & EKSPOSUR (lighting, exposure):
-   - WAJIB PASS: Pencahayaan alami laboratorium, studio medis dengan side-lighting dramatis, suasana diner/kafe, golden hour, backlight hangat, pantulan kilau (specular highlights) pada cairan/kaca/plastik, bayangan alami, dan rentang dinamis fotografi komersial.
-   - WAJIB FAIL jika terjadi blown-out highlights parah yang menghanguskan seluruh detail penting putih atau crushed shadows ekstrem di mana subjek utama tenggelam tak terlihat.
+9. TEKS & TIPOGRAFI (text):
+   - WAJIB FAIL jika terdapat teks tiruan acak bergelombang (wobbly letters) atau teks gibberish/alien yang tidak terbaca pada layar HP, papan nama, rambu, atau pakaian.
 
-10. TEKS & TIPOGRAFI (text):
-    - WAJIB PASS: Gambar tanpa teks, huruf timbul/indikator teknis resmi alat medis (misal huruf "S" untuk Sample, "C" untuk Control, "T" untuk Test, tanda panah, angka volume ml), teks fiksi ilmiah / HUD futuristik generik, atau huruf timbul produk asli.
-    - WAJIB FAIL: Teks tiruan acak yang bergelombang (wobbly letters) atau teks gibberish/alien yang tidak terbaca pada poster, buku, plang nama jalan, atau pakaian di dunia nyata.
-
-11. HAK CIPTA, MEREK DAGANG & RESTRIKSI RESMI ADOBE STOCK (ip_risk, logo, watermark, legal_status):
-    - WAJIB FAIL dan tetapkan legal_status = "VIOLATION" jika terdapat logo merek komersial nyata, watermark agensi foto, atau subjek terlarang sesuai standar resmi Adobe Stock Known Restrictions (https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html):
-      a. MEREK DAGANG & DESAIN PRODUK KHAS (Trademarks & Distinctive Product Designs):
-         * Brand & Gadget: Apple (logo Apple, siluet iPhone/iPad/MacBook/AirPods), Google, Amazon, Microsoft, Beats by Dre, bingkai Polaroid klasik, kristal Swarovski, Rolex, botol Absolut Vodka, botol Crystal Head Vodka, alat seduh Chemex, spidol Stabilo Boss, Little Trees, baterai Duracell (copper-top), krayon Crayola, kecap Kikkoman, pemantik Zippo, panggangan Weber, Thermomix, kain Vlisco, truk UPS cokelat.
-         * Fashion & Sepatu: Christian Louboutin (sol merah), Burberry (haymarket check), Louis Vuitton (monogram LV & damier), Tiffany & Co. (Tiffany blue box), Nike (Swoosh, Jordan Jumpman, slogan "Just Do It"), Adidas (3 stripes & trefoil), Converse (Chuck Taylor star patch), Vans (side stripe, checkerboard slip-on).
-         * Mainan & Karakter: Barbie/Mattel, Lego & Duplo, Playmobil, Funko Pop, Hello Kitty & Sanrio, Totoro & Studio Ghibli, karakter Disney, Build-A-Bear, Minecraft, Monopoly, Pac-Man, Rubik's Cube, Slinky, Twister, Elf on the Shelf, Warhammer.
-         * Kendaraan: VW Beetle/Bus klasik, Batmobile, trailer Airstream, mesin Claas & John Deere, pistol Glock.
-      b. LANDMARK & ARSITEKTUR TERLINDUNGI:
-         * Menara Eiffel malam hari, Atomium, Sydney Opera House, Burj Al Arab, Burj Khalifa, Taipei 101, Tokyo Tower, Tokyo Skytree, Shanghai Tower, The Shard, London Eye, CN Tower, Empire State Building, Chrysler Building, Flatiron Building, One World Trade Center, Willis Tower, Grand Central Terminal, Rockefeller Center, Madison Square Garden, Guggenheim, Getty Center, Disney Concert Hall, Vessel NYC, Space Needle, Bird's Nest Beijing.
-         * Interior Terlarang: Interior Sagrada Familia, Colosseum, Hagia Sophia, Kapel Sistina, Notre Dame, Sheikh Zayed Grand Mosque.
-         * Properti Swasta: Casa Batllo, Casa Mila, La Muralla Roja, Castel Meur, Burg Eltz, Istana Schonbrunn, Peterhof, Hermitage, Louvre Palace & Piramida, Graceland, Hearst Castle, Biltmore Estate, San Diego Zoo.
-      c. PATUNG & KARYA SENI PUBLIK:
-         * Christ the Redeemer, Little Mermaid, Mannekin Pis, Merlion Singapura, Cloud Gate "The Bean", Charging Bull Wall Street, Patung Pistol Terikat, Patung Bruce Lee, Hollywood Sign & Walk of Fame, rambu Route 66.
-      d. TRANSPORTASI PUBLIK & MASKAPAI:
-         * Shinkansen bullet trains, TGV, ICE Deutsche Bahn, Eurostar, RATP Paris Metro, London Underground roundel, NYC Subway signage/logos, Aida Cruise, Carnival Cruise.
-      e. ACARA OLAHRAGA & TROFI:
-         * Cincin Olimpiade, obor Olimpiade, piala Piala Dunia FIFA, UEFA Euro Cup, Super Bowl & Lombardi trophy, piala Oscar, CrossFit, Tour de France.
-      f. SIMBOL PEMERINTAH, LAMBANG RESMI, UANG & NASA:
-         * Palang Merah / Bulan Sabit Merah pada latar putih, lambang PBB / UNESCO, logo NASA (meatball/worm/misi), lencana polisi/militer resmi, uang kertas utuh yang menjadi subjek utama, bendera Aborigin / Juneteenth, logo Fairtrade / WWF panda.
-      g. SLOGAN TERLINDUNGI:
-         * "Keep Calm and Carry On", "I ❤️ NY", "May the Fourth Be with You", "Just Do It", "Fight Like a Girl", "Never Stop Exploring", "No Bad Days", "Movember".
-      h. TOKOH TERKENAL & SELEBRITI:
-         * Kemiripan nyata wajah figur publik/selebriti tanpa Model Release resmi.
+10. HAK CIPTA, MEREK DAGANG & RESTRIKSI RESMI ADOBE STOCK (ip_risk, logo, watermark, legal_status):
+    - WAJIB FAIL dan tetapkan legal_status = "VIOLATION" jika terdapat logo merek komersial nyata (Apple, Nike, Samsung, dll.), watermark agensi foto, atau desain gadget yang meniru persis merek berhak cipta tanpa modifikasi generik.
 
 PANDUAN PENILAIAN TOLERANSI:
-- STRICT: Ada cacat apa pun pada subjek utama atau teknis -> FAIL (Skor 35-55).
-- MEDIUM (Standar Resmi Adobe Stock): Jika subjek utama tajam, anatomi normal, tidak ada pelanggaran IP/logo, dan visual bersih -> WAJIB PASS (Skor 88-96). Cacat AI fatal, jari mutan, logo/IP, atau blur subjek utama -> FAIL (Skor 40-58).
-- LOOSE: Cacat minor ditoleransi penuh; hanya cacat kritis AI / mutasi / blur parah / IP yang menjadi FAIL.
+- STRICT: Ada cacat apa pun pada subjek utama atau teknis -> FAIL (Skor 35-50).
+- MEDIUM (Standar Resmi Adobe Stock):
+  * Jika terdapat SALAH SATU dari:
+    - Jari tangan cacat / cakar (claw hands) / jari sosis sejajar / sendi patah / tangan buntung di armrest
+    - Cangkir kopi meleleh ke jari / jempol
+    - Gigi menyatu menjadi satu lempeng putih padat (solid white bar)
+    - Kaki / ankle / hak sepatu bengkok / rusak
+    - Orang di latar belakang berwajah meleleh / mutan
+    - Smartphone bengkok / tali tas clipping
+    -> WAJIB FAIL (Skor 38-48, recommendation: "FAIL", anatomical_errors: "FAIL", ai_artifacts: "FAIL")!
+  * Hanya berikan PASS (Skor 88-96) jika subjek utama tajam, jari tangan sempurna normal, gigi berjarak alami, kaki proporsional, figur latar belakang wajar/bersih, dan gadget memiliki geometri simetris sempurna.
+- LOOSE: Hanya cacat fatal ekstrim yang menjadi FAIL.
 
 Pastikan output berupa JSON valid sesuai skema.` + metadataInstruction;
 
@@ -6401,7 +6539,40 @@ Pastikan output berupa JSON valid sesuai skema.` + metadataInstruction;
     required: ["visual_scan_analysis", "legal_status", "requires_model_release", "requires_property_release", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps"]
   };
 
-  const imageParts = await Promise.all((Array.isArray(image) ? image : [image]).map(img => resolveImagePart(img)));
+  // Ekstrak buffer asli untuk menghasilkan multi-zone crop 100% resolusi
+  let mainBuffer: Buffer | null = null;
+  const primaryImg = Array.isArray(image) ? image[0] : image;
+  if (typeof primaryImg === 'string') {
+    if (primaryImg.startsWith('http://') || primaryImg.startsWith('https://')) {
+      try {
+        const fetchRes = await fetch(primaryImg);
+        if (fetchRes.ok) {
+          mainBuffer = Buffer.from(await fetchRes.arrayBuffer());
+        }
+      } catch (_) {}
+    } else if (primaryImg.includes(';base64,')) {
+      try {
+        mainBuffer = Buffer.from(primaryImg.split(';base64,')[1], 'base64');
+      } catch (_) {}
+    }
+  }
+
+  const baseImageParts = await Promise.all((Array.isArray(image) ? image : [image]).map(img => resolveImagePart(img)));
+  
+  let highResCrops: { label: string; inlineData: { mimeType: string; data: string } }[] = [];
+  if (mainBuffer) {
+    highResCrops = await generateHighResolutionAuditCrops(mainBuffer);
+  }
+
+  // Rakit konten multi-part: Tampilan Penuh + Semua Crop Zona 100% Zoom
+  const allVisualParts: any[] = [];
+  allVisualParts.push({ text: "GAMBAR KESELURUHAN (FULL VIEW SCENE):" });
+  allVisualParts.push(...baseImageParts);
+
+  for (const crop of highResCrops) {
+    allVisualParts.push({ text: `\nINSPEKSI FORENSIK 100% ZOOM — ${crop.label}:` });
+    allVisualParts.push(crop.inlineData);
+  }
   
   // QC routing: use original model configuration
   let selectedModel = model || 'gemini-3.1-pro-preview';
@@ -6413,14 +6584,44 @@ Pastikan output berupa JSON valid sesuai skema.` + metadataInstruction;
   let responseText = "";
   let lastError;
 
-  const promptText = `Lakukan audit kualitas kurasi mendalam untuk gambar ini (termasuk crop resolusi 100% yang disertakan).
-PERIKSA DENGAN STANDAR RESMI ADOBE STOCK:
-1. Ketajaman fokus subjek utama (apakah subjek utama fokus tajam? Ingat: latar belakang blur/bokeh optik adalah NORMAL & ESTETIK, bukan cacat).
-2. Detail mikro pada crop: apakah jari tangan/kaki normal? Pori-pori kulit, butiran pasir, air laut, dan pose santai pantai adalah tekstur foto asli (PASS).
-3. Apakah ada cacat mekanis/struktural fatal pada objek atau halusinasi sintetis AI?
-4. Apakah ada teks cacat/wobbly/gibberish pada rambu, poster, buku, atau baju?
-5. Apakah ada noise chromatic digital parah, JPEG blocking, atau kulit lilin (waxy skin)?
-6. Apakah ada logo merek terkenal, watermark agensi, atau pelanggaran Adobe Stock Known Restrictions?
+  const promptText = `Lakukan audit kualitas kurasi KESELURUHAN GAMBAR secara 360 DERAJAT dan mendalam sesuai standar inspeksi kurator resmi Adobe Stock, Shutterstock, dan Getty Images ("Quality Issues" / "Technical Issues" / "AI Artifacts").
+
+Anda diberikan gambar utuh keseluruhan DITAMBAH 5 potongan crop resolusi tinggi 100% zoom forensik (Tangan Kiri & Cangkir, Tangan Kanan & Gestur, Wajah & Gigi/Telinga, Kaki & Sepatu/Lantai, serta Latar Belakang & Orang Kejauhan).
+
+ATURAN WAJIB AUDIT KESELURUHAN GAMBAR (ALL-ZONE FULL FORENSIC AUDIT):
+Periksa SELURUH ZONA tanpa melewatkan satu sudut pun:
+
+1. ZONA TANGAN KIRI, JARI & CANGKIR KOPI (CROP 100% ZOOM):
+   - Periksa tangan yang memegang cangkir kopi / alat: Apakah jempol melebur/mencair ke dalam rim cangkir? Apakah ada jari ekstra atau sendi patah?
+   - Periksa tangan yang bertumpu pada armrest kursi: Apakah bentuknya buntung/kaku tanpa buku jari yang terdefinisi? Apakah kuku mencair atau bentuk jari abnormal?
+
+2. ZONA TANGAN GESTUR & TANGAN KANAN (CROP 100% ZOOM):
+   - Periksa jari saat gestur berbicara: Apakah jari bengkok tidak wajar seperti cakar mutan (claw hands)? Apakah sendi buku jari terkilir atau kuku meleleh?
+   - Periksa jari yang bertumpuk: Apakah jari berbentuk sosis sejajar aneh tanpa perspektif kedalaman 3D alami?
+
+3. ZONA SUBJEK WAJAH, SENYUM, GIGI & TELINGA (CROP 100% ZOOM):
+   - Periksa gigi: Apakah gigi tampak sebagai SATU BLOK/LEMPENG PUTIH PADAT tanpa garis batas celah gigi alami (unbroken solid white denture strip)?
+   - Periksa ketajaman mata dan pupil.
+   - Periksa lipatan tulang rawan telinga (kartilago): apakah normal atau membentuk pusaran lilin AI yang aneh?
+   - Periksa tekstur kulit: apakah memiliki pori-pori mikro alami, atau tekstur lilin plastik sintetis (waxy AI skin)?
+
+4. ZONA KAKI, SEPATU, ANKLE & LANTAI (CROP 100% ZOOM):
+   - Periksa pergelangan kaki (ankle): Apakah ada urat bengkak abnormal, pembengkakan karet (rubbery ankle), atau distorsi sendi?
+   - Periksa sepatu: Apakah hak sepatu hak tinggi (high heel pump/stiletto) bengkok meliuk, putus, atau sepatu melayang di atas lantai?
+   - Periksa kaki meja dan kursi: apakah kaki meja/kursi simetris dan menapak sempurna ke lantai?
+
+5. ZONA LATAR BELAKANG & ORANG-ORANG DI KEJAUHAN (CROP 100% ZOOM):
+   - Periksa SEMUA orang/pejalan kaki/pekerja di meja kejauhan di latar belakang!
+   - Apakah wajah mereka meleleh, tanpa mata/hidung/mulut yang wajar? Apakah anggota badan melayang atau tubuh bermutasi (khas halusinasi AI zombie crowd)?
+   - Di Adobe Stock, orang di latar belakang yang berwajah meleleh/mutan adalah ALASAN NOMOR 1 PENOLAKAN "Quality Issues"! Jika ada figur orang latar belakang yang terdistorsi, Anda WAJIB menandai FAIL pada anatomical_errors atau ai_artifacts!
+
+INSTRUKSI KEPUTUSAN & HEATMAPS:
+- Jika ditemukan cacat jari tangan (claw hands / sosis sejajar / tangan buntung), gigi menyatu jadi lempeng padat, kaki/ankle/hak sepatu rusak, cangkir meleleh ke jari, orang latar belakang meleleh, atau tali tas menembus pakaian:
+  * Anda WAJIB menandai FAIL pada kategori terkait (anatomical_errors, ai_artifacts, atau structural_defects)!
+  * recommendation: "FAIL"!
+  * overall_score: WAJIB dibatasi di rentang 38%–48% (TOLAK / REJECTED)!
+  * Tandai kotak heatmap pada area koordinat cacat tersebut!
+- Jelaskan secara transparan dan detail di "visual_scan_analysis", "technical_issues", dan "detailed_feedback" apa saja temuan cacat di setiap zona dan alasan penolakannya di Adobe Stock beserta solusinya.
 
 Tingkat toleransi yang diminta: ${tolerance}.
 Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
@@ -6430,7 +6631,7 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
     try {
       responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: [...imageParts, { text: promptText }],
+        contents: [...allVisualParts, { text: promptText }],
         responseMimeType: "application/json",
         responseSchema,
         config: { temperature: 0.0, topP: 0.1 },
@@ -6446,7 +6647,7 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
     
     for (const modelName of modelsToTryList) {
       try {
-        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
+        const res = await callGeminiWithRetry(modelName, { parts: [...allVisualParts, { text: promptText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema
@@ -6478,9 +6679,9 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
         }
       }
 
-      // Kunci kritis yang benar-benar memicu penolakan stock (IP, Watermark, Mutasi Anatomi AI fatal, atau AI artifact nyata)
-      const criticalKeys = ['watermark', 'logo', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts'];
-      // Kunci teknis utama
+      // Kunci kritis yang memicu penolakan stock (IP, Watermark, Mutasi Anatomi AI, Cacat Gadget/Struktur, atau AI artifact nyata)
+      const criticalKeys = ['watermark', 'logo', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts', 'proportion_defects'];
+      // Kunci teknis pendukung
       const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'noise', 'artifacts', 'text'];
       
       const failedCriticalKeys: string[] = [];
@@ -6503,15 +6704,16 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
       }
 
       // Evaluasi toleransi penolakan yang cerdas dan proporsional:
+      const modelWantsFail = parsedResult.recommendation === "FAIL";
       const hasCriticalFail = failedCriticalKeys.length > 0;
       const hasSevereBlur = parsedResult.ai_vision_checks.blur?.status === 'FAIL';
       
       let isFailing = false;
       if (tolerance === 'STRICT') {
-        isFailing = hasCriticalFail || failedTechnicalKeys.length > 0 || hasSevereBlur || anyIpFail;
+        isFailing = modelWantsFail || hasCriticalFail || failedTechnicalKeys.length > 0 || hasSevereBlur || anyIpFail;
         if (isFailing) {
           parsedResult.recommendation = "FAIL";
-          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 48, 55);
+          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 45, 50);
         } else {
           parsedResult.recommendation = "PASS";
           parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 92, 88);
@@ -6520,24 +6722,22 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
         isFailing = hasCriticalFail || anyIpFail || (hasSevereBlur && failedTechnicalKeys.length >= 2);
         if (isFailing) {
           parsedResult.recommendation = "FAIL";
-          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 55, 62);
+          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 52, 60);
         } else {
           parsedResult.recommendation = "PASS";
           parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 90, 88);
         }
       } else {
         // Default MEDIUM (Standar Resmi Adobe Stock):
-        // Di microstock, foto tajam dengan estetika komersial tinggi lulus kurasi meskipun ada preferensi minor.
-        // Hanya tolak jika ada cacat kritis (IP/logo, cacat anatomi AI fatal, ai_artifacts nyata) atau blur parah pada subjek.
-        isFailing = hasCriticalFail || anyIpFail || (hasSevereBlur && failedTechnicalKeys.length >= 2);
+        // Jika ada cacat kritis (IP/logo, anatomi jari/orang latar belakang, smartphone bengkok, ai_artifacts) atau model menyimpulkan FAIL -> WAJIB FAIL
+        isFailing = modelWantsFail || hasCriticalFail || anyIpFail || hasSevereBlur || failedTechnicalKeys.length >= 2;
         
         if (isFailing) {
           parsedResult.recommendation = "FAIL";
-          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 52, 60);
+          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === 'number' ? parsedResult.overall_score : 42, 48);
         } else {
           parsedResult.recommendation = "PASS";
-          // Jika ada 1 catatan teknis minor non-kritis (misal exposure hangat sunset), beri skor 86-94, jika sempurna 95-98
-          const scoreDeduction = failedTechnicalKeys.length * 4;
+          const scoreDeduction = failedTechnicalKeys.length * 3;
           const calculatedScore = Math.max(86, 96 - scoreDeduction);
           parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === 'number' && parsedResult.overall_score >= 80 ? parsedResult.overall_score : calculatedScore, 86);
         }
@@ -6550,9 +6750,18 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
         parsedResult.ai_vision_checks.stock_acceptance.status = "PASS";
       }
 
-      // Lampirkan daftar check yang gagal
+      // Lampirkan daftar check yang gagal dan sinkronkan technical_issues
       if (failedCheckKeys.length > 0) {
         (parsedResult as any).failed_checks = failedCheckKeys;
+        if (!Array.isArray(parsedResult.technical_issues)) {
+          parsedResult.technical_issues = [];
+        }
+        for (const k of failedCheckKeys) {
+          const note = (parsedResult.ai_vision_checks as any)[k]?.note;
+          if (note && !parsedResult.technical_issues.includes(note)) {
+            parsedResult.technical_issues.push(note);
+          }
+        }
       }
       
       if (anyIpFail) {
@@ -8084,117 +8293,123 @@ export async function generatePainterlyDigitalArtPrompt(topic: string): Promise<
 }
 
 
-export async function generateAutoSubject(styleCategory: string, model?: string, currentSubject?: string, promptMode?: 'background' | 'png'): Promise<string> {
+export async function generateAutoSubject(styleCategory?: string, model?: string, currentSubject?: string, promptMode?: 'background' | 'png'): Promise<string> {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
-
-  const creativeSeedsByStyle: Record<string, string[]> = {
-    'Cinematic': [
-      "solitary cyberpunk detective standing in neon-lit rain reflections near a noodle bar",
-      "cinematic golden hour drone shot of a futuristic solar energy farm in Iceland",
-      "dramatic chiaroscuro portrait of a seasoned female astronaut overlooking Martian sunrise",
-      "epic atmospheric cinematic shot of an ancient Scandinavian fishing village surrounded by morning fog",
-      "wide anamorphic cinematic scene of a sleek hypercar charging at a glowing forest waypoint at dusk",
-      "moody cinematic street photography of Tokyo alleyways during a heavy monsoon rain with neon reflections",
-      "cinematic aerial shot of a luxury mountain lodge surrounded by snow-covered pines with warm glowing interior lights"
-    ],
-    '3D CGI': [
-      "floating translucent glass orbs with glistening internal golden liquid and soft studio caustics",
-      "futuristic biometric smartwatch with holographic interface hovering over a matte ceramic podium",
-      "intricate 3D cross-section of a glowing crystalline cybernetic heart with glowing fiber optic arteries",
-      "claymorphic pastel cute 3D coffee machine with pillowy steam clouds and glossy finish",
-      "ultra-detailed 3D isometric laboratory room with glowing specimen tubes and sleek synthetic panels",
-      "smooth matte 3D geometric abstract composition with floating chrome spheres and velvet textures"
-    ],
-    'Photorealistic': [
-      "macro close-up photography of a dewdrop reflecting a blooming cherry blossom at sunrise",
-      "authentic editorial portrait of a diverse modern pottery artisan working on a clay wheel in sunlit studio",
-      "high-end culinary flat lay of artisanal sourdough bread, fresh rosemary, and organic olive oil on dark slate",
-      "crisp architectural photography of a minimalist Scandinavian concrete villa with floor-to-ceiling glass windows",
-      "candid street lifestyle photography of remote digital nomads working in a bright Bali garden cafe",
-      "hyper-detailed macro photography of a colorful chameleon perched on an exotic tropical monstera leaf"
-    ],
-    'Flat Illustration': [
-      "vibrant modern flat vector illustration of an eco-friendly smart city with wind turbines and electric transit",
-      "minimalist flat corporate illustration of team collaboration around floating analytics dashboard with Alegria style",
-      "charming 2D flat botanical greenhouse illustration with lush potted plants and sunny window grid",
-      "isometric flat vector scene of a cozy home office setup with dual monitors and indoor greenery",
-      "retro-modern 2D flat travel poster of Mount Fuji with cherry blossoms and clean geometric lines",
-      "colorful flat vector collection of organic gardening tools, seed packets, and fresh harvest vegetables"
-    ],
-    'Vector Art': [
-      "clean minimalist linear vector landscape of mountain ranges with geometric rising sun",
-      "high-contrast continuous line art portrait of a woman surrounded by blooming floral elements",
-      "corporate flat vector illustration of cloud data synchronization with dynamic gradient accents",
-      "retro vintage badge vector design featuring a camping campfire and pine forest silhouette",
-      "modern isometric flat vector infographic depicting renewable energy grid network"
-    ],
-    'Dark Horror Aesthetic': [
-      "grimdark ancient gothic cathedral sanctuary overgrown with thorned black roses and eerie green mist",
-      "atmospheric macabre scene of a cloaked entity holding an ethereal glowing lantern in an enchanted dead forest",
-      "Lovecraftian cosmic entity submerged beneath abyssal ocean trenches surrounded by bioluminescent runes",
-      "haunting biomechanical skeletal throne fused with industrial machinery and dim candlelight",
-      "cinematic chiaroscuro dark fantasy ritual chamber with floating arcane symbols and swirling shadows"
-    ],
-    'Anime/Manga': [
-      "vibrant anime style illustration of a high school rooftop overlooking sunset cityscape with fluffy clouds",
-      "cyberpunk anime warrior standing on a skyscraper ledge gazing at massive holographic billboards in Neo-Tokyo",
-      "whimsical Ghibli-inspired countryside train ride passing through endless golden rice fields under summer sky",
-      "magical anime alchemist apprentice brewing glowing starlight potions in a cozy rustic workshop"
-    ],
-    'Watercolor Painting': [
-      "loose dreamy watercolor painting of wildflowers blooming along a coastal cliff edge overlooking azure ocean",
-      "delicate transparent watercolor wash of a steaming matcha latte surrounded by botanical eucalyptus leaves",
-      "soft wet-on-wet watercolor landscape of misty autumn pine mountains with subtle golden splatter accents",
-      "expressive splash watercolor illustration of a hummingbird sipping nectar from a vibrant hibiscus flower"
-    ]
-  };
-
-  const pngSeeds: string[] = [
-    "cute 3D isometric coffee cup icon with fluffy foam heart, isolated on white background",
-    "glossy golden shield security badge icon with glowing checkmark, isolated on white background",
-    "delicate watercolor botanical monstera leaf branch element, isolated on transparent background",
-    "futuristic holographic AI brain processor chip with glowing circuits, isolated on black background",
-    "playful cartoon Shiba Inu astronaut character floating with small rocket, isolated on white background",
-    "hand-drawn vintage bakery logo emblem with wheat stalks and rolling pin, isolated on white background",
-    "sleek flat vector analytics bar chart icon with upward growth arrow, isolated on transparent background",
-    "detailed 3D render of a sparkling emerald gemstone with facet refractions, isolated on white background",
-    "minimalist continuous line art icon of a human hand holding a seedling, isolated on transparent background",
-    "glossy ceramic 3D cloud with golden lightning bolt weather icon, isolated on white background"
-  ];
-
   const isPng = promptMode === 'png';
-  const categorySeeds = (!isPng && creativeSeedsByStyle[styleCategory]) ? creativeSeedsByStyle[styleCategory] : (!isPng ? creativeSeedsByStyle['Photorealistic'] : pngSeeds);
-  const randomFallback = categorySeeds[Math.floor(Math.random() * categorySeeds.length)];
 
-  const creativeSeedsGeneral = [
-    "cyberpunk coffee shop", "organic biotechnology", "whimsical woodland creatures", "cosmic ocean nebula", 
-    "minimalist brutalist concrete villa", "ancient steampunk mechanical workshop", "vibrant neon desert oasis", 
-    "surreal levitating glass islands", "cozy Scandinavian hygge attic", "retro-futuristic astronaut exploring mossy ruins", 
-    "mythical crystal cavern glow", "zen botanical garden with koi fish", "underwater city ruins populated by bioluminescent jellyfish", 
-    "futuristic alpine research station", "nostalgic 80s arcade neon glow", "surreal origami paper bird swarm", 
-    "ethereal cloud castle with golden gates", "mystical potion brewing room", "abandoned gothic cathedral claimed by blooming roses", 
-    "sleek futuristic electric motorcycle on rain-slicked highway", "rustic clay pottery workshop with sun-dappled shadows", 
-    "extravagant Victorian masquerade ball", "modern smart greenhouse farming robotics", "abstract flowing liquid marble waves", 
-    "enchanted treehouse village inside a giant hollow oak", "cinematic desert caravan at golden hour", 
-    "surreal clockwork solar system globe", "vibrant pop-art stylized fruit display", "cozy winter cabin library with crackling fireplace", 
-    "majestic phoenix rising from colorful smoke", "futuristic luxury yacht sailing on liquid silver", "magical floating lantern festival"
+  // ══════════════════════════════════════════════════════════════════════
+  // GLOBAL MICROSTOCK MARKET RESEARCH - HIGH COMMERCIAL DEMAND CATEGORIES
+  // ══════════════════════════════════════════════════════════════════════
+  // Curated based on top buyer search volumes, annual trend reports (Adobe Stock,
+  // Shutterstock, Getty Images), and corporate creative agency buying habits worldwide.
+  // STRICTLY STYLE-AGNOSTIC: No art style jargon, pure commercial visual subjects.
+  const GLOBAL_MARKET_SECTORS = [
+    // 1. Business, Corporate Innovation & Hybrid Workspace
+    "diverse corporate executive team analyzing holographic predictive growth charts in sunlit modern boardroom",
+    "multinational business professionals collaborating around digital tablet in glass-walled hybrid coworking space",
+    "confident female creative director presenting sustainable corporate strategy on high-definition interactive display",
+    "financial analysts reviewing real-time global stock exchange telemetry across curved multi-monitor trading desk",
+    "diverse project managers conducting agile stand-up meeting with color-coded sticky notes on transparent glass wall",
+    "entrepreneur conducting international video conference call with modern wireless headset in architectural loft office",
+    
+    // 2. Healthcare, Medicine & Biotechnology
+    "research scientists in cleanroom lab coats examining molecular cell cultures through automated digital microscope",
+    "compassionate female physician explaining diagnostic results to an elderly patient using a medical digital tablet",
+    "advanced surgical team operating robotic assisted-surgery arms in high-tech sterile operating theater",
+    "geneticist analyzing 3D DNA sequence helix data on glowing laboratory workstation in biomedical facility",
+    "radiologist and neurologist examining high-resolution brain MRI scans on diagnostic workstation",
+    "caring modern nurse taking blood pressure reading of smiling senior woman in bright wellness clinic",
+    "pharmacist dispensing prescription medication with handheld digital barcode scanner in modern pharmacy",
+    
+    // 3. Renewable Energy, ESG & Environmental Sustainability
+    "renewable energy engineers in hardhats inspecting vast industrial solar panel farm across sun-drenched valley",
+    "offshore wind turbine technician wearing safety harness securing blade assembly against vast ocean horizon",
+    "environmental scientists taking river water quality samples with digital sensory probes in pristine forest",
+    "architect and green building engineer examining sustainable timber construction blueprints on active site",
+    "electric vehicle driver plugging ultra-fast charging cable into modern EV car at green solar-powered station",
+    "sustainable urban rooftop community garden with volunteers harvesting organic leafy greens against city skyline",
+    "circular economy recycling facility workers operating automated optical sorter for sustainable packaging",
+    
+    // 4. Technology, AI, Cybersecurity & Industry 4.0
+    "cybersecurity intelligence team monitoring simulated global network intrusion alerts in dark command center",
+    "industrial automation engineer testing collaborative robotic arm in smart manufacturing factory",
+    "cloud infrastructure engineer inspecting fiber-optic cabling and glowing server racks in enterprise data center",
+    "autonomous electric delivery van fleet parked in smart logistics depot with automated loading conveyors",
+    "software developers collaborating on dual-screen coding terminal with digital neural network diagrams",
+    "drone pilot operating high-precision agricultural quadcopter monitoring precision irrigation fields",
+    
+    // 5. Modern Lifestyle, Wellness & Authentic Human Connection
+    "active multi-ethnic senior citizens practicing morning yoga outdoors in lush green public park",
+    "mindful young professional meditating in sunlit apartment filled with air-purifying indoor plants",
+    "multi-generational diverse family cooking healthy Mediterranean meal together in bright open-plan kitchen",
+    "father teaching young daughter how to ride bicycle in suburban neighborhood during gentle golden afternoon",
+    "artisan barista carefully crafting specialty espresso drink with poured latte art at minimalist cafe counter",
+    "digital nomad working peacefully on laptop at wooden patio table overlooking tropical mountain greenery",
+    
+    // 6. Education, STEM & Future Workforce
+    "elementary school students collaborating enthusiastically on educational robotics kit in modern STEM laboratory",
+    "female university engineering student assembling electronic circuit board with soldering iron and digital multimeter",
+    "high school science teacher demonstrating interactive physics experiment with students watching intently",
+    "vocational technical apprentice learning precision mechanical calibration under guidance of seasoned mentor",
+    
+    // 7. E-Commerce, Retail & Supply Chain
+    "warehouse logistics workers packing eco-friendly cardboard parcels alongside autonomous mobile transport robots",
+    "satisfied customer completing instant contactless mobile payment at modern boutique coffee and bakery counter",
+    "cargo logistics dispatcher planning international container ship routes on digital maritime shipping map"
   ];
-  const randomSeedKeyword = isPng ? "isolated commercial stock asset icon or character" : creativeSeedsGeneral[Math.floor(Math.random() * creativeSeedsGeneral.length)];
 
-  let systemInstruction = isPng
-    ? `You are an elite commercial microstock art director specializing in isolated PNG assets, icons, stickers, and standalone design elements. Generate a highly unique, modern, high-demand commercial subject idea for an isolated element. Return ONLY the plain text subject idea in 1 concise, vivid sentence describing the object, materials, and isolated composition. Do NOT use prefixes, quotes, or markdown formatting.`
-    : `You are an elite creative director for a global microstock agency (Adobe Stock, Shutterstock). Generate a highly unique, modern, and high-demand commercial subject idea for a text-to-image generator. Return ONLY the plain text subject idea in 1-2 vivid, descriptive sentences, without quotes, prefixes, or formatting.`;
+  // Isolated Commercial Asset Seeds for PNG / Asset Mode
+  const GLOBAL_MARKET_PNG_ASSETS = [
+    "isolated modern fintech credit card with glowing digital security shield and upward economic growth line",
+    "isolated green sustainability leaf emblem with circular recycling arrows and fresh water droplet",
+    "isolated medical diagnostic stethoscope resting beside digital healthcare tablet with vital heartbeat graph",
+    "isolated smart logistics cardboard parcel box with digital QR tracking barcode and priority shipping label",
+    "isolated artificial intelligence processor microchip with glowing gold circuit board pathways",
+    "isolated clean energy solar panel module with sunbeam icon and high-capacity battery level indicator",
+    "isolated golden winner trophy cup surrounded by floating victory stars and ribbon badge",
+    "isolated modern smartphone mockup with blank bezel-less screen and floating notification badges",
+    "isolated cybersecurity padlock hardware device with illuminated digital biometric fingerprint scanner",
+    "isolated electric vehicle fast-charging connector plug with green lightning bolt energy badge",
+    "isolated graduation cap resting atop hardcover educational textbooks with tied diploma scroll",
+    "isolated precision laboratory microscope with glass sample slide and calibrated adjustment knobs"
+  ];
+
+  const pool = isPng ? GLOBAL_MARKET_PNG_ASSETS : GLOBAL_MARKET_SECTORS;
+  const randomFallback = pool[Math.floor(Math.random() * pool.length)];
+
+  // Formulate AI prompt strictly focused on Global Market Research & Style Agnostic
+  const systemInstruction = isPng
+    ? `You are the Chief Market Research Director for global commercial microstock agencies (Adobe Stock, Shutterstock, Getty Images).
+Your goal is to generate a single high-demand, commercially viable ISOLATED SUBJECT IDEA based strictly on GLOBAL MICROSTOCK MARKET RESEARCH and buyer demand trends.
+RULES:
+1. FOCUS ON MARKET DEMAND: Focus on objects, icons, devices, or assets that graphic designers and marketing agencies worldwide frequently buy to place in their layouts (fintech, green energy, medical, AI, logistics, business).
+2. STYLE-AGNOSTIC: NEVER mention any art styles (do NOT say "3D render", "flat vector", "watercolor", "photorealistic", etc.). Only describe the physical subject, its parts, and its commercial details so ANY style can be applied to it later.
+3. OUTPUT FORMAT: Return ONLY 1 concise, descriptive sentence describing the isolated subject. No prefixes, no quotes, no markdown.`
+    : `You are the Chief Market Research Director for global commercial microstock agencies (Adobe Stock, Shutterstock, Getty Images).
+Your goal is to generate a single high-demand, commercially viable SCENE SUBJECT IDEA based strictly on GLOBAL MICROSTOCK MARKET RESEARCH and buyer demand trends.
+RULES:
+1. FOCUS ON GLOBAL MARKET RESEARCH: Focus on scenes that corporate buyers, advertising agencies, and publishers worldwide actively purchase:
+   - Business, Hybrid Workspace & Global Fintech
+   - Healthcare, Biotechnology & Senior Wellness
+   - Renewable Energy, ESG & Ecological Sustainability
+   - Advanced Robotics, AI Integration & Smart Logistics
+   - Authentic Modern Lifestyle, Diversity & Mental Well-being
+   - STEM Education & Future Workforce Training
+2. STYLE-AGNOSTIC (CRITICAL): NEVER mention or dictate any visual art style (do NOT use words like "cinematic photo of", "flat vector illustration of", "watercolor painting of", "3D CGI of", "shot on DSLR"). Describe ONLY the authentic human actions, environment, and physical visual subject so that ANY visual style can be applied seamlessly later.
+3. COMMERCIAL QUALITY: Must be clean, professional, and free of any trademarked logos or specific brand names.
+4. OUTPUT FORMAT: Return ONLY 1 to 2 clear, vivid sentences describing the scene. No prefixes, no quotes, no markdown.`;
 
   let promptText = "";
   if (currentSubject && currentSubject.trim()) {
     promptText = isPng
-      ? `Transform and enhance the concept "${currentSubject.trim()}" into a high-demand isolated commercial asset/icon/sticker idea tailored for style: "${styleCategory || 'General'}". Return ONLY 1 descriptive sentence.`
-      : `Expand and enhance the concept "${currentSubject.trim()}" into a rich, commercial microstock visual scene for style: "${styleCategory || 'General'}". Use rich, compound long-tail keyword descriptors. Return ONLY 1-2 descriptive sentences.`;
+      ? `Based on global microstock market research, transform and enhance the subject "${currentSubject.trim()}" into a top-selling, high-demand isolated commercial asset. Do NOT include any visual art style names. Return ONLY 1 descriptive sentence.`
+      : `Based on global microstock market research, expand and elevate the topic "${currentSubject.trim()}" into a rich, top-selling commercial microstock scene concept. Do NOT mention any visual art styles. Return ONLY 1-2 descriptive sentences.`;
   } else {
+    const randomSectorSeed = pool[Math.floor(Math.random() * pool.length)];
     promptText = isPng
-      ? `Generate a fresh, highly creative standalone isolated asset idea for style: "${styleCategory || 'General'}". Ensure it is distinct and commercial. Inspiration angle: "${randomSeedKeyword}". Return ONLY 1 descriptive sentence.`
-      : `Generate a fresh, highly creative commercial subject idea for style: "${styleCategory || 'General'}". Ensure absolute uniqueness across repeated clicks using this seed angle: "${randomSeedKeyword}". Return ONLY 1-2 descriptive sentences.`;
+      ? `Generate a fresh, top-selling isolated commercial asset concept based on global microstock market research. Inspiration sector: "${randomSectorSeed}". Do NOT mention any visual art styles. Return ONLY 1 descriptive sentence.`
+      : `Generate a fresh, top-selling commercial microstock scene concept based on global microstock market research and current buyer demand. Inspiration sector: "${randomSectorSeed}". Do NOT mention any visual art styles. Return ONLY 1-2 descriptive sentences.`;
   }
 
   const activeModel = model || 'gemini-2.5-flash';
@@ -8205,7 +8420,7 @@ export async function generateAutoSubject(styleCategory: string, model?: string,
       rawText = await callOpenAICompatibleWithRetry({
         systemInstruction,
         contents: { parts: [{ text: promptText }] },
-        config: { temperature: 0.95, maxOutputTokens: 150 },
+        config: { temperature: 0.92, maxOutputTokens: 150 },
         model: activeModel
       });
     } else {
@@ -8213,7 +8428,7 @@ export async function generateAutoSubject(styleCategory: string, model?: string,
         parts: [{ text: promptText }]
       }, {
         systemInstruction,
-        temperature: 0.98,
+        temperature: 0.95,
         maxOutputTokens: 150
       });
       rawText = response.text || '';
@@ -8221,15 +8436,18 @@ export async function generateAutoSubject(styleCategory: string, model?: string,
 
     let cleaned = (rawText || '').trim()
       .replace(/^["']|["']$/g, '')
-      .replace(/^(Subject Idea|Ide Subjek|Prompt Idea|Concept|Subject):\s*/i, '')
+      .replace(/^(Subject Idea|Ide Subjek|Prompt Idea|Concept|Subject|Market Concept):\s*/i, '')
+      // Remove any lingering style mentions if the model mistakenly generated them
+      .replace(/\b(in\s+)?(photorealistic|cinematic|flat\s+vector|3d\s+render|watercolor|anime|cartoon|digital\s+art|illustration)\s+(style|format|aesthetic)?\b/gi, '')
       .trim();
 
-    if (cleaned && cleaned.length > 5) {
+    if (cleaned && cleaned.length > 10) {
       return cleaned;
     }
     return randomFallback;
   } catch (err: any) {
-    console.warn('[AutoSubject] AI generation failed, using rich procedural fallback:', err?.message);
+    console.warn('[AutoSubject] AI market research generation failed, using curated global market fallback:', err?.message);
     return randomFallback;
   }
 }
+
