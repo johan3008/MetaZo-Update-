@@ -82,6 +82,15 @@ function saveSandboxAccount(email: string, pass: string) {
 // --- AUTH API ADAPTERS ---
 export const auth = {
   get currentUser(): User | null {
+    // 1. Prioritize offline/local session if active
+    const offlineStr = localStorage.getItem('mz_offline_user');
+    if (offlineStr) {
+      try {
+        const u = JSON.parse(offlineStr);
+        if (u && u.uid) return u;
+      } catch (e) {}
+    }
+
     if (supabase) {
       // Return local cached user session or handle reactively
       const sessionStr = localStorage.getItem('supabase.auth.token');
@@ -272,13 +281,29 @@ export async function signInWithPopup(authInstance: any, provider: any): Promise
   }
 }
 
-export async function signOut(authInstance: any): Promise<void> {
+export function signInOffline(creatorName?: string): { user: User } {
+  const offlineUser: User = {
+    uid: 'offline_user_' + (localStorage.getItem('mz_device_id') || 'local_creator'),
+    email: 'offline.creator@metazo.local',
+    displayName: creatorName || 'Offline Creator',
+    emailVerified: true,
+    photoURL: null
+  };
+  localStorage.setItem('mz_offline_user', JSON.stringify(offlineUser));
+  saveSandboxUser(offlineUser);
+  authListeners.forEach(cb => cb(offlineUser));
+  return { user: offlineUser };
+}
+
+export async function signOut(authInstance?: any): Promise<void> {
+  localStorage.removeItem('mz_offline_user');
+  saveSandboxUser(null);
   if (supabase) {
-    await supabase.auth.signOut();
-  } else {
-    saveSandboxUser(null);
-    authListeners.forEach(cb => cb(null));
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {}
   }
+  authListeners.forEach(cb => cb(null));
 }
 
 // --- DATABASE COMPATIBILITY OBJECTS ---
@@ -386,16 +411,25 @@ export async function getDoc(docRef: SupabaseDocRef): Promise<DocumentSnapshot> 
     const found = list.find(item => (docRef.table === 'keys' ? item.key : item.id) === docRef.id);
     return new DocumentSnapshot(docRef.id, found || null);
   }
-  const { data, error } = await supabase
-    .from(docRef.table)
-    .select('*')
-    .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
-    .single();
-  if (error && error.code !== 'PGRST116') {
-    console.error('[Supabase] getDoc error:', error);
-    throw error;
+  try {
+    const { data, error } = await supabase
+      .from(docRef.table)
+      .select('*')
+      .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
+      .single();
+    if (error && error.code !== 'PGRST116') {
+      console.warn('[Supabase] getDoc error, falling back to local cache:', error.message);
+      const list = getEmulatedTable(docRef.table);
+      const found = list.find(item => (docRef.table === 'keys' ? item.key : item.id) === docRef.id);
+      return new DocumentSnapshot(docRef.id, found || null);
+    }
+    return new DocumentSnapshot(docRef.id, data || null);
+  } catch (err: any) {
+    console.warn('[Supabase] getDoc exception, falling back to local cache:', err);
+    const list = getEmulatedTable(docRef.table);
+    const found = list.find(item => (docRef.table === 'keys' ? item.key : item.id) === docRef.id);
+    return new DocumentSnapshot(docRef.id, found || null);
   }
-  return new DocumentSnapshot(docRef.id, data || null);
 }
 
 // --- LIGHTWEIGHT PUBSUB SUBSCRIPTION FOR REALTIME SYNC ---
@@ -418,9 +452,19 @@ export function notifyTableMutation(table: string) {
 }
 
 export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merge?: boolean }): Promise<void> {
-  const processedData = { ...(data || {}) };
+  let processedData = { ...(data || {}) };
   if (docRef.table === 'keys') {
     processedData.key = docRef.id;
+    // Keep only valid columns for keys table in Supabase
+    const allowedKeysCols = new Set(['key', 'id', 'activated', 'activatedBy', 'firstActivatedBy', 'activatedAt', 'duration', 'createdAt', 'settings']);
+    const sanitized: any = {};
+    for (const [k, v] of Object.entries(processedData)) {
+      if (allowedKeysCols.has(k)) {
+        sanitized[k] = v;
+      }
+    }
+    sanitized.key = docRef.id;
+    processedData = sanitized;
   } else {
     processedData.id = docRef.id;
   }
@@ -440,7 +484,20 @@ export async function setDoc(docRef: SupabaseDocRef, data: any, options?: { merg
   }
   
   try {
-    const { error } = await supabase.from(docRef.table).upsert(processedData);
+    let finalData = processedData;
+    if (options?.merge) {
+      try {
+        const { data: existing } = await supabase
+          .from(docRef.table)
+          .select('*')
+          .eq(docRef.table === 'keys' ? 'key' : 'id', docRef.id)
+          .single();
+        if (existing) {
+          finalData = { ...existing, ...processedData };
+        }
+      } catch (e) {}
+    }
+    const { error } = await supabase.from(docRef.table).upsert(finalData);
     if (error) {
       console.warn(`[Supabase] setDoc to ${docRef.table} failed, falling back to local:`, error.message);
       const list = getEmulatedTable(docRef.table);
@@ -489,10 +546,19 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
             if (!current[parts[i]] || typeof current[parts[i]] !== 'object') current[parts[i]] = {};
             current = current[parts[i]];
           }
-          current[parts[parts.length - 1]] = value;
+          const leafKey = parts[parts.length - 1];
+          if (value && typeof value === 'object' && (value as any).__deleteField) {
+            delete current[leafKey];
+          } else {
+            current[leafKey] = value;
+          }
           topLevelUpdates[topKey] = mergedData[topKey];
         } else {
-          topLevelUpdates[key] = value;
+          if (value && typeof value === 'object' && (value as any).__deleteField) {
+            topLevelUpdates[key] = null;
+          } else {
+            topLevelUpdates[key] = value;
+          }
         }
       }
     } else {
@@ -502,11 +568,23 @@ export async function updateDoc(docRef: SupabaseDocRef, data: any): Promise<void
     topLevelUpdates = { ...data };
   }
 
-  // Remove deleteField
+  // Remove deleteField at top level
   for (const [key, value] of Object.entries(topLevelUpdates)) {
     if (value && typeof value === 'object' && (value as any).__deleteField) {
       topLevelUpdates[key] = null;
     }
+  }
+
+  // Sanitize columns for keys table to prevent schema mismatch errors
+  if (docRef.table === 'keys') {
+    const allowedKeysCols = new Set(['key', 'id', 'activated', 'activatedBy', 'firstActivatedBy', 'activatedAt', 'duration', 'createdAt', 'settings']);
+    const sanitized: any = {};
+    for (const [k, v] of Object.entries(topLevelUpdates)) {
+      if (allowedKeysCols.has(k)) {
+        sanitized[k] = v;
+      }
+    }
+    topLevelUpdates = sanitized;
   }
 
   if (!supabase) {

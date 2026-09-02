@@ -1334,9 +1334,19 @@ const App: React.FC = () => {
   const [mzWhatsApp, setMzWhatsApp] = useState(() => localStorage.getItem('mz_reseller_whatsapp') || 'https://chat.whatsapp.com/EJgcCSymQYE3724FqpFzxr');
   const [mzPriceText, setMzPriceText] = useState(() => localStorage.getItem('mz_reseller_price') || '');
   const [mzLicenseSeed, setMzLicenseSeed] = useState(() => localStorage.getItem('mz_reseller_seed') || 'MZPRO-COMMERCIAL-2026');
-  const [mzLicenseKey, setMzLicenseKey] = useState(() => localStorage.getItem('mz_license_key') || '');
-  const [isMzLicensedState, setIsMzLicensed] = useState(() => { const k = (localStorage.getItem('mz_license_key') || '').trim().toUpperCase(); return !!k; });
-  const [isCheckingLicense, setIsCheckingLicense] = useState(true);
+  const [mzLicenseKey, setMzLicenseKey] = useState(() => {
+    if (localStorage.getItem('mz_cancelled_subscription') === 'true') return '';
+    return localStorage.getItem('mz_license_key') || '';
+  });
+  const [isMzLicensedState, setIsMzLicensed] = useState(() => {
+    if (localStorage.getItem('mz_cancelled_subscription') === 'true') return false;
+    const k = (localStorage.getItem('mz_license_key') || '').trim().toUpperCase();
+    return !!k;
+  });
+  const [isCheckingLicense, setIsCheckingLicense] = useState(() => {
+    if (localStorage.getItem('mz_cancelled_subscription') === 'true') return false;
+    return !!(localStorage.getItem('mz_license_key') || '').trim();
+  });
   const isMzLicensed = isMzLicensedState;
   const [subDaysLeft, setSubDaysLeft] = useState<number | null>(null);
   const [showActivationModal, setShowActivationModal] = useState(false);
@@ -1754,26 +1764,33 @@ const App: React.FC = () => {
         const data = snapshot.data();
         
         // 1. Sync license key (with local backup protection & keys collection fallback)
-        const localKey = localStorage.getItem('mz_license_key') || '';
-        const cloudKey = data.licenseKey || '';
-        const cancelled = (data.cancelledSubscription === true && !cloudKey && !localKey) || (data.cancelledSubscription !== false && localStorage.getItem('mz_cancelled_subscription') === 'true' && !cloudKey && !localKey);
+        const localCancelled = localStorage.getItem('mz_cancelled_subscription') === 'true';
+        const isCancelled = data.cancelledSubscription === true || localCancelled;
 
-        if (cancelled) {
-          setMzLicenseKey((prev) => {
-                  
-                  return '';
-                });
+        if (isCancelled) {
+          setMzLicenseKey('');
+          setIsMzLicensed(false);
+          setIsCheckingLicense(false);
+          setSubDaysLeft(null);
           localStorage.removeItem('mz_license_key');
           localStorage.setItem('mz_cancelled_subscription', 'true');
           setHasSyncedProfile(true);
+
+          // If database still had a lingering key or unflagged cancellation, clean it up
+          if (data.licenseKey || data.cancelledSubscription !== true) {
+            setDoc(userDocRef, {
+              licenseKey: '',
+              cancelledSubscription: true,
+              updatedAt: new Date().toISOString()
+            }, { merge: true }).catch(() => {});
+          }
         } else {
+          const localKey = localStorage.getItem('mz_license_key') || '';
+          const cloudKey = data.licenseKey || '';
           const activeKey = cloudKey || localKey || '';
           
           if (activeKey) {
-            setMzLicenseKey((prev) => {
-              
-              return activeKey;
-            });
+            setMzLicenseKey(activeKey);
             setIsCheckingLicense(true);
             localStorage.setItem('mz_license_key', activeKey);
             localStorage.removeItem('mz_cancelled_subscription');
@@ -1784,51 +1801,34 @@ const App: React.FC = () => {
                 cancelledSubscription: false,
                 updatedAt: new Date().toISOString()
               }, { merge: true })
-              .then(() => {
-                // Defer: validator will set setHasSyncedProfile(true) when validation completes
-              })
               .catch(e => {
                 console.info('db_op', e);
-                // In case of error, we can set true to avoid being stuck, but typically validator will run anyway.
               });
-            } else {
-              // Defer: validator will set setHasSyncedProfile(true) when validation completes
             }
           } else {
-            // Attempt to restore from keys collection if both cloud and local are empty and not cancelled
-            if (data.cancelledSubscription || localStorage.getItem('mz_cancelled_subscription') === 'true') {
-              setMzLicenseKey('');
-              setHasSyncedProfile(true);
-            } else {
-              findActiveKeyForEmail(user.email || '').then((foundKey) => {
-                if (foundKey) {
-                  setMzLicenseKey((prev) => {
-                    
-                    return foundKey;
-                  });
-                  setIsCheckingLicense(true);
-                  localStorage.setItem('mz_license_key', foundKey);
-                  localStorage.removeItem('mz_cancelled_subscription');
-                  setDoc(userDocRef, {
-                    licenseKey: foundKey,
-                    cancelledSubscription: false,
-                    updatedAt: new Date().toISOString()
-                  }, { merge: true })
-                  .then(() => {
-                    // Defer: validator will set setHasSyncedProfile(true)
-                  })
-                  .catch(e => {
-                    console.info('db_op', e);
-                  });
-                } else {
-                  setMzLicenseKey((prev) => {
-                    
-                    return '';
-                  });
-                  setHasSyncedProfile(true);
-                }
-              });
-            }
+            // Both cloud and local are empty and not cancelled
+            findActiveKeyForEmail(user.email || '').then((foundKey) => {
+              if (foundKey) {
+                setMzLicenseKey(foundKey);
+                setIsCheckingLicense(true);
+                localStorage.setItem('mz_license_key', foundKey);
+                localStorage.removeItem('mz_cancelled_subscription');
+                setDoc(userDocRef, {
+                  licenseKey: foundKey,
+                  cancelledSubscription: false,
+                  updatedAt: new Date().toISOString()
+                }, { merge: true })
+                .catch(e => {
+                  console.info('db_op', e);
+                });
+              } else {
+                setMzLicenseKey('');
+                setIsMzLicensed(false);
+                setIsCheckingLicense(false);
+                setSubDaysLeft(null);
+                setHasSyncedProfile(true);
+              }
+            });
           }
         }
 
@@ -1988,6 +1988,8 @@ const App: React.FC = () => {
     }, (error) => {
       console.warn("Firestore user load error:", error);
       handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+      setHasSyncedProfile(true);
+      setIsCheckingLicense(false);
     });
 
     return () => unsubscribeUser();
