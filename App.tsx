@@ -1701,8 +1701,8 @@ const App: React.FC = () => {
 
   // Live real-time sync user profile (license key & subscription/trial status) from Firestore
   useEffect(() => {
-    setHasSyncedProfile(false);
     if (!user) {
+      setHasSyncedProfile(true);
       setCloudDailyCounts({});
       return;
     }
@@ -1775,15 +1775,6 @@ const App: React.FC = () => {
           localStorage.removeItem('mz_license_key');
           localStorage.setItem('mz_cancelled_subscription', 'true');
           setHasSyncedProfile(true);
-
-          // If database still had a lingering key or unflagged cancellation, clean it up
-          if (data.licenseKey || data.cancelledSubscription !== true) {
-            setDoc(userDocRef, {
-              licenseKey: '',
-              cancelledSubscription: true,
-              updatedAt: new Date().toISOString()
-            }, { merge: true }).catch(() => {});
-          }
         } else {
           const localKey = localStorage.getItem('mz_license_key') || '';
           const cloudKey = data.licenseKey || '';
@@ -1795,7 +1786,7 @@ const App: React.FC = () => {
             localStorage.setItem('mz_license_key', activeKey);
             localStorage.removeItem('mz_cancelled_subscription');
             
-            if (cloudKey !== activeKey || data.cancelledSubscription) {
+            if (cloudKey !== activeKey && !localCancelled) {
               setDoc(userDocRef, {
                 licenseKey: activeKey,
                 cancelledSubscription: false,
@@ -4598,7 +4589,7 @@ const App: React.FC = () => {
 
   const t = TRANSLATIONS[uiLanguage];
 
-  if (!hasInitiallyLoaded && (isCheckingAuth || (user && (!hasSyncedProfile || isCheckingLicense)))) {
+  if (isCheckingAuth) {
     return (
       <div className={`min-h-screen flex items-center justify-center bg-[#f8f9fc] dark:bg-[#090d16] text-[#5a5c69] dark:text-slate-100 ${theme === 'dark' ? 'dark' : ''}`}>
         <div className="flex flex-col items-center space-y-4 animate-pulse">
