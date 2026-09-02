@@ -80,12 +80,6 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 
   static getDerivedStateFromError(error: any) {
-    // If it's an Illegal constructor error, attempt graceful silent recovery
-    const msg = error?.message || String(error);
-    if (msg.includes('Illegal constructor') || msg.includes('Illegal invocation')) {
-      console.warn('[ErrorBoundary] Gracefully recovering from constructor anomaly:', msg);
-      return { hasError: false, error: null };
-    }
     return { hasError: true, error };
   }
 
