@@ -4,7 +4,8 @@ import { motion } from 'motion/react';
 import { 
   Heart, Zap, ImageIcon, Film, FileCode, Clock, ChevronLeft, ChevronRight, X, HelpCircle,
   ChevronDown, Sparkles, LayoutDashboard, Wand2, Type, MessageCircle, CheckCircle,
-  Calendar, CreditCard, Info, Receipt, VolumeX, Video, Star, CopyCheck, UploadCloud, Maximize2, Compass
+  Calendar, CreditCard, Info, Receipt, VolumeX, Video, Star, CopyCheck, UploadCloud, Maximize2, Compass,
+  Lock
 } from 'lucide-react';
 import { ToolType, GenerationMode, toolToPath } from '@/types';
 
