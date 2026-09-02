@@ -648,10 +648,16 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
             if (uData && uData.email && uData.email.toLowerCase().trim() === email.toLowerCase().trim()) {
               updateDoc(doc(db, 'users', userDoc.id), {
                 licenseKey: '',
+                cancelledSubscription: true,
                 updatedAt: new Date().toISOString()
               }).catch(err => console.error("Error revoking user licence:", err));
             }
           });
+          if (userEmail && email.toLowerCase().trim() === userEmail.toLowerCase().trim()) {
+            localStorage.removeItem('mz_license_key');
+            localStorage.setItem('mz_cancelled_subscription', 'true');
+            setLicenseKey('');
+          }
         } catch (e) {
           console.warn('Could not revoke user doc during key reset:', e);
         }
@@ -1817,7 +1823,8 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
         await updateDoc(doc(db, 'keys', keyToRemove.trim().toUpperCase()), {
           activated: false,
           activatedBy: '',
-          activatedAt: ''
+          activatedAt: '',
+          firstActivatedBy: ''
         });
       } catch (e) {
         console.warn("Could not deactivate key in keys collection:", e);
@@ -1862,7 +1869,7 @@ export const SaaSPortal: React.FC<SaaSPortalProps> = ({
     setInputKey('');
     setActivationError('');
     setShowCancelConfirm(false);
-    alert("Lisensi telah dihapus.");
+    setShowActivation(false);
   };
 
   const handleCopyText = (text: string, label: string) => {
