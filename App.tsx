@@ -26,6 +26,7 @@ import { ImageCheckView } from './src/components/ImageCheckView';
 import { VideoQualityCheck } from './src/components/VideoQualityCheck';
 import { CalendarGenView } from './src/components/CalendarGenView';
 import { MuteVideoView } from './src/components/MuteVideoView';
+import { BgRemoverView } from './src/components/BgRemoverView';
 import { MotionGenView } from './src/components/MotionGenView';
 import { AntiSpamView } from './src/components/AntiSpamView';
 import { ReviewsView } from './src/components/ReviewsView';
@@ -4924,6 +4925,22 @@ const App: React.FC = () => {
               incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.MUTE_VIDEO, amount)}
               setShowLimitModal={setShowLimitModal}
               setShowActivationModal={setShowActivationModal}
+            />
+          ) : activeTool === ToolType.BG_REMOVER ? (
+            <BgRemoverView 
+              t={t}
+              isLicensed={isMzLicensed}
+              dailyGenCount={dailyGenCounts[ToolType.BG_REMOVER] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.BG_REMOVER, amount)}
+              setShowLimitModal={setShowLimitModal}
+              setShowActivationModal={setShowActivationModal}
+              onSendToMetadataGen={(passedFiles) => {
+                if (passedFiles && passedFiles.length > 0) {
+                  handleFileChange({ target: { files: passedFiles } });
+                  handleSetActiveTool(ToolType.IMAGE);
+                }
+              }}
+              uiLanguage={uiLanguage}
             />
           ) : activeTool === ToolType.MOTION_GEN ? (
             <MotionGenView 
