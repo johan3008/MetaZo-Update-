@@ -29,8 +29,8 @@ export interface ServiceOptions {
   zaiKeys?: string | string[];
 }
 
-export const getHeaders = (options?: ServiceOptions) => {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+export const getHeaders = (options?: ServiceOptions, includeContentType: boolean = true) => {
+  const headers: Record<string, string> = includeContentType ? { 'Content-Type': 'application/json' } : {};
   if (options) {
     if (options.provider) headers['x-ai-provider'] = options.provider;
     
@@ -70,6 +70,10 @@ export const getHeaders = (options?: ServiceOptions) => {
     if (zKey) headers['x-zai-key'] = zKey;
   }
   return headers;
+};
+
+export const getFormDataHeaders = (options?: ServiceOptions) => {
+  return getHeaders(options, false);
 };
 
 const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 3): Promise<Response> => {

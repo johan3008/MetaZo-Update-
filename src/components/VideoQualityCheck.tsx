@@ -3,7 +3,7 @@ import { Upload, CheckCircle, AlertCircle, Loader2, FileVideo, Zap, Info, Downlo
 import { motion, AnimatePresence } from 'motion/react';
 import { TechnicalMetricsView } from './TechnicalMetricsView';
 import { getDailyLimit } from '../../constants';
-import { getHeaders } from '../../services/geminiService';
+import { getHeaders, getFormDataHeaders } from '../../services/geminiService';
 
 interface QualityReport {
   visual_scan_analysis?: string;
@@ -383,7 +383,7 @@ export const VideoQualityCheck: React.FC<{
 
         response = await fetch('/api/check-video-quality', {
           method: 'POST',
-          headers: getHeaders(aiOptions),
+          headers: getFormDataHeaders(aiOptions),
           body: formData
         });
       }
