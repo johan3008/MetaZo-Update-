@@ -230,6 +230,11 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
                 : 'Payload too large. Vector file exceeds the server capacity (max 500MB). Try optimizing the EPS file.';
             return res.status(413).json({ error: limitMsg });
         }
+        if (err instanceof SyntaxError && err.message?.includes('is not valid JSON') && (err.message?.includes('------') || err.message?.includes("Unexpected token '-'"))) {
+            return res.status(400).json({ 
+                error: 'Format request tidak valid: Payload multipart (FormData) dikirim dengan header Content-Type application/json. Header Content-Type harus dihilangkan agar browser dapat menambahkan boundary multipart.' 
+            });
+        }
         if (!res.headersSent) {
             return res.status(500).json({ error: err.message || 'Internal Server Error' });
         }
