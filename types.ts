@@ -49,6 +49,13 @@ export interface AdobeCategory {
   name: string;
 }
 
+export interface YOLODetectedObject {
+  label: string;
+  confidence: number;
+  box_2d?: [number, number, number, number]; // [ymin, xmin, ymax, xmax] scaled 0 to 1000
+  category?: string;
+}
+
 export interface StockMetadata {
   title: string;
   description: string;
@@ -59,6 +66,7 @@ export interface StockMetadata {
   dreamstime_category: string;
   miricanvas_category: string;
   category_reason?: string;
+  yolo_detected_objects?: YOLODetectedObject[];
 }
 
 export interface FileItem {
@@ -80,6 +88,7 @@ export interface FileItem {
   isExtracting?: boolean;
   error: string | null;
   exifMetadata?: any;
+  yolo_detected_objects?: YOLODetectedObject[];
 }
 
 export interface ProgressInfo {
