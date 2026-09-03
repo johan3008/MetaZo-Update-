@@ -2418,7 +2418,7 @@ const App: React.FC = () => {
   const [selectedNvidiaModel, setSelectedNvidiaModel] = useState<string>(localStorage.getItem('mz_nvidia_model') || 'stepfun-ai/step-3.5-flash');
   const [selectedAiveneModel, setSelectedAiveneModel] = useState<string>(localStorage.getItem('mz_aivene_model') || 'auto');
   const [selectedZaiModel, setSelectedZaiModel] = useState<string>(localStorage.getItem('mz_zai_model') || 'glm-5.2');
-  const [selectedGeminiModel, setSelectedGeminiModel] = useState<'auto' | 'gemini-3.6-flash' | 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3-flash' | 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-flash-8b' | 'gemma-4-31b-it'>(() => (localStorage.getItem('mz_gemini_model') as any) || 'auto');
+  const [selectedGeminiModel, setSelectedGeminiModel] = useState<'auto' | 'gemini-3.8-flash' | 'gemini-3.7-flash' | 'gemini-3.6-flash' | 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3-flash' | 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-flash-8b' | 'gemma-4-31b-it'>(() => (localStorage.getItem('mz_gemini_model') as any) || 'auto');
   const [selectedGroqModel, setSelectedGroqModel] = useState<'llama-3.3-70b-versatile' | 'llama-4-scout-17b-16e-instruct'>(() => (localStorage.getItem('mz_groq_model') as any) || 'llama-3.3-70b-versatile');
 
   const [newGeminiKey, setNewGeminiKey] = useState('');
@@ -3547,6 +3547,7 @@ const App: React.FC = () => {
                             dreamstimeCategory: '',
                             miriCanvasCategory: '',
                 categoryReason: metadata.category_reason,
+                yolo_detected_objects: metadata.yolo_detected_objects,
                 isGenerating: false,
                 error: null
               } : f));
@@ -3733,6 +3734,7 @@ const App: React.FC = () => {
                             dreamstimeCategory: '',
                             miriCanvasCategory: '',
                             categoryReason: result.metadata.category_reason,
+                            yolo_detected_objects: result.metadata.yolo_detected_objects,
                             isGenerating: false,
                             error: null
                         };
@@ -5521,6 +5523,8 @@ const App: React.FC = () => {
                       className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     >
                       <option value="auto">{t.settings_gemini_model_auto}</option>
+                      <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+                      <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
                       <option value="gemini-3.1-flash-lite">Gemini 3.5 Flash-Lite / 3.1 Lite (Primary Default)</option>
                       <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
                       <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>

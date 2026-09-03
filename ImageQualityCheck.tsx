@@ -18,6 +18,7 @@ export interface QualityReport {
   strengths: string[];
   detailed_feedback: string;
   heatmaps?: { type: "noise" | "focus" | "lighting" | "ip_violation" | "artifact" | "gen_ai_anomaly" | "composition"; x: number; y: number; intensity: number; raw_value: string }[];
+  yolo_detected_objects?: { label: string; confidence: number; box_2d?: [number, number, number, number]; category?: string }[];
   technical_gate?: {
     passed?: boolean;
     failures?: { key: string; reason_en?: string; reason_id?: string }[];
@@ -1420,6 +1421,39 @@ export const ImageQualityCheck: React.FC<{
                         <p className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">{t.qc_legal_status}</p>
                         <p className="text-[11px] font-bold">{r.legal_status}</p>
                       </div>
+
+                      {/* YOLO Vision Object Grounding Badge Display */}
+                      {Array.isArray(r.yolo_detected_objects) && r.yolo_detected_objects.length > 0 && (
+                        <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-500/5 via-violet-500/5 to-purple-500/5 border border-indigo-500/20 shadow-xs">
+                          <div className="flex items-center justify-between mb-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="flex h-2 w-2 relative">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                              </span>
+                              <p className="text-[10px] font-black text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">
+                                YOLO Vision Object Grounding
+                              </p>
+                            </div>
+                            <span className="text-[9px] font-mono font-bold text-slate-400 dark:text-slate-500">
+                              {r.yolo_detected_objects.length} Verified Objects
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {r.yolo_detected_objects.map((obj, idx) => (
+                              <span 
+                                key={idx} 
+                                className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-indigo-100 dark:border-indigo-900/50 shadow-xs hover:border-indigo-300 transition-colors"
+                              >
+                                <span>🎯 {obj.label}</span>
+                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
+                                  {Math.round(obj.confidence > 1 ? obj.confidence : obj.confidence * 100)}%
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Audit Details Dropdown UI */}
                       <div className="space-y-4">
