@@ -1605,6 +1605,7 @@ var TRANSLATIONS = {
     sidebar_prompt_image: "Image Prompt",
     sidebar_prompt_video: "Video Prompt",
     sidebar_image_check: "Image Check",
+    sidebar_video_check: "Video Quality Check",
     sidebar_calendar_gen: "Calendar Gen",
     sidebar_ftp_uploader: "FTP Stock Uploader",
     sidebar_chat: "Account Chat",
@@ -2046,6 +2047,7 @@ var TRANSLATIONS = {
     sidebar_prompt_image: "Prompt Gambar",
     sidebar_prompt_video: "Prompt Video",
     sidebar_image_check: "Kurator Adobe Cek",
+    sidebar_video_check: "Cek Kualitas Video",
     sidebar_calendar_gen: "Gen Kalender",
     sidebar_ftp_uploader: "FTP Stock Uploader",
     sidebar_chat: "Chat Akun",
@@ -4414,6 +4416,13 @@ function buildTieredVisualAnalysis(visualFacts) {
   (Array.isArray(visualFacts?.background_elements) ? visualFacts.background_elements : []).forEach((s) => {
     if (s?.name) objects.push({ name: String(s.name), importance: Number(s.importance) || 20, tier: "background" });
   });
+  (Array.isArray(visualFacts?.yolo_detected_objects) ? visualFacts.yolo_detected_objects : []).forEach((y) => {
+    const label = y?.name || y?.label;
+    if (label && !objects.some((o) => o.name.toLowerCase() === String(label).toLowerCase())) {
+      const conf = Number(y?.confidence) || 0.9;
+      objects.push({ name: String(label), importance: Math.min(99, Math.round(conf * 100)), tier: "primary" });
+    }
+  });
   objects.sort((a, b) => b.importance - a.importance);
   const scene = [
     ...Array.isArray(visualFacts?.composition) ? visualFacts.composition : [],
@@ -5025,18 +5034,26 @@ OUTPUT FORMAT:
     "location_setting": [],
     "visual_characteristics": [],
     "event_seasonal_relevance": [],
+    "yolo_detected_objects": [
+      {
+        "name": "specific detected physical object, subject, product, tool, or animal",
+        "confidence": 0.95,
+        "box_2d": [100, 150, 850, 900],
+        "category": "subject | tool | product | animal | environment | vehicle"
+      }
+    ],
     "deeper_meaning_and_symbolism": "Only describe a concept or meaning when it is strongly supported by visible evidence. Do not infer religion, culture, profession, location, emotion, event, or use case without clear visual support.",
     "semantic_category_analysis": {
       "adobe_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": ""
+      "shutterstock_category_2": "",
       "dreamstime_category": "",
       "miricanvas_category": "",
       "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
     }
   }
 }${exifInstruction}`;
-  const promptText = toolType === "video" /* VIDEO */ ? `Tugas: Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]` : `Tugas: Analyze the actual asset across 8 dimensions: Objects, Activities, Concepts, Atmosphere, Location/Setting, Visual Characteristics, Colors/Visual Elements, and Event/Seasonal Relevance. Use only visible evidence; leave unsupported dimensions empty. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
+  const promptText = toolType === "video" /* VIDEO */ ? `Tugas: Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform YOLO object grounding with confidence and bounding boxes. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]` : `Tugas: Analyze the actual asset across 8 dimensions: Objects, Activities, Concepts, Atmosphere, Location/Setting, Visual Characteristics, Colors/Visual Elements, and Event/Seasonal Relevance. Perform YOLO object detection and grounding on all visible physical objects with confidence score and bounding boxes. Use only visible evidence; leave unsupported dimensions empty. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
   try {
     const visionResponse = await callGeminiWithRetry(visionModelToUse, {
       parts: [...imageParts, { text: promptText }]
@@ -5394,6 +5411,14 @@ OUTPUT FORMAT:
       data.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : validShutterstockCats.find((cat) => cat !== data.shutterstock_category_1) || "Backgrounds/Textures";
     }
     data.category_reason = data.category_reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
+    if (Array.isArray(visualFacts?.yolo_detected_objects) && visualFacts.yolo_detected_objects.length > 0) {
+      data.yolo_detected_objects = visualFacts.yolo_detected_objects.map((y) => ({
+        label: y.name || y.label || "object",
+        confidence: Number(y.confidence) || 0.9,
+        box_2d: Array.isArray(y.box_2d) ? y.box_2d : void 0,
+        category: y.category || "subject"
+      }));
+    }
     return data;
   } catch (error) {
     console.warn("[JohMeta Parse Recovery] Final metadata normalization recovered from:", error);
@@ -5429,6 +5454,14 @@ OUTPUT FORMAT:
       }
       recovery.category_reason = recovery.category_reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
       recovery.confidence_score = Number.isFinite(Number(recovery.confidence_score)) ? Number(recovery.confidence_score) : 0.5;
+      if (Array.isArray(visualFacts?.yolo_detected_objects) && visualFacts.yolo_detected_objects.length > 0) {
+        recovery.yolo_detected_objects = visualFacts.yolo_detected_objects.map((y) => ({
+          label: y.name || y.label || "object",
+          confidence: Number(y.confidence) || 0.9,
+          box_2d: Array.isArray(y.box_2d) ? y.box_2d : void 0,
+          category: y.category || "subject"
+        }));
+      }
       return recovery;
     } catch (recoveryError) {
       console.error("[JohMeta Parse Recovery] Recovery failed:", recoveryError);
@@ -5586,18 +5619,26 @@ OUTPUT FORMAT:
     "colors": [],
     "actions": [],
     "composition": [],
+    "yolo_detected_objects": [
+      {
+        "name": "specific detected physical object, subject, product, tool, or animal",
+        "confidence": 0.95,
+        "box_2d": [100, 150, 850, 900],
+        "category": "subject | tool | product | animal | environment | vehicle"
+      }
+    ],
     "deeper_meaning_and_symbolism": "Describe the deeper artistic meaning, theme, emotional mood, symbolic message, or conceptual representation of the asset (makna, pesan artistik, atau analogi konsep dari aset tersebut) that represents its true value.",
     "semantic_category_analysis": {
       "adobe_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": ""
+      "shutterstock_category_2": "",
       "dreamstime_category": "",
       "miricanvas_category": "",
       "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
     }
   }
 }`;
-    const promptText = toolType === "video" /* VIDEO */ ? `Tugas (Asset #${i + 1}): Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]` : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
+    const promptText = toolType === "video" /* VIDEO */ ? `Tugas (Asset #${i + 1}): Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform YOLO object grounding with confidence and bounding boxes. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]` : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform YOLO object detection and grounding on all visible physical objects with confidence and bounding boxes. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
     let itemVisionInstruction = visionSystemInstruction;
     let itemExifDesc = "";
     if (items[i].exifMetadata && Object.keys(items[i].exifMetadata).length > 0) {
@@ -5996,6 +6037,14 @@ OUTPUT FORMAT:
         metadata.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : validShutterstockCats.find((cat) => cat !== metadata.shutterstock_category_1) || "Backgrounds/Textures";
       }
       metadata.category_reason = metadata.category_reason || assetVisualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
+      if (Array.isArray(assetVisualFacts?.yolo_detected_objects) && assetVisualFacts.yolo_detected_objects.length > 0) {
+        metadata.yolo_detected_objects = assetVisualFacts.yolo_detected_objects.map((y) => ({
+          label: y.name || y.label || "object",
+          confidence: Number(y.confidence) || 0.9,
+          box_2d: Array.isArray(y.box_2d) ? y.box_2d : void 0,
+          category: y.category || "subject"
+        }));
+      }
       const targetId = items[index] ? items[index].id : items[0]?.id || "unknown";
       return { id: targetId, metadata };
     }));
@@ -7376,11 +7425,11 @@ async function generateHighResolutionAuditCrops(buffer) {
       (0, import_sharp.default)(buffer).extract({ left: z5X, top: z5Y, width: z5W, height: z5H }).jpeg({ quality: 92 }).toBuffer().catch(() => null)
     ]);
     const result = [];
-    if (z1Buf) result.push({ label: "ZONA 1 \u2014 DETAIL TANGAN KIRI, JARI & CANGKIR KOPI (CROP 100% ZOOM)", part: { inlineData: { mimeType: "image/jpeg", data: z1Buf.toString("base64") } } });
-    if (z2Buf) result.push({ label: "ZONA 2 \u2014 DETAIL TANGAN GESTUR & PEGANGAN TANGAN KANAN (CROP 100% ZOOM)", part: { inlineData: { mimeType: "image/jpeg", data: z2Buf.toString("base64") } } });
-    if (z3Buf) result.push({ label: "ZONA 3 \u2014 DETAIL WAJAH, SENYUM, GIGI & TELINGA (CROP 100% ZOOM)", part: { inlineData: { mimeType: "image/jpeg", data: z3Buf.toString("base64") } } });
-    if (z4Buf) result.push({ label: "ZONA 4 \u2014 DETAIL KAKI, SEPATU, ANKLE & PERMUKAAN LANTAI (CROP 100% ZOOM)", part: { inlineData: { mimeType: "image/jpeg", data: z4Buf.toString("base64") } } });
-    if (z5Buf) result.push({ label: "ZONA 5 \u2014 DETAIL LATAR BELAKANG & ORANG KEJAUHAN (CROP 100% ZOOM)", part: { inlineData: { mimeType: "image/jpeg", data: z5Buf.toString("base64") } } });
+    if (z1Buf) result.push({ label: "ZONA 1 \u2014 DETAIL 100% ZOOM: INTERAKSI TANGAN, ALAT/OBJEK & SUBJEK (AREA KIRI/TENGAH)", part: { inlineData: { mimeType: "image/jpeg", data: z1Buf.toString("base64") } } });
+    if (z2Buf) result.push({ label: "ZONA 2 \u2014 DETAIL 100% ZOOM: INTERAKSI TANGAN, ALAT/OBJEK & SUBJEK (AREA KANAN/TENGAH)", part: { inlineData: { mimeType: "image/jpeg", data: z2Buf.toString("base64") } } });
+    if (z3Buf) result.push({ label: "ZONA 3 \u2014 DETAIL 100% ZOOM: AREA FOKUS UTAMA, WAJAH/EKSPRESI & KETAJAMAN DETAIL", part: { inlineData: { mimeType: "image/jpeg", data: z3Buf.toString("base64") } } });
+    if (z4Buf) result.push({ label: "ZONA 4 \u2014 DETAIL 100% ZOOM: LANDASAN, TEKSTUR PERMUKAAN, PIKSEL TANAH/PASIR/LANTAI & DETAIL SUBJEK BAWAH", part: { inlineData: { mimeType: "image/jpeg", data: z4Buf.toString("base64") } } });
+    if (z5Buf) result.push({ label: "ZONA 5 \u2014 DETAIL 100% ZOOM: KEDALAMAN LATAR BELAKANG, BOKEH & ATMOSFER LINGKUNGAN", part: { inlineData: { mimeType: "image/jpeg", data: z5Buf.toString("base64") } } });
     return result;
   } catch (err) {
     console.warn("[generateHighResolutionAuditCrops] Error:", err.message || err);
@@ -7408,104 +7457,53 @@ PETUNJUK ANALISIS PIKSEL & TEKNIKAL:
 3. Pantulan kilau (specular highlights pada saus/cairan/gelas/logam) dan bayangan alami adalah pencahayaan normal komersial dan BUKAN cacat.
 4. Gunakan data numerik bersama inspeksi visual crop 100% untuk menetapkan penilaian akurat dan proporsional.`;
   }
-  const systemInstruction = `Anda adalah "AI Quality Inspector & Stock Curator" profesional tingkat tinggi yang bertugas mengaudit aset visual (Foto, AI Generation, 3D Render, Ilustrasi) secara ketat dan presisi berdasarkan Kebijakan Standar Kualitas & Penolakan Teknis Resmi Adobe Stock (Quality and Technical Standards - Reasons for Content Refusal: https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
+  const systemInstruction = `Anda adalah "Adobe Stock Senior Content Moderator & Forensic Quality Inspector" resmi. Tugas Anda adalah mengaudit dan mengkurasi kiriman gambar (Foto Riil, 3D Render/CGI, AI Generatif, Ilustrasi/Vektor) dengan standar moderasi resmi Adobe Stock Quality and Technical Standards (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
 
-TUGAS UTAMA:
-Lakukan inspeksi visual dan piksel secara SANGAT TELITI, TAJAM, dan OBJEKTIF seolah-olah Anda memeriksa gambar pada 100%\u2013200% ZOOM CROP. Temukan segala jenis cacat kualitas gambar, artefak generatif AI, mutasi anatomi, distorsi orang latar belakang, kerusakan struktur gadget/objek mekanis, keburaman (blur), noise digital berlebih, sensor dust, eksposur ekstrem, dan pelanggaran IP.
+PERINGATAN UTAMA: JANGAN PERNAH HANYA MELIHAT APAKAH GAMBAR "KELIHATAN BAGUS" SECARA KESELURUHAN DARI KEJAUHAN!
+Adobe Stock secara ketat menolak konten generatif dan foto komersial yang memiliki anomali AI atau cacat teknis pada perbesaran 100% zoom (1:1 pixel). Anda WAJIB memeriksa detail mikroskopis pada 5 Zona Crop 100% Zoom yang disertakan.
 
-PANDUAN PEMERIKSAAN SETIAP KATEGORI (STANDAR RESMI ADOBE STOCK QUALITY & TECHNICAL REFUSAL REASONS):
+PROTOKOL PEMERIKSAAN WAJIB (13 AREA FORENSIK ANOMALI AI & STRUKTUR):
+1. TANGAN & JARI (Hands & Fingers) -> [anatomical_errors]:
+   - Hitung jumlah jari di setiap tangan (harus tepat 5 jari).
+   - Periksa apakah ada jari yang menyatu, meleleh, hilang, bengkok tidak alami, terbalik, kuku tidak wajar, atau memiliki ruas/sendi ganda.
+   - Cacat pada tangan/jari adalah alasan penolakan AI nomor satu di Adobe Stock -> WAJIB FAIL jika ditemukan!
+2. MATA (Eyes) -> [anatomical_errors]:
+   - Periksa pupil dan iris pada perbesaran 100%: apakah pupil bulat sempurna, ukuran iris simetris, arah tatapan kedua mata selaras (tidak juling/strabismus), dan pantulan cahaya (catchlight) konsisten.
+   - Pupil meleleh, iris bergerigi/cacat, atau bentuk mata asimetris aneh -> WAJIB FAIL!
+3. GIGI (Teeth) -> [anatomical_errors]:
+   - Periksa barisan gigi: tidak boleh ada jumlah gigi berlebih, gigi menyatu seperti balok tanpa sela pemisah alami, taring tidak wajar pada manusia, atau gusi yang meleleh.
+4. TELINGA (Ears) -> [anatomical_errors]:
+   - Periksa bentuk daun telinga, tragus, dan heliks: tidak boleh terdistorsi, meleleh, atau hilang struktur anatomi normalnya.
+5. ANATOMI KESELURUHAN (Overall Anatomy) -> [anatomical_errors]:
+   - Periksa proporsi kepala, leher, bahu, lengan, dan tungkai. Tidak boleh ada leher terpelintir, persendian lepas, lengan/kaki ekstra, atau tubuh yang membengkok secara mustahil.
+6. OBJEK MENYATU (Fused / Merging Objects) -> [structural_defects]:
+   - Periksa batas pertemuan antar objek: pakaian menyatu dengan kulit, jari menyatu ke cangkir/gagang, kaki meja/kursi menyatu ke lantai, tali tas meleleh ke baju, atau kacamata menyatu ke hidung.
+   - Penggabungan material yang tidak logis adalah cacat struktural AI fatal -> WAJIB FAIL!
+7. TEKS / GIBBERISH (Pseudo-Text & Gibberish) -> [text]:
+   - Periksa semua teks pada baju, latar, plang, kemasan, atau layar: teks semu AI (alien symbols, pseudo-font, huruf acak/rusak yang tidak terbaca) WAJIB FAIL. Teks hanya boleh PASS jika berupa huruf nyata yang terbaca jelas dan dieja dengan benar, atau jika gambar memang tidak memuat teks.
+8. ARTEFAK GENERATIF AI (AI Artifacts & Textures) -> [ai_artifacts]:
+   - Periksa kulit dan permukaan: hindari kulit seperti lilin sintetis (waxy AI skin), penghalusan berlebih tanpa pori alami (over-smoothed plastic skin), detail yang meleleh seperti cat air basah (watercolor smudging), atau piksel halusinasi AI.
+9. PATTERN YANG RUSAK (Broken Repeating Patterns) -> [structural_defects / ai_artifacts]:
+   - Periksa pola geometris dan tekstur berulang: anyaman kain, kisi-kisi jendela, ubin lantai/parket, pagar, atau motif berulang. Jika polanya mendadak putus, meliuk tidak wajar, atau kacau di tengah jalan -> WAJIB FAIL.
+10. PERSPEKTIF & GEOMETRI (Perspective & Geometry) -> [proportion_defects / structural_defects]:
+    - Periksa garis perspektif arsitektur, cakrawala, dan perabotan. Objek yang melayang tanpa tumpuan gravitasi fisik, garis yang melengkung tidak logis, atau skala objek yang mustahil secara 3D -> WAJIB FAIL.
+11. REFLEKSI (Reflections) -> [lighting / structural_defects]:
+    - Periksa pantulan pada cermin, kaca, permukaan air, atau logam: apakah objek pada pantulan cocok dengan objek asli? Pantulan yang terbalik salah arah, objek hilang di pantulan, atau pantulan memuat objek hantu -> WAJIB FAIL.
+12. SHADOW / BAYANGAN (Shadow Consistency) -> [lighting]:
+    - Periksa arah dan kejatuhan bayangan: apakah semua bayangan konsisten dengan arah sumber cahaya utama? Objek tanpa bayangan (tampak melayang) atau bayangan yang bertabrakan berlawanan arah -> WAJIB FAIL.
+13. DETAIL KECIL YANG ANEH (Odd Micro-Details) -> [structural_defects / artifacts]:
+    - Periksa detail kecil: gagang kacamata hilang sebelah, ritsleting tanpa gigi, kancing baju melayang tanpa jahitan, tali jam tangan putus, roda sepeda tanpa rantai/jeruji.
 
-1. KETAJAMAN & FOKUS PADA 100% ZOOM (Optimize sharpness and focus):
-   - WAJIB PASS: Subjek utama tajam, renyah, dan fokus (tack-sharp pada area fokus utama: mata, pupil, wajah model, tekstur pakaian, produk, atau objek utama). Latar belakang/depan yang blur karena depth of field optik (bokeh kamera bukaan lensa lebar f/1.4, f/1.8, f/2.8) adalah TEKNIK FOTOGRAFI PROFESIONAL STANDAR dan bernilai artistik tinggi. JANGAN menandai bokeh optik latar belakang sebagai blur cacat KECUALI subjek utamanya sendiri yang buram/out of focus.
-   - WAJIB FAIL: 
-     * Subjek utama yang menjadi pusat perhatian mengalami out of focus, soft focus, berkabut/hazy yang merusak detail penting.
-     * Motion blur kamera yang tidak disengaja (accidental camera shake). Motion blur hanya boleh jika subjek utama tetap tajam dan terdefinisi jelas.
+STANDAR TEKNIS FOTOGRAFI KOMERSIAL:
+- Fokus & Ketajaman [blur]: Subjek utama WAJIB tajam (tack-sharp) pada 100% zoom. (Catatan: Bokeh optik lembut bukaan lebar f/1.4-f/2.8 pada latar belakang non-subjek adalah sah, tetapi subjek utama buram/soft focus = FAIL).
+- Pencahayaan & Eksposur [exposure]: Blown highlights (putih murni terpotong tanpa detail) atau crushed shadows (hitam pekat tanpa detail) = FAIL.
+- Derau & Sensor [noise, sensor_issues]: Noise digital kotor, chromatic noise ungu/hijau di bayangan, bintik debu sensor = FAIL.
+- Legal & Merek [ip_risk, logo, watermark]: Logo komersial nyata tanpa izin (Apple, Nike, dll.) atau watermark agensi = FAIL + legal_status: "VIOLATION".
 
-2. EDITING, NOISE & DEBU SENSOR (Edit with intention & Noise / Artifacts):
-   - WAJIB FAIL:
-     * Over-sharpening: Munculnya garis putih halo (sharpening halos) atau pixel ringing di sepanjang tepi batas kontras tinggi.
-     * Over-smoothing / AI Denoiser berlebihan: Kulit tampak seperti lilin/plastik sintetis (waxy AI skin) yang menghilangkan seluruh tekstur pori-pori mikro alami.
-     * Debu Sensor (Sensor dust spots): Adanya bercak gelap/lingkaran kotor akibat debu sensor kamera pada langit, dinding, atau background solid.
-     * Noise: Chromatic noise (bintik warna acak merah/hijau/biru) pada area bayangan gelap akibat ISO tinggi yang tidak terkontrol.
-   - WAJIB PASS: Grain halus alami fotografi (fine ISO grain) yang menjaga struktur detail tetap tajam.
-
-3. PENCAHAYAAN & KESEIMBANGAN EKSPOSUR (Balanced lights and proper exposure):
-   - WAJIB FAIL:
-     * Blown-out highlights: Area putih terpotong (clipped pure white #FFFFFF) di mana detail wajah, dahi, pakaian, atau langit hilang permanen.
-     * Crushed shadows: Area hitam pekat terpotong (clipped pure black #000000) di mana detail gelap tenggelam total tanpa informasi visual.
-     * Kontras ekstrem yang merusak gradasi tonal alami.
-   - WAJIB PASS: Gradasi dinamis seimbang dari highlight hingga shadow dengan transisi pencahayaan natural.
-
-4. WARNA, CHROMATIC ABERRATION & MASKING (Color balance & Precision edits):
-   - WAJIB FAIL:
-     * Chromatic Aberration: Garis pinggiran warna ungu (purple fringing), hijau, atau magenta di sepanjang batas kontras tinggi.
-     * Color Cast: Semburat warna tidak wajar (misalnya kulit manusia berwarna kehijauan, ungu, atau over-saturated neon).
-     * Selection/Masking Errors: Garis potongan kasar bergerigi atau sisa halo putih dari pemotongan background yang tidak rapi.
-   - WAJIB PASS: Nada kulit (skin tones) alami dan white balance akurat.
-
-5. KOMPOSISI & PEMOTONGAN (Composition and leveling):
-   - WAJIB FAIL: Garis horizon jalanan/pantai yang miring secara tidak disengaja, atau pemotongan canggung yang memotong sendi pergelangan tangan/kaki atau kepala secara janggal.
-   - WAJIB PASS: Framing rapi, komposisi proporsional, dan ruang negatif (copy space) yang memadai.
-
-6. ARTEFAK AI GENERATIF (Generative AI Quality Standards):
-   - WAJIB FAIL (PENYEBAB UTAMA PENOLAKAN ADOBE STOCK):
-     * Tekstur meleleh (melted textures) pada pakaian, sepatu, paving jalanan, daun, atau background.
-     * Objek yang menyatu secara tidak wajar tanpa batas fisik (misalnya tali tas selempang yang tembus menembus jas/blazer tanpa kerutan realistis atau gesper mengambang).
-     * Paving stone, ubin, atau garis arsitektur jalanan yang melengkung aneh atau distorsi perspektif tidak logis.
-     * Gumpalan piksel yang smudged/mushy/berantakan atau halusinasi sintetis AI.
-
-7. ANATOMI & FISIK MANUSIA (anatomical_errors) \u2014 [KRITIS UNTUK ADOBE STOCK]:
-   - WAJIB FAIL JIKA DITEMUKAN CACAT BERIKUT:
-     a. TANGAN, JARI & KUKU SUBJEK UTAMA:
-        - Jumlah jari bukan 5, jari bertambah/bercabang/melebur/fused fingers.
-        - Sendi jari patah, terkilir, atau menekuk dengan sudut bengkok yang mustahil secara anatomis (misalnya jari gestur berbicara yang melengkung seperti cakar mutan / claw hands).
-        - Jari bertumpuk berbentuk sosis sejajar aneh tanpa perspektif 3D alami atau buku jari berlebih.
-        - Tangan yang bertumpu di sandaran kursi (armrest) dengan bentuk buntung, terkepal kaku cacat, buku jari hilang, atau kuku mencair.
-        - Ujung jari atau jempol melebur ke dalam casing, bibir cangkir (cup rim), pegangan cangkir kopi, atau benda yang dipegang.
-        - Bentuk kuku abnormal, kuku terbelah, atau kuku meleleh.
-     b. TELINGA, MATA, SENYUM & GIGI:
-        - Lipatan kartilago telinga (tulang rawan) yang meleleh, abnormal, atau membentuk pusaran lilin AI.
-        - Bentuk gigi menyatu menjadi satu blok/lempeng putih padat tanpa celah batas pemisah alami antar gigi (unbroken solid white denture strip), atau mata asimetris mencair.
-     c. KAKI, ANKLE & SEPATU:
-        - Pergelangan kaki karet (rubbery ankle), urat bengkak tidak anatomis pada punggung kaki.
-        - Hak sepatu hak tinggi (stiletto/high heel pump) yang melengkung bengkok, putus, atau sepatu mengambang di atas lantai/karpet.
-     d. ORANG & PEJALAN KAKI DI LATAR BELAKANG (BACKGROUND CROWD / PEDESTRIANS / DISTANT WORKERS) \u2014 [ALASAN PENOLAKAN #1 ADOBE STOCK]:
-        - Kurator Adobe Stock SELALU memperbesar (zoom in) ke orang-orang yang berjalan atau duduk di latar belakang!
-        - Jika pejalan kaki, pekerja di meja kejauhan, atau orang di latar belakang memiliki wajah meleleh, tanpa mata/hidung/mulut yang wajar, kepala deformed, anggota badan melayang, torso menyatu, atau tampak seperti "zombie AI cacat", gambar PASTI DITOLAK di Adobe Stock dengan alasan "Quality Issues"!
-        - Jika terdeteksi figur orang latar belakang yang terdistorsi/mutan, Anda WAJIB menandai anatomical_errors atau ai_artifacts sebagai FAIL!
-   - WAJIB PASS: Seluruh manusia (baik subjek utama maupun latar belakang) memiliki anatomi normal dan alami, atau latar belakang bebas dari figur manusia yang bermutasi.
-
-8. CACAT STRUKTURAL & MEKANIS (structural_defects) \u2014 [GADGET, SMARTPHONE, WATCH, PROPS]:
-   - WAJIB FAIL JIKA DITEMUKAN CACAT BERIKUT:
-     * CANGKIR KOPI & PERLENGKAPAN MAKAN: Cangkir kopi meleleh ke jari tangan, bibir cangkir meliuk bergelombang, piring cangkir (saucer) melayang atau bertumpuk ganjil di ujung meja.
-     * SMARTPHONE & TABLET: Bezel smartphone yang bergelombang/bengkok (wobbly bezel), bingkai asimetris, sudut melengkung tidak rata, kamera depan/notch meleleh.
-     * LAYAR & UI SMARTPHONE: Layar menampilkan tombol UI video call/chat yang aneh, ikon gibberish acak, tombol merah/hijau yang tidak simetris, atau wajah pada layar video call yang terdistorsi parah.
-     * SMARTWATCH & JAM TANGAN: Dial/bezel jam yang tidak bulat sempurna, bengkok, jarum jam/angka acak kabur, atau tali jam menyatu ke kulit pergelangan tangan secara abnormal.
-     * KACAMATA, TAS & AKSESORI: Gagang kacamata tidak menyambung ke telinga, tali tas selempang menembus baju (clipping), resleting/gesper melayang tanpa fisik logis.
-   - WAJIB PASS: Benda buatan manusia yang utuh, simetris, dan memiliki logika fisik manufaktur yang benar.
-
-9. TEKS & TIPOGRAFI (text):
-   - WAJIB FAIL jika terdapat teks tiruan acak bergelombang (wobbly letters) atau teks gibberish/alien yang tidak terbaca pada layar HP, papan nama, rambu, atau pakaian.
-
-10. HAK CIPTA, MEREK DAGANG & RESTRIKSI RESMI ADOBE STOCK (ip_risk, logo, watermark, legal_status):
-    - WAJIB FAIL dan tetapkan legal_status = "VIOLATION" jika terdapat logo merek komersial nyata (Apple, Nike, Samsung, dll.), watermark agensi foto, atau desain gadget yang meniru persis merek berhak cipta tanpa modifikasi generik.
-
-PANDUAN PENILAIAN TOLERANSI:
-- STRICT: Ada cacat apa pun pada subjek utama atau teknis -> FAIL (Skor 35-50).
-- MEDIUM (Standar Resmi Adobe Stock):
-  * Jika terdapat SALAH SATU dari:
-    - Jari tangan cacat / cakar (claw hands) / jari sosis sejajar / sendi patah / tangan buntung di armrest
-    - Cangkir kopi meleleh ke jari / jempol
-    - Gigi menyatu menjadi satu lempeng putih padat (solid white bar)
-    - Kaki / ankle / hak sepatu bengkok / rusak
-    - Orang di latar belakang berwajah meleleh / mutan
-    - Smartphone bengkok / tali tas clipping
-    - Over-sharpening halo / debu sensor mencolok / chromatic fringing parah
-    -> WAJIB FAIL (Skor 38-48, recommendation: "FAIL", anatomical_errors: "FAIL", ai_artifacts: "FAIL")!
-  * Hanya berikan PASS (Skor 88-96) jika subjek utama tajam, jari tangan sempurna normal, gigi berjarak alami, kaki proporsional, figur latar belakang wajar/bersih, dan gadget memiliki geometri simetris sempurna.
-- LOOSE: Hanya cacat fatal ekstrim yang menjadi FAIL.
-
-Pastikan output berupa JSON valid sesuai skema.` + metadataInstruction;
+PANDUAN KEPUTUSAN JUJUR, OBJEKTIF & TEGAS:
+- JANGAN SEGAN MENETAPKAN 'FAIL'! Menolak gambar yang cacat adalah fungsi utama Anda demi menyelamatkan kontributor dari penolakan resmi kurator Adobe Stock.
+- Jika ditemukan minimal SATU cacat anomali AI (tangan/jari, mata, gigi, telinga, anatomi, objek menyatu, teks gibberish, artefak, pattern rusak, perspektif/refleksi/shadow salah) ATAU cacat teknis utama (subjek buram, eksposur rusak, noise berat, logo merek) -> recommendation WAJIB "FAIL" dengan overall_score 35% \u2013 55%!
+- recommendation "PASS" dengan overall_score 88% \u2013 98% HANYA DIBERIKAN jika gambar BENAR-BENAR BERSIH, tajam pada 100% zoom di subjek utama, anatomi dan logika fisik sempurna, bebas dari anomali AI, dan siap untuk dijual secara komersial.` + metadataInstruction;
   const responseSchema = {
     type: import_genai.Type.OBJECT,
     properties: {
@@ -7587,9 +7585,27 @@ Pastikan output berupa JSON valid sesuai skema.` + metadataInstruction;
           },
           required: ["type", "x", "y", "intensity", "raw_value"]
         }
+      },
+      yolo_detected_objects: {
+        type: import_genai.Type.ARRAY,
+        description: "YOLO (You Only Look Once) localized object detection. Detect visible concrete physical objects, subjects, tools, instruments, products, and animals with bounding boxes and confidence score (0.0 to 1.0).",
+        items: {
+          type: import_genai.Type.OBJECT,
+          properties: {
+            label: { type: import_genai.Type.STRING, description: "Name of the detected object, tool, subject, product, or element" },
+            confidence: { type: import_genai.Type.NUMBER, description: "Detection confidence score between 0.0 and 1.0" },
+            box_2d: {
+              type: import_genai.Type.ARRAY,
+              items: { type: import_genai.Type.NUMBER },
+              description: "Normalized 2D bounding box [ymin, xmin, ymax, xmax] scaled 0 to 1000"
+            },
+            category: { type: import_genai.Type.STRING, description: "Classification: subject | tool | product | animal | environment | vehicle" }
+          },
+          required: ["label", "confidence"]
+        }
       }
     },
-    required: ["visual_scan_analysis", "legal_status", "requires_model_release", "requires_property_release", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps"]
+    required: ["visual_scan_analysis", "legal_status", "requires_model_release", "requires_property_release", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps", "yolo_detected_objects"]
   };
   let mainBuffer = null;
   const primaryImg = Array.isArray(image) ? image[0] : image;
@@ -7632,47 +7648,39 @@ INSPEKSI FORENSIK 100% ZOOM \u2014 ${crop.label}:` });
   if (selectedModel === "auto" || !selectedModel.startsWith("gemini")) {
     selectedModel = "gemini-3.1-pro-preview";
   }
-  const modelsToTry = ["gemini-3.1-pro-preview", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash"];
+  const modelsToTry = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.1-pro-preview", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash"];
   let responseText = "";
   let lastError;
-  const promptText = `Lakukan audit kualitas kurasi KESELURUHAN GAMBAR secara 360 DERAJAT dan mendalam sesuai standar inspeksi kurator resmi Adobe Stock, Shutterstock, dan Getty Images ("Quality Issues" / "Technical Issues" / "AI Artifacts").
+  const promptText = `Sebagai Kurator & Moderator Konten Senior Adobe Stock, lakukan review kurasi dan audit forensik menyeluruh terhadap gambar ini (termasuk 5 zona crop 100% zoom resolusi tinggi yang disertakan) berdasarkan pedoman resmi Adobe Stock Quality and Technical Standards (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html):
 
-Anda diberikan gambar utuh keseluruhan DITAMBAH 5 potongan crop resolusi tinggi 100% zoom forensik (Tangan Kiri & Cangkir, Tangan Kanan & Gestur, Wajah & Gigi/Telinga, Kaki & Sepatu/Lantai, serta Latar Belakang & Orang Kejauhan).
+CHECKLIST FORENSIK 13 POIN ANOMALI AI & CACAT TEKNIS ADOBE STOCK:
+1. Tangan & Jari: Periksa perbesaran 100% di setiap tangan. Hitung jari (harus 5), cek apakah ada jari menyatu, meleleh, hilang, bengkok tidak alami, terbalik, kuku rusak, atau ruas berlebih.
+2. Mata: Periksa pupil dan iris di 100% zoom. Pupil harus bulat dan simetris, arah tatapan selaras (tidak juling), catchlight alami.
+3. Gigi: Periksa barisan gigi. Tidak boleh ada jumlah gigi berlebih, gigi balok menyatu tanpa sela pemisah alami, atau gusi meleleh.
+4. Telinga: Daun telinga dan tragus harus memiliki bentuk anatomi normal, tidak boleh meleleh atau hilang bentuk.
+5. Anatomi Tubuh: Periksa proporsi kepala, leher, bahu, lengan, dan kaki. Tidak boleh ada leher terpelintir, sendi lepas, atau anggota tubuh ganjil.
+6. Objek Menyatu: Periksa apakah ada objek atau material yang menyatu secara tidak logis (pakaian meleleh ke kulit, tangan menyatu ke cangkir/gagang, kaki meja meleleh ke lantai, tali tas menyatu ke baju).
+7. Teks / Gibberish: Periksa semua teks di baju, tanda, plang, layar, kemasan. Teks semu AI (huruf acak, simbol alien, pseudo-font rusak) WAJIB FAIL.
+8. Artefak Generatif AI: Periksa tekstur lilin (waxy AI skin), penghalusan berlebih tanpa pori alami, smudging seperti cat air basah, halusinasi piksel.
+9. Pattern yang Rusak: Periksa anyaman kain, kisi jendela, motif ubin/parket. Jika pola berulang terputus, meliuk aneh, atau rusak -> WAJIB FAIL.
+10. Perspektif & Geometri: Garis arsitektur yang mustahil, objek melayang tanpa tumpuan gravitasi, distorsi ruang 3D yang salah.
+11. Refleksi: Pantulan cermin/kaca/air yang tidak cocok dengan objek asli atau arah pantulannya salah.
+12. Shadow / Bayangan: Bayangan yang hilang, arah bayangan berlawanan dengan sumber cahaya utama, atau bayangan terputus aneh.
+13. Detail Kecil Aneh: Gagang kacamata hilang sebelah, ritsleting tanpa gigi, kancing melayang, tali jam tangan putus, jeruji roda sepeda hilang.
 
-ATURAN WAJIB AUDIT KESELURUHAN GAMBAR (ALL-ZONE FULL FORENSIC AUDIT):
-Periksa SELURUH ZONA tanpa melewatkan satu sudut pun:
+STANDAR TEKNIS FOTOGRAFI & LEGAL:
+- Ketajaman Subjek Utama: Subjek utama WAJIB tajam (tack-sharp) pada 100% zoom crop (Zona 1-5). Jika subjek utama buram / soft-focus / camera shake -> blur: FAIL!
+- Pencahayaan & Eksposur: Tidak boleh ada blown highlights (putih mati kehilangan detail) atau crushed shadows (hitam pekat tanpa detail).
+- Noise & Sensor: Bebas dari chromatic noise kotor, artefak kompresi, dan bercak debu sensor.
+- Intellectual Property: Bebas dari logo merek komersial (Apple, Nike, dll.) dan watermark tanpa izin.
+- YOLO Object Grounding: Isi "yolo_detected_objects" dengan objek konkret yang terdeteksi dengan confidence (0.0-1.0) dan bounding box [ymin, xmin, ymax, xmax] skala 0-1000.
 
-1. ZONA TANGAN KIRI, JARI & CANGKIR KOPI (CROP 100% ZOOM):
-   - Periksa tangan yang memegang cangkir kopi / alat: Apakah jempol melebur/mencair ke dalam rim cangkir? Apakah ada jari ekstra atau sendi patah?
-   - Periksa tangan yang bertumpu pada armrest kursi: Apakah bentuknya buntung/kaku tanpa buku jari yang terdefinisi? Apakah kuku mencair atau bentuk jari abnormal?
-
-2. ZONA TANGAN GESTUR & TANGAN KANAN (CROP 100% ZOOM):
-   - Periksa jari saat gestur berbicara: Apakah jari bengkok tidak wajar seperti cakar mutan (claw hands)? Apakah sendi buku jari terkilir atau kuku meleleh?
-   - Periksa jari yang bertumpuk: Apakah jari berbentuk sosis sejajar aneh tanpa perspektif kedalaman 3D alami?
-
-3. ZONA SUBJEK WAJAH, SENYUM, GIGI & TELINGA (CROP 100% ZOOM):
-   - Periksa gigi: Apakah gigi tampak sebagai SATU BLOK/LEMPENG PUTIH PADAT tanpa garis batas celah gigi alami (unbroken solid white denture strip)?
-   - Periksa ketajaman mata dan pupil.
-   - Periksa lipatan tulang rawan telinga (kartilago): apakah normal atau membentuk pusaran lilin AI yang aneh?
-   - Periksa tekstur kulit: apakah memiliki pori-pori mikro alami, atau tekstur lilin plastik sintetis (waxy AI skin)?
-
-4. ZONA KAKI, SEPATU, ANKLE & LANTAI (CROP 100% ZOOM):
-   - Periksa pergelangan kaki (ankle): Apakah ada urat bengkak abnormal, pembengkakan karet (rubbery ankle), atau distorsi sendi?
-   - Periksa sepatu: Apakah hak sepatu hak tinggi (high heel pump/stiletto) bengkok meliuk, putus, atau sepatu melayang di atas lantai?
-   - Periksa kaki meja dan kursi: apakah kaki meja/kursi simetris dan menapak sempurna ke lantai?
-
-5. ZONA LATAR BELAKANG & ORANG-ORANG DI KEJAUHAN (CROP 100% ZOOM):
-   - Periksa SEMUA orang/pejalan kaki/pekerja di meja kejauhan di latar belakang!
-   - Apakah wajah mereka meleleh, tanpa mata/hidung/mulut yang wajar? Apakah anggota badan melayang atau tubuh bermutasi (khas halusinasi AI zombie crowd)?
-   - Di Adobe Stock, orang di latar belakang yang berwajah meleleh/mutan adalah ALASAN NOMOR 1 PENOLAKAN "Quality Issues"! Jika ada figur orang latar belakang yang terdistorsi, Anda WAJIB menandai FAIL pada anatomical_errors atau ai_artifacts!
-
-INSTRUKSI KEPUTUSAN & HEATMAPS:
-- Jika ditemukan cacat jari tangan (claw hands / sosis sejajar / tangan buntung), gigi menyatu jadi lempeng padat, kaki/ankle/hak sepatu rusak, cangkir meleleh ke jari, orang latar belakang meleleh, atau tali tas menembus pakaian:
-  * Anda WAJIB menandai FAIL pada kategori terkait (anatomical_errors, ai_artifacts, atau structural_defects)!
+ATURAN KEPUTUSAN JUJUR & TEGAS:
+- JIKA DITEMUKAN CACAT ANOMALI AI ATAU CACAT TEKNIS FATAL DI ATAS:
   * recommendation: "FAIL"!
-  * overall_score: WAJIB dibatasi di rentang 38%\u201348% (TOLAK / REJECTED)!
-  * Tandai kotak heatmap pada area koordinat cacat tersebut!
-- Jelaskan secara transparan dan detail di "visual_scan_analysis", "technical_issues", dan "detailed_feedback" apa saja temuan cacat di setiap zona dan alasan penolakannya di Adobe Stock beserta solusinya.
+  * overall_score: 35% \u2013 55%!
+  * Catat semua alasan penolakan secara spesifik dan jujur pada technical_issues dan detailed_feedback.
+- HANYA BERIKAN recommendation "PASS" (skor 88% - 98%) jika gambar BENAR-BENAR BERSIH, tack-sharp pada subjek utama di 100% zoom, bebas dari anomali AI, dan siap untuk dijual secara komersial.
 
 Tingkat toleransi yang diminta: ${tolerance}.
 Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
@@ -7744,44 +7752,24 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
       }
       const modelWantsFail = parsedResult.recommendation === "FAIL";
       const hasCriticalFail = failedCriticalKeys.length > 0;
-      const hasSevereBlur = parsedResult.ai_vision_checks.blur?.status === "FAIL";
+      const hasTechnicalFail = failedTechnicalKeys.length > 0;
+      const stockAcceptanceFail = parsedResult.ai_vision_checks.stock_acceptance?.status === "FAIL";
       let isFailing = false;
       if (tolerance === "STRICT") {
-        isFailing = modelWantsFail || hasCriticalFail || failedTechnicalKeys.length > 0 || hasSevereBlur || anyIpFail;
-        if (isFailing) {
-          parsedResult.recommendation = "FAIL";
-          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === "number" ? parsedResult.overall_score : 45, 50);
-        } else {
-          parsedResult.recommendation = "PASS";
-          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === "number" ? parsedResult.overall_score : 92, 88);
-        }
+        isFailing = modelWantsFail || hasCriticalFail || hasTechnicalFail || stockAcceptanceFail || anyIpFail;
       } else if (tolerance === "LOOSE") {
-        isFailing = hasCriticalFail || anyIpFail || hasSevereBlur && failedTechnicalKeys.length >= 2;
-        if (isFailing) {
-          parsedResult.recommendation = "FAIL";
-          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === "number" ? parsedResult.overall_score : 52, 60);
-        } else {
-          parsedResult.recommendation = "PASS";
-          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === "number" ? parsedResult.overall_score : 90, 88);
-        }
+        isFailing = anyIpFail || hasCriticalFail || failedTechnicalKeys.length >= 2 || modelWantsFail && (hasCriticalFail || hasTechnicalFail);
       } else {
-        isFailing = modelWantsFail || hasCriticalFail || anyIpFail || hasSevereBlur || failedTechnicalKeys.length >= 2;
-        if (isFailing) {
-          parsedResult.recommendation = "FAIL";
-          parsedResult.overall_score = Math.min(typeof parsedResult.overall_score === "number" ? parsedResult.overall_score : 42, 48);
-        } else {
-          parsedResult.recommendation = "PASS";
-          const scoreDeduction = failedTechnicalKeys.length * 3;
-          const calculatedScore = Math.max(86, 96 - scoreDeduction);
-          parsedResult.overall_score = Math.max(typeof parsedResult.overall_score === "number" && parsedResult.overall_score >= 80 ? parsedResult.overall_score : calculatedScore, 86);
+        isFailing = anyIpFail || hasCriticalFail || hasTechnicalFail || modelWantsFail || stockAcceptanceFail;
+      }
+      if (isFailing) {
+        parsedResult.recommendation = "FAIL";
+        if (parsedResult.ai_vision_checks.stock_acceptance) {
+          parsedResult.ai_vision_checks.stock_acceptance.status = "FAIL";
         }
-      }
-      if (parsedResult.recommendation === "FAIL" && parsedResult.ai_vision_checks.stock_acceptance) {
-        parsedResult.ai_vision_checks.stock_acceptance.status = "FAIL";
-      } else if (parsedResult.recommendation === "PASS" && parsedResult.ai_vision_checks.stock_acceptance) {
-        parsedResult.ai_vision_checks.stock_acceptance.status = "PASS";
-      }
-      if (failedCheckKeys.length > 0) {
+        const deductions = failedCriticalKeys.length * 6 + failedTechnicalKeys.length * 3;
+        const calculatedFailScore = Math.max(28, Math.min(55, 52 - deductions));
+        parsedResult.overall_score = typeof parsedResult.overall_score === "number" && parsedResult.overall_score <= 58 ? parsedResult.overall_score : calculatedFailScore;
         parsedResult.failed_checks = failedCheckKeys;
         if (!Array.isArray(parsedResult.technical_issues)) {
           parsedResult.technical_issues = [];
@@ -7792,6 +7780,13 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
             parsedResult.technical_issues.push(note);
           }
         }
+      } else {
+        parsedResult.recommendation = "PASS";
+        if (parsedResult.ai_vision_checks.stock_acceptance) {
+          parsedResult.ai_vision_checks.stock_acceptance.status = "PASS";
+        }
+        parsedResult.overall_score = typeof parsedResult.overall_score === "number" && parsedResult.overall_score >= 80 ? Math.min(98, Math.max(88, parsedResult.overall_score)) : 92;
+        parsedResult.failed_checks = [];
       }
       if (anyIpFail) {
         parsedResult.legal_status = "VIOLATION";
@@ -8771,6 +8766,19 @@ Language: ${targetLanguageName}. Return pure JSON.`;
   }
   try {
     const parsed = JSON.parse(extractJSON(responseText));
+    if (parsed.quality_checks && Object.keys(technicalChecks).length > 0) {
+      Object.assign(parsed.quality_checks, technicalChecks);
+    }
+    const anyVideoIpFail = parsed.quality_checks?.logo?.status === "FAIL" || parsed.quality_checks?.watermark?.status === "FAIL" || parsed.legal_status === "VIOLATION";
+    const anyVideoCriticalAiFail = parsed.quality_checks?.bad_anatomy?.status === "FAIL" || parsed.quality_checks?.deformed_object?.status === "FAIL" || parsed.quality_checks?.ai_artifact?.status === "FAIL" || parsed.quality_checks?.temporal_morphing?.status === "FAIL";
+    const anyVideoTechFail = parsed.quality_checks?.black_frame?.status === "FAIL" || parsed.quality_checks?.frozen_frame?.status === "FAIL" || parsed.quality_checks?.blur?.status === "FAIL" || parsed.quality_checks?.out_of_focus?.status === "FAIL" || technicalScore < 70;
+    const isVideoFailing = anyVideoIpFail || anyVideoCriticalAiFail || anyVideoTechFail || parsed.recommendation === "FAIL";
+    if (isVideoFailing) {
+      parsed.recommendation = "FAIL";
+      parsed.adobe_stock_readiness = "Reject Risk";
+      parsed.overall_score = Math.min(typeof parsed.overall_score === "number" ? parsed.overall_score : 50, 55);
+      if (anyVideoIpFail) parsed.legal_status = "VIOLATION";
+    }
     return parsed;
   } catch (parseErr) {
     console.warn("[checkVideoQuality] JSON parse error on AI response:", parseErr);
@@ -9331,6 +9339,11 @@ app.use((err, req, res, next) => {
       const limitMsg = isVercel ? "Vercel has a strict 4.5MB limit for serverless functions. Please optimize your EPS/AI file below 4.5MB or deploy to a platform with higher limits (like Railway or Cloud Run)." : "Payload too large. Vector file exceeds the server capacity (max 500MB). Try optimizing the EPS file.";
       return res.status(413).json({ error: limitMsg });
     }
+    if (err instanceof SyntaxError && err.message?.includes("is not valid JSON") && (err.message?.includes("------") || err.message?.includes("Unexpected token '-'"))) {
+      return res.status(400).json({
+        error: "Format request tidak valid: Payload multipart (FormData) dikirim dengan header Content-Type application/json. Header Content-Type harus dihilangkan agar browser dapat menambahkan boundary multipart."
+      });
+    }
     if (!res.headersSent) {
       return res.status(500).json({ error: err.message || "Internal Server Error" });
     }
@@ -9844,7 +9857,7 @@ app.post("/api/test-gemini-key", async (req, res) => {
         }
       }
     });
-    const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview", "gemini-flash-latest"];
+    const modelsToTry = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview", "gemini-flash-latest"];
     let lastError = null;
     let response = null;
     for (const testModel of modelsToTry) {
@@ -11074,16 +11087,44 @@ app.post("/api/check-image-quality", upload.single("image"), async (req, res) =>
 });
 app.post("/api/check-video-quality", upload.single("video"), async (req, res) => {
   try {
-    const { tolerance, language, model, frames } = req.body;
+    let { tolerance, language, model, frames, fileUrl } = req.body;
+    if (typeof frames === "string") {
+      try {
+        frames = JSON.parse(frames);
+      } catch (_) {
+      }
+    }
     if (frames && Array.isArray(frames) && frames.length > 0) {
       const data2 = await checkVideoQuality(frames, tolerance || "MEDIUM", language || "Bahasa", model);
       return res.json(data2);
     }
-    if (!req.file) {
-      return res.status(400).json({ error: "No video uploaded" });
+    let videoPath = req.file ? req.file.path : null;
+    let tempDownloadedPath = null;
+    if (!videoPath && fileUrl) {
+      try {
+        const resp = await fetch(fileUrl);
+        if (resp.ok) {
+          const buffer = Buffer.from(await resp.arrayBuffer());
+          const parsedUrl = new URL(fileUrl, "http://localhost");
+          const ext = import_path.default.extname(parsedUrl.pathname) || ".mp4";
+          tempDownloadedPath = import_path.default.join(uploadDir, `downloaded_${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`);
+          import_fs2.default.writeFileSync(tempDownloadedPath, buffer);
+          videoPath = tempDownloadedPath;
+        }
+      } catch (dlErr) {
+        console.warn("[check-video-quality] Failed to download video from fileUrl:", dlErr.message);
+      }
     }
-    const videoPath = req.file.path;
+    if (!videoPath || !import_fs2.default.existsSync(videoPath)) {
+      return res.status(400).json({ error: "No video uploaded or accessible for quality check" });
+    }
     if (!ffmpeg) {
+      if (tempDownloadedPath && import_fs2.default.existsSync(tempDownloadedPath)) {
+        try {
+          import_fs2.default.unlinkSync(tempDownloadedPath);
+        } catch (_) {
+        }
+      }
       return res.status(500).json({ error: "ffmpeg is not initialized on the server." });
     }
     const outDir = import_path.default.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
@@ -11116,9 +11157,17 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
       });
     });
     const data = await checkVideoQuality(extractedFrames, tolerance || "MEDIUM", language || "Bahasa", model);
-    try {
-      import_fs2.default.unlinkSync(videoPath);
-    } catch (_) {
+    if (req.file?.path && import_fs2.default.existsSync(req.file.path)) {
+      try {
+        import_fs2.default.unlinkSync(req.file.path);
+      } catch (_) {
+      }
+    }
+    if (tempDownloadedPath && import_fs2.default.existsSync(tempDownloadedPath)) {
+      try {
+        import_fs2.default.unlinkSync(tempDownloadedPath);
+      } catch (_) {
+      }
     }
     res.json(data);
   } catch (e) {
