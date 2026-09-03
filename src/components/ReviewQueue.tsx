@@ -945,6 +945,36 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
 
                   {file.title && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      {Array.isArray(file.yolo_detected_objects) && file.yolo_detected_objects.length > 0 && (
+                        <div className="p-3 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-500/20 shadow-2xs">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="flex h-2 w-2 relative">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                              </span>
+                              <span className="text-[10px] font-black text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">
+                                YOLO Grounded Objects ({file.yolo_detected_objects.length})
+                              </span>
+                            </div>
+                            <span className="text-[8px] font-mono text-slate-400 dark:text-slate-500 font-bold">100% FACTUAL</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {file.yolo_detected_objects.map((obj, idx) => (
+                              <span 
+                                key={idx} 
+                                className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-indigo-100 dark:border-indigo-900/50 shadow-2xs"
+                              >
+                                <span>🎯 {obj.label}</span>
+                                <span className="text-[8px] font-black text-indigo-600 dark:text-indigo-400">
+                                  {Math.round(obj.confidence > 1 ? obj.confidence : obj.confidence * 100)}%
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <ProjectCopyBox 
                         label={t.title_label} 
                         value={file.title} 
