@@ -1,6 +1,6 @@
 import { getDailyLimit } from '../../constants';
 import React, { useState, useEffect, useRef } from 'react';
-import { getHeaders } from '../../services/geminiService';
+import { getHeaders, getFormDataHeaders } from './services/geminiService';
 import { 
   Upload, ShieldCheck, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, 
   ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info, Download, 
@@ -451,7 +451,7 @@ export const ImageQualityCheck: React.FC<{
         if (aiOptions?.model) formData.append('model', aiOptions.model);
         response = await fetch('/api/check-video-quality', {
           method: 'POST',
-          headers: getHeaders(aiOptions),
+          headers: getFormDataHeaders(aiOptions),
           body: formData
         });
       }
@@ -478,7 +478,7 @@ export const ImageQualityCheck: React.FC<{
 
       response = await fetch('/api/check-image-quality', {
         method: 'POST',
-        headers: getHeaders(aiOptions),
+        headers: getFormDataHeaders(aiOptions),
         body: formData
       });
     }
