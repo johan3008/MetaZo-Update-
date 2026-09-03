@@ -2151,18 +2151,42 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/check-video-quality', upload.single('video'), async (req, res) => {
         try {
-            const { tolerance, language, model, frames } = req.body;
+            let { tolerance, language, model, frames, fileUrl } = req.body;
+            if (typeof frames === 'string') {
+                try { frames = JSON.parse(frames); } catch (_) {}
+            }
             if (frames && Array.isArray(frames) && frames.length > 0) {
                 const data = await checkVideoQuality(frames, tolerance || 'MEDIUM', language || 'Bahasa', model);
                 return res.json(data);
             }
 
-            if (!req.file) {
-                return res.status(400).json({ error: 'No video uploaded' });
+            let videoPath = req.file ? req.file.path : null;
+            let tempDownloadedPath: string | null = null;
+
+            if (!videoPath && fileUrl) {
+                try {
+                    const resp = await fetch(fileUrl);
+                    if (resp.ok) {
+                        const buffer = Buffer.from(await resp.arrayBuffer());
+                        const parsedUrl = new URL(fileUrl, 'http://localhost');
+                        const ext = path.extname(parsedUrl.pathname) || '.mp4';
+                        tempDownloadedPath = path.join(uploadDir, `downloaded_${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`);
+                        fs.writeFileSync(tempDownloadedPath, buffer);
+                        videoPath = tempDownloadedPath;
+                    }
+                } catch (dlErr: any) {
+                    console.warn('[check-video-quality] Failed to download video from fileUrl:', dlErr.message);
+                }
             }
-            const videoPath = req.file.path;
+
+            if (!videoPath || !fs.existsSync(videoPath)) {
+                return res.status(400).json({ error: 'No video uploaded or accessible for quality check' });
+            }
             
             if (!ffmpeg) {
+                if (tempDownloadedPath && fs.existsSync(tempDownloadedPath)) {
+                    try { fs.unlinkSync(tempDownloadedPath); } catch (_) {}
+                }
                 return res.status(500).json({ error: 'ffmpeg is not initialized on the server.' });
             }
 
@@ -2199,7 +2223,12 @@ app.get('/api/debug-uploads', (req, res) => {
 
             const data = await checkVideoQuality(extractedFrames, tolerance || 'MEDIUM', language || 'Bahasa', model);
             
-            try { fs.unlinkSync(videoPath); } catch (_) {}
+            if (req.file?.path && fs.existsSync(req.file.path)) {
+                try { fs.unlinkSync(req.file.path); } catch (_) {}
+            }
+            if (tempDownloadedPath && fs.existsSync(tempDownloadedPath)) {
+                try { fs.unlinkSync(tempDownloadedPath); } catch (_) {}
+            }
 
             res.json(data);
         } catch (e: any) {

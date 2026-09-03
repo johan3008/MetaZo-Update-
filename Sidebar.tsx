@@ -289,7 +289,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             </div>
 
-                        <a href={toolToPath[ToolType.PROMPT_IMAGE_CHECK]} onClick={(e) => handleNavClick(e, ToolType.PROMPT_IMAGE_CHECK)}
+            <a href={toolToPath[ToolType.PROMPT_IMAGE_CHECK]} onClick={(e) => handleNavClick(e, ToolType.PROMPT_IMAGE_CHECK)}
               className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
                 activeTool === ToolType.PROMPT_IMAGE_CHECK 
                   ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-violet-500" 
@@ -298,6 +298,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <CheckCircle size={16} className={activeTool === ToolType.PROMPT_IMAGE_CHECK ? "text-emerald-400" : "text-slate-400"} />
               {!sidebarCollapsed && <span>{t.sidebar_image_check}</span>}
+            </a>
+
+            <a href={toolToPath[ToolType.PROMPT_VIDEO_CHECK]} onClick={(e) => handleNavClick(e, ToolType.PROMPT_VIDEO_CHECK)}
+              className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
+                activeTool === ToolType.PROMPT_VIDEO_CHECK 
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-violet-500" 
+                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Film size={16} className={activeTool === ToolType.PROMPT_VIDEO_CHECK ? "text-purple-400" : "text-slate-400"} />
+              {!sidebarCollapsed && <span>{t.sidebar_video_check || "Cek Kualitas Video"}</span>}
             </a>
 
             <a href={toolToPath[ToolType.CALENDAR_GEN]} onClick={(e) => handleNavClick(e, ToolType.CALENDAR_GEN)}
