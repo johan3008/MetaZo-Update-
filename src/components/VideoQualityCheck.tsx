@@ -339,7 +339,27 @@ export const VideoQualityCheck: React.FC<{
 
       let response: Response;
 
-      if (uploadedUrl) {
+      // Ekstrak keyframes secara lokal dari elemen video browser (instan, ringan, mengatasi limit ukuran file)
+      let localFrames: string[] = [];
+      try {
+        localFrames = await extractVideoFrames(file, 3);
+      } catch (fErr) {
+        console.warn('[Video Audit] Client frame extraction fallback:', fErr);
+      }
+
+      if (localFrames.length > 0) {
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
+          body: JSON.stringify({
+            frames: localFrames,
+            fileUrl: uploadedUrl,
+            tolerance,
+            language: t.language || 'English',
+            model: aiOptions?.model || 'gemini-3.5-flash'
+          })
+        });
+      } else if (uploadedUrl) {
         response = await fetch('/api/check-video-quality', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
@@ -352,8 +372,8 @@ export const VideoQualityCheck: React.FC<{
           })
         });
       } else {
-        if (file.size > 4.5 * 1024 * 1024) {
-          throw new Error('Ukuran file video terlalu besar untuk server langsung (>4.5MB). Harap konfigurasikan Cloudflare R2 di menu Settings agar dapat mengaudit video ukuran besar tanpa batasan.');
+        if (file.size > 25 * 1024 * 1024) {
+          throw new Error('Ukuran file video terlalu besar (>25MB) dan browser tidak dapat mengekstrak frame secara langsung. Harap gunakan format MP4/WebM atau konfigurasikan Cloudflare R2.');
         }
         const formData = new FormData();
         formData.append('video', file);

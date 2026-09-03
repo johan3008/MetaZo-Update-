@@ -378,6 +378,67 @@ export const ImageQualityCheck: React.FC<{
     });
   };
 
+  const extractVideoFrames = (file: File, frameCount: number = 3): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'auto';
+      video.style.position = 'fixed';
+      video.style.top = '-9999px';
+      document.body.appendChild(video);
+
+      const frames: string[] = [];
+      let currentStep = 0;
+
+      const cleanup = () => {
+        if (video.parentNode) video.parentNode.removeChild(video);
+        URL.revokeObjectURL(url);
+      };
+
+      const seekToNextFrame = () => {
+        if (currentStep >= frameCount) {
+          cleanup();
+          resolve(frames);
+          return;
+        }
+        const targetTime = (video.duration / (frameCount + 1)) * (currentStep + 1);
+        video.currentTime = targetTime;
+      };
+
+      video.onloadedmetadata = () => {
+        seekToNextFrame();
+      };
+
+      video.onseeked = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 640;
+          canvas.height = 360;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            frames.push(canvas.toDataURL('image/jpeg', 0.85));
+          }
+          currentStep++;
+          seekToNextFrame();
+        } catch (e) {
+          cleanup();
+          reject(e);
+        }
+      };
+
+      video.onerror = () => {
+        cleanup();
+        reject(new Error("Gagal mengekstrak frame video"));
+      };
+
+      video.src = url;
+      video.load();
+    });
+  };
+
   // 🔍 Analisis Satu File Tunggal (One-by-One Processing)
   const analyzeSingleFile = async (
     item: QCQueueItem, 
@@ -400,20 +461,22 @@ export const ImageQualityCheck: React.FC<{
       }
     }
 
-    let uploadedUrl = null;
-    let getUrlData = null;
+    let uploadedUrl: string | null = null;
+    let getUrlData: any = null;
 
-    if (!isEpsAi) {
-      onStepChange('Mengunggah file asli ke Cloud Storage...');
+    // Coba upload ke R2 jika konfigurasi aktif untuk file besar
+    if (r2Configured && file.size > 2 * 1024 * 1024) {
       try {
-        const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || 'image/jpeg')}`);
+        onStepChange('Mengunggah ke storage cloud (R2)...');
+        const contentType = file.type || (isVideo ? 'video/mp4' : (isEpsAi ? 'application/postscript' : 'image/jpeg'));
+        const getUrlRes = await fetch(`/api/get-upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(contentType)}`);
         if (getUrlRes.ok) {
           getUrlData = await getUrlRes.json().catch(() => ({}));
           if (getUrlData.uploadUrl && getUrlData.fileUrl) {
             const putRes = await fetch(getUrlData.uploadUrl, {
               method: 'PUT',
               body: file,
-              headers: { 'Content-Type': file.type || 'image/jpeg' }
+              headers: { 'Content-Type': contentType }
             });
             if (putRes.ok) {
               uploadedUrl = getUrlData.fileUrl;
@@ -430,7 +493,26 @@ export const ImageQualityCheck: React.FC<{
     let response;
 
     if (isVideo) {
-      if (uploadedUrl) {
+      let localFrames: string[] = [];
+      try {
+        localFrames = await extractVideoFrames(file, 3);
+      } catch (fErr) {
+        console.warn('[ImageQualityCheck] Client video frame extraction fallback:', fErr);
+      }
+
+      if (localFrames.length > 0) {
+        response = await fetch('/api/check-video-quality', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
+          body: JSON.stringify({
+            frames: localFrames,
+            fileUrl: uploadedUrl,
+            tolerance,
+            language: t.language || 'English',
+            model: aiOptions?.model || 'gemini-3.5-flash'
+          })
+        });
+      } else if (uploadedUrl) {
         response = await fetch('/api/check-video-quality', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
@@ -439,12 +521,12 @@ export const ImageQualityCheck: React.FC<{
             pathKey: getUrlData?.pathKey,
             tolerance,
             language: t.language || 'English',
-            model: aiOptions?.model || 'gemini-3.1-flash-lite'
+            model: aiOptions?.model || 'gemini-3.5-flash'
           })
         });
       } else {
-        if (file.size > 4.5 * 1024 * 1024) {
-           throw new Error('File video asli terlalu besar (>4.5MB). Harap aktifkan Cloudflare R2 pada konfigurasi server.');
+        if (file.size > 25 * 1024 * 1024) {
+           throw new Error('File video asli terlalu besar (>25MB) dan browser tidak dapat mengekstrak frame secara langsung. Harap gunakan format MP4/WebM atau aktifkan Cloudflare R2.');
         }
         const formData = new FormData();
         formData.append('video', file);
