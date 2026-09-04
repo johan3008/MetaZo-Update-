@@ -2115,6 +2115,7 @@ app.get('/api/debug-uploads', (req, res) => {
     app.get('/api/event-keywords', handleEventKeywordsRequest);
 
     app.post('/api/check-image-quality', upload.single('image'), async (req, res) => {
+        let cleanupDownload: (() => void) | null = null;
         try {
             let imagePayload: any;
             let fileType: string | undefined = req.body.fileType;
@@ -2126,10 +2127,24 @@ app.get('/api/debug-uploads', (req, res) => {
                 imagePayload = `data:${mime};base64,${buffer.toString('base64')}`;
                 fileType = fileType || mime;
                 try { fs.unlinkSync(req.file.path); } catch (_) {}
+            } else if (req.body.fileUrl || req.body.pathKey || (typeof req.body.image === 'string' && (req.body.image.startsWith('http://') || req.body.image.startsWith('https://')))) {
+                const targetUrl = req.body.fileUrl || (typeof req.body.image === 'string' ? req.body.image : '');
+                const pathKey = req.body.pathKey;
+                let ext = '.jpeg';
+                try {
+                    const parsedUrl = new URL(targetUrl || 'http://localhost');
+                    ext = path.extname(parsedUrl.pathname) || (fileType ? `.${fileType.replace(/^image\//, '')}` : '.jpeg');
+                } catch (_) {}
+                const downloaded = await downloadFileFromStorage(targetUrl, pathKey, ext);
+                cleanupDownload = downloaded.cleanup;
+                const buffer = fs.readFileSync(downloaded.localPath);
+                let mime = 'image/jpeg';
+                if (ext.toLowerCase() === '.png') mime = 'image/png';
+                else if (ext.toLowerCase() === '.webp') mime = 'image/webp';
+                imagePayload = `data:${mime};base64,${buffer.toString('base64')}`;
+                fileType = fileType || mime;
             } else if (req.body.image) {
                 imagePayload = req.body.image;
-            } else if (req.body.fileUrl) {
-                imagePayload = req.body.fileUrl;
             }
 
             if (!imagePayload) {
@@ -2144,9 +2159,16 @@ app.get('/api/debug-uploads', (req, res) => {
 
             const { tolerance, language, model } = req.body;
             const result = await checkImageQuality(imagePayload, tolerance || 'MEDIUM', language || 'Bahasa', model, fileType, metadata);
+            if (cleanupDownload) {
+                try { cleanupDownload(); } catch (_) {}
+                cleanupDownload = null;
+            }
             res.json(result);
         } catch (e: any) {
             console.warn('Server check-image-quality error:', e);
+            if (cleanupDownload) {
+                try { cleanupDownload(); } catch (_) {}
+            }
             if (req.file && req.file.path && fs.existsSync(req.file.path)) {
                 try { fs.unlinkSync(req.file.path); } catch (_) {}
             }
@@ -2156,7 +2178,7 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/check-video-quality', upload.single('video'), async (req, res) => {
         try {
-            let { tolerance, language, model, frames, fileUrl } = req.body;
+            let { tolerance, language, model, frames, fileUrl, pathKey } = req.body;
             if (typeof frames === 'string') {
                 try { frames = JSON.parse(frames); } catch (_) {}
             }
@@ -2168,19 +2190,15 @@ app.get('/api/debug-uploads', (req, res) => {
             let videoPath = req.file ? req.file.path : null;
             let tempDownloadedPath: string | null = null;
 
-            if (!videoPath && fileUrl) {
+            if (!videoPath && (fileUrl || pathKey)) {
                 try {
-                    const resp = await fetch(fileUrl);
-                    if (resp.ok) {
-                        const buffer = Buffer.from(await resp.arrayBuffer());
-                        const parsedUrl = new URL(fileUrl, 'http://localhost');
-                        const ext = path.extname(parsedUrl.pathname) || '.mp4';
-                        tempDownloadedPath = path.join(uploadDir, `downloaded_${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`);
-                        fs.writeFileSync(tempDownloadedPath, buffer);
-                        videoPath = tempDownloadedPath;
-                    }
+                    const parsedUrl = new URL(fileUrl || 'http://localhost');
+                    const ext = path.extname(parsedUrl.pathname) || '.mp4';
+                    const dl = await downloadFileFromStorage(fileUrl || '', pathKey, ext);
+                    tempDownloadedPath = dl.localPath;
+                    videoPath = tempDownloadedPath;
                 } catch (dlErr: any) {
-                    console.warn('[check-video-quality] Failed to download video from fileUrl:', dlErr.message);
+                    console.warn('[check-video-quality] Failed to download video from storage/url:', dlErr.message);
                 }
             }
 
@@ -2443,11 +2461,24 @@ app.get('/api/debug-uploads', (req, res) => {
         const fileStream = fs.createWriteStream(localPath);
         const { finished } = await import('stream/promises');
 
-        if (pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
-            console.log(`[Storage] Downloading from S3 with key ${pathKey}...`);
+        let effectivePathKey = pathKey;
+        if (!effectivePathKey && fileUrl) {
+            try {
+                const u = new URL(fileUrl);
+                const p = u.pathname.replace(/^\/+/, '');
+                if (p.startsWith('eps-uploads/') || p.startsWith('metazostorage/') || p.startsWith('video-muted/')) {
+                    effectivePathKey = p;
+                } else if (process.env.S3_BUCKET_NAME && p.startsWith(process.env.S3_BUCKET_NAME + '/')) {
+                    effectivePathKey = p.substring(process.env.S3_BUCKET_NAME.length + 1);
+                }
+            } catch (_) {}
+        }
+
+        if (effectivePathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
+            console.log(`[Storage] Downloading from S3 with key ${effectivePathKey}...`);
             const command = new GetObjectCommand({
                 Bucket: process.env.S3_BUCKET_NAME,
-                Key: pathKey
+                Key: effectivePathKey
             });
             const response = await getS3Client().send(command);
             const stream = response.Body as any;
