@@ -2391,7 +2391,6 @@ var TRANSLATIONS = {
 var import_node_fs = __toESM(require("node:fs"), 1);
 var import_node_path = __toESM(require("node:path"), 1);
 var import_node_https = __toESM(require("node:https"), 1);
-var import_sharp = __toESM(require("sharp"), 1);
 var apiKeyStorage = new import_node_async_hooks.AsyncLocalStorage();
 var CACHE_FILE_PATH = import_node_path.default.join(process.cwd(), "qa_reports_cache.json");
 function loadQACache() {
@@ -2621,289 +2620,43 @@ function containsKeywordConnector(phrase) {
   const words = String(phrase || "").toLowerCase().trim().split(/\s+/).filter(Boolean);
   return words.some((word) => KEYWORD_CONNECTOR_WORDS.has(word));
 }
-var ADOBE_STOCK_IP_REPLACEMENTS = {
-  // Apple / iOS
-  "iphone": "smartphone",
-  "ipad": "tablet computer",
-  "macbook": "laptop",
-  "macbook pro": "laptop computer",
-  "macbook air": "ultraportable laptop",
-  "imac": "all-in-one desktop",
-  "airpods": "wireless earbuds",
-  "apple watch": "smartwatch",
-  "iwatch": "smartwatch",
-  "ipod": "digital audio player",
-  "apple": "consumer tech",
-  "ios": "mobile operating system",
-  "macos": "operating system",
-  "siri": "virtual assistant",
-  // Google / Android
-  "android": "mobile operating system",
-  "pixel phone": "smartphone",
-  "google pixel": "smartphone",
-  "google": "search engine technology",
-  "chromebook": "laptop",
-  "youtube": "video streaming platform",
-  "gmail": "electronic mail",
-  // Microsoft
-  "microsoft": "software technology",
-  "windows 11": "operating system",
-  "windows 10": "operating system",
-  "windows": "operating system",
-  "xbox": "gaming console",
-  "surface pro": "convertible tablet laptop",
-  // Sony / Gaming
-  "playstation 5": "gaming console",
-  "playstation": "gaming console",
-  "ps5": "gaming console",
-  "ps4": "gaming console",
-  "sony": "electronics brand",
-  "nintendo switch": "handheld console",
-  "nintendo": "video game company",
-  "game boy": "retro handheld console",
-  "walkman": "portable cassette player",
-  // Other Tech / Cameras
-  "samsung galaxy": "mobile device",
-  "samsung": "electronics brand",
-  "galaxy s23": "smartphone",
-  "galaxy s24": "smartphone",
-  "thinkpad": "business laptop",
-  "dell": "computer hardware",
-  "lenovo": "computer hardware",
-  "canon eos": "dslr camera",
-  "canon": "dslr camera",
-  "nikon z": "mirrorless camera",
-  "nikon": "dslr camera",
-  "sony alpha": "mirrorless camera",
-  "fujifilm": "digital camera",
-  "leica": "rangefinder camera",
-  "gopro": "action camera",
-  "dji mavic": "quadcopter drone",
-  "dji": "camera drone",
-  // Social Media & Web
-  "facebook": "social network",
-  "metaverse": "virtual reality world",
-  "meta": "technology platform",
-  "instagram": "photo sharing app",
-  "tiktok": "short form video app",
-  "whatsapp": "instant messaging app",
-  "twitter": "microblogging social network",
-  "snapchat": "multimedia messaging app",
-  "telegram": "cloud messaging app",
-  "discord": "communication app",
-  "netflix": "streaming service",
-  "spotify": "music streaming app",
-  "amazon": "online marketplace",
-  // AI Platforms
-  "midjourney": "generative artificial intelligence",
-  "dall-e": "synthetic image generation",
-  "dalle": "synthetic image generation",
-  "chatgpt": "conversational artificial intelligence",
-  "openai": "artificial intelligence",
-  "firefly": "generative visual model",
-  "stable diffusion": "diffusion model",
-  "stablediffusion": "diffusion model",
-  "flux": "generative visual model",
-  "piclumen": "generative visual software",
-  // Automotive
-  "ferrari": "luxury sports car",
-  "lamborghini": "supercar",
-  "porsche": "sports automobile",
-  "bmw": "luxury sedan",
-  "mercedes-benz": "luxury vehicle",
-  "mercedes": "luxury automobile",
-  "audi": "executive automobile",
-  "volkswagen": "compact vehicle",
-  "vw": "automobile",
-  "tesla cybertruck": "futuristic electric pickup",
-  "tesla": "electric vehicle",
-  "mustang": "muscle car",
-  "chevrolet corvette": "sports car",
-  "corvette": "sports car",
-  "harley-davidson": "cruiser motorcycle",
-  "harley": "motorcycle",
-  "vespa": "classic motor scooter",
-  "toyota": "automobile",
-  "honda": "passenger car",
-  // Sportswear & Fashion Brands
-  "air jordan": "basketball sneakers",
-  "jordan sneakers": "athletic sneakers",
-  "swoosh": "sportswear emblem",
-  "nike": "athletic footwear",
-  "adidas": "sportswear apparel",
-  "yeezy": "lifestyle sneakers",
-  "puma": "athletic trainers",
-  "reebok": "fitness sneakers",
-  "under armour": "performance activewear",
-  "new balance": "running sneakers",
-  "converse all star": "canvas sneakers",
-  "converse": "canvas sneakers",
-  "vans": "skateboarding shoes",
-  "gucci": "designer fashion",
-  "louis vuitton": "luxury leather goods",
-  "chanel": "luxury fashion house",
-  "prada": "high-end fashion",
-  "hermes": "luxury artisan leather",
-  "birkin bag": "designer tote handbag",
-  "birkin": "designer tote handbag",
-  "rolex": "luxury chronometer wristwatch",
-  "cartier": "fine jewelry timekeeper",
-  "dior": "couture fashion apparel",
-  "balenciaga": "avant-garde fashion",
-  "versace": "luxury designer wear",
-  "burberry": "designer fashion apparel",
-  "ray-ban": "classic sunglasses eyewear",
-  "rayban": "eyewear sunglasses",
-  "oakley": "sports eyewear",
-  "crocs": "foam clog footwear",
-  "levi's": "denim jeans trousers",
-  "levis": "denim jeans trousers",
-  // Food & Beverage
-  "coca-cola": "cola soft drink",
-  "cocacola": "carbonated cola beverage",
-  "coke": "soda pop drink",
-  "pepsi": "carbonated cola soft drink",
-  "starbucks": "specialty coffeehouse drink",
-  "mcdonald's": "fast food meal",
-  "mcdonalds": "fast food meal",
-  "burger king": "fast food hamburger",
-  "kfc": "crispy fried chicken",
-  "subway sandwich": "submarine sandwich meal",
-  "subway": "submarine sandwich meal",
-  "red bull": "caffeinated energy drink",
-  "monster energy": "energy beverage",
-  "nutella": "hazelnut cocoa spread",
-  "oreo": "chocolate sandwich cookie",
-  "kitkat": "chocolate wafer bar",
-  // Famous Artists (Strict Adobe Policy: Cannot use artist names or 'in the style of')
-  "vincent van gogh": "post-impressionist painting",
-  "van gogh": "post-impressionist art",
-  "pablo picasso": "cubist expressionist painting",
-  "picasso": "cubist modern art",
-  "andy warhol": "pop art silkscreen design",
-  "salvador dali": "surrealist dreamscape art",
-  "dali": "surrealist painting",
-  "leonardo da vinci": "classical renaissance art",
-  "da vinci": "renaissance fine art",
-  "michelangelo": "renaissance sculpture painting",
-  "claude monet": "impressionist landscape painting",
-  "monet": "impressionist oil artwork",
-  "rembrandt": "chiaroscuro baroque painting",
-  "frida kahlo": "symbolic magical realist portrait",
-  "gustav klimt": "symbolist golden decorative art",
-  "klimt": "symbolist decorative art",
-  "banksy": "stencil street graffiti art",
-  "basquiat": "neo-expressionist street art",
-  "keith haring": "pop graffiti line art",
-  // Fictional Characters & Franchises
-  "mickey mouse": "cheerful cartoon mouse mascot",
-  "donald duck": "whimsical cartoon duck character",
-  "disney": "fairytale family entertainment",
-  "marvel": "comic book superhero franchise",
-  "spider-man": "masked web-spinning superhero",
-  "spiderman": "masked superhero vigilante",
-  "iron man": "armored high-tech superhero",
-  "batman": "masked dark vigilante hero",
-  "superman": "caped heroic savior",
-  "joker": "comic book clown villain",
-  "star wars": "space fantasy adventure saga",
-  "darth vader": "dark galactic sci-fi warlord",
-  "yoda": "wise alien sci-fi master",
-  "baby yoda": "small green alien child",
-  "grogu": "small green alien creature",
-  "lightsaber": "glowing plasma energy sword",
-  "jedi": "cosmic energy warrior knight",
-  "pokemon": "fantasy creature",
-  "pikachu": "electric fantasy rodent creature",
-  "dragon ball": "martial arts anime adventure",
-  "goku": "martial arts anime warrior",
-  "naruto": "ninja anime hero character",
-  "barbie doll": "glamorous fashion doll figurine",
-  "barbie": "fashion doll figurine",
-  "lego blocks": "interlocking plastic toy bricks",
-  "lego": "plastic building blocks",
-  "transformers": "shape-shifting robotic beings",
-  "harry potter": "magical wizard student",
-  "hogwarts": "ancient gothic wizard academy",
-  // Restricted Landmarks
-  "hollywood sign": "iconic hillside billboard landmark",
-  "eiffel tower at night": "illuminated wrought-iron lattice tower",
-  "eiffel tower": "historic wrought-iron lattice tower",
-  "sydney opera house": "sculptural sail-roof performance venue",
-  "burj khalifa": "modern skyscraper spire",
-  "empire state building": "art deco skyscraper landmark",
-  "louvre pyramid": "glass geometric museum entrance",
-  "mount rushmore": "granite mountain monument",
-  // Agencies & Badges
-  "nasa": "aerospace research agency",
-  "fbi": "federal law enforcement investigation",
-  "cia": "intelligence agency",
-  "interpol": "international police organization",
-  "red cross": "humanitarian medical aid emblem",
-  "olympic games": "international athletic games",
-  "olympics": "international athletic championship"
-};
 var PROHIBITED_KEYWORDS_SET = /* @__PURE__ */ new Set([
-  // Brands & Companies
   "apple",
   "iphone",
   "ipad",
   "macbook",
   "mac",
-  "imac",
-  "airpods",
-  "iwatch",
-  "ipod",
   "ios",
-  "macos",
-  "siri",
-  "google",
   "android",
-  "pixel",
-  "chromebook",
-  "youtube",
-  "gmail",
   "microsoft",
   "windows",
   "xbox",
-  "surface",
-  "sony",
   "playstation",
-  "ps4",
-  "ps5",
-  "nintendo",
-  "switch",
-  "walkman",
+  "sony",
   "samsung",
-  "galaxy",
-  "dell",
-  "lenovo",
-  "thinkpad",
-  "canon",
-  "nikon",
-  "fujifilm",
-  "leica",
-  "gopro",
-  "dji",
-  "mavic",
+  "nike",
+  "adidas",
+  "gucci",
+  "rolex",
+  "cocacola",
+  "coca-cola",
+  "pepsi",
+  "starbucks",
+  "amazon",
+  "google",
   "meta",
   "facebook",
   "instagram",
-  "tiktok",
-  "whatsapp",
   "twitter",
-  "snapchat",
-  "telegram",
-  "discord",
+  "tiktok",
   "netflix",
-  "spotify",
-  "amazon",
-  "ebay",
+  "disney",
+  "marvel",
+  "canon",
+  "nikon",
   "adobe",
   "shutterstock",
   "getty",
-  "istock",
-  "freepik",
   "midjourney",
   "firefly",
   "stablediffusion",
@@ -2911,166 +2664,21 @@ var PROHIBITED_KEYWORDS_SET = /* @__PURE__ */ new Set([
   "llama",
   "chatgpt",
   "openai",
-  "flux",
-  "piclumen",
-  // Automotive
-  "ferrari",
-  "lamborghini",
-  "porsche",
-  "bmw",
-  "mercedes",
-  "audi",
-  "volkswagen",
-  "vw",
-  "tesla",
-  "cybertruck",
-  "mustang",
-  "corvette",
-  "chevrolet",
-  "ford",
-  "toyota",
-  "honda",
-  "harley",
-  "vespa",
-  // Fashion / Luxury
-  "nike",
-  "jordan",
-  "swoosh",
-  "adidas",
-  "yeezy",
-  "puma",
-  "reebok",
-  "converse",
-  "vans",
-  "gucci",
-  "prada",
-  "chanel",
-  "hermes",
-  "birkin",
-  "rolex",
-  "cartier",
-  "dior",
-  "balenciaga",
-  "versace",
-  "burberry",
-  "rayban",
-  "oakley",
-  "crocs",
-  "levis",
-  // Food
-  "cocacola",
-  "coca-cola",
-  "coke",
-  "pepsi",
-  "starbucks",
-  "mcdonalds",
-  "kfc",
-  "nutella",
-  "oreo",
-  "kitkat",
-  // Artists
-  "gogh",
-  "picasso",
-  "warhol",
-  "dali",
-  "vinci",
-  "michelangelo",
-  "monet",
-  "rembrandt",
-  "kahlo",
-  "klimt",
-  "banksy",
-  "basquiat",
-  "haring",
-  "murakami",
-  "kusama",
-  // Characters & Franchises
-  "disney",
-  "marvel",
-  "spiderman",
-  "batman",
-  "superman",
-  "joker",
-  "yoda",
-  "grogu",
-  "lightsaber",
-  "jedi",
-  "pokemon",
-  "pikachu",
-  "goku",
-  "naruto",
-  "barbie",
-  "lego",
-  "transformers",
-  "hogwarts",
-  // Restricted Sites & Agencies
-  "nasa",
-  "fbi",
-  "cia",
-  "interpol",
-  "olympics",
-  "olympic",
-  // Generic legal & spam terms
+  "instagram",
+  "youtube",
+  "whatsapp",
   "brand",
   "trademark",
   "logo",
   "copyright",
   "intellectual",
-  "property",
-  "high quality",
-  "high-quality",
-  "premium quality",
-  "4k",
-  "8k",
-  "trending",
-  "masterpiece",
-  "award winning",
-  "bestseller",
-  "photorealistic"
+  "property"
 ]);
-function sanitizeTextForAdobeStockIP(text) {
-  if (!text || typeof text !== "string") return "";
-  let result = text;
-  result = result.replace(/\b(?:in the style of|in style of|style of|inspired by|in the manner of|influenced by)\s+[a-zA-Z\s'-]+/gi, "in artistic aesthetic style");
-  const sortedKeys = Object.keys(ADOBE_STOCK_IP_REPLACEMENTS).sort((a, b) => b.length - a.length);
-  for (const term of sortedKeys) {
-    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp("\\b" + escaped + "\\b", "gi");
-    if (regex.test(result)) {
-      result = result.replace(regex, ADOBE_STOCK_IP_REPLACEMENTS[term]);
-    }
-  }
-  result = result.replace(/\ban\s+([bcdfghjklmnpqrstvwxyz])/gi, "a $1").replace(/\ba\s+([aeio])/gi, "an $1");
-  const spamBuzzwords = [
-    "high quality",
-    "high-quality",
-    "premium quality",
-    "ultra hd",
-    "4k",
-    "8k",
-    "trending on artstation",
-    "masterpiece",
-    "award winning",
-    "award-winning",
-    "bestseller",
-    "photorealistic"
-  ];
-  for (const buzz of spamBuzzwords) {
-    const escaped = buzz.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp("\\b" + escaped + "\\b", "gi");
-    result = result.replace(regex, "").replace(/\s+/g, " ").trim();
-  }
-  return result.replace(/\s+/g, " ").trim();
-}
 function isProhibitedKeyword(word) {
   const normalized = String(word || "").trim().toLowerCase();
   if (!normalized) return true;
-  if (PROHIBITED_KEYWORDS_SET.has(normalized)) return true;
-  if (Object.prototype.hasOwnProperty.call(ADOBE_STOCK_IP_REPLACEMENTS, normalized)) return true;
   const tokens = normalized.split(/\s+/).filter(Boolean);
-  if (tokens.some((token) => PROHIBITED_KEYWORDS_SET.has(token))) return true;
-  if (tokens.some((token) => Object.prototype.hasOwnProperty.call(ADOBE_STOCK_IP_REPLACEMENTS, token))) return true;
-  return false;
+  return tokens.some((token) => PROHIBITED_KEYWORDS_SET.has(token)) || PROHIBITED_KEYWORDS_SET.has(normalized);
 }
 function getHeuristicCategories(title, keywords) {
   const t = String(title || "").toLowerCase();
@@ -3253,7 +2861,6 @@ function ensureTitleLength(title, keywords, description, titleLength, customProm
   }
   cleanedTitle = deduplicatedWords.join(" ");
   cleanedTitle = cleanedTitle.replace(/,/g, "").replace(/\./g, "").replace(/\s+/g, " ").trim();
-  cleanedTitle = sanitizeTextForAdobeStockIP(cleanedTitle);
   if (cleanedTitle.length > 0) {
     cleanedTitle = cleanedTitle.charAt(0).toUpperCase() + cleanedTitle.slice(1);
   }
@@ -3271,15 +2878,15 @@ function ensureDescription(description, title, keywords) {
     if (title && title.trim().length > 5) {
       const cleanTitle = title.replace(/write a descriptive/gi, "").replace(/<generate/gi, "").replace(/highly descriptive/gi, "").trim();
       if (cleanTitle.length > 5) {
-        return sanitizeTextForAdobeStockIP(`Visual media showcasing ${cleanTitle.toLowerCase()}, designed for commercial, editorial, and creative projects.`);
+        return `Visual media showcasing ${cleanTitle.toLowerCase()}, designed for commercial, editorial, and creative projects.`;
       }
     }
     if (keywords && keywords.length >= 3) {
-      return sanitizeTextForAdobeStockIP(`Visual content featuring ${keywords.slice(0, 5).join(", ")}, suitable for advertising, marketing, and editorial purposes.`);
+      return `Visual content featuring ${keywords.slice(0, 5).join(", ")}, suitable for advertising, marketing, and editorial purposes.`;
     }
     return "Digital media asset designed for commercial, editorial, or creative projects.";
   }
-  let cleaned = sanitizeTextForAdobeStockIP(description.trim().replace(/\s+/g, " "));
+  const cleaned = description.trim().replace(/\s+/g, " ");
   if (cleaned.length <= 200) return cleaned;
   const truncated = cleaned.slice(0, 200);
   const lastSpace = truncated.lastIndexOf(" ");
@@ -3294,23 +2901,52 @@ var getTitleLengthRule = (titleLength) => {
   return "Title MUST be highly SEO optimized, front-loaded with primary commercial keywords, and have at least 10-15 descriptive words to ensure maximum visibility on stock platforms.";
 };
 var getLanguageName = (code) => {
+  if (!code) return "ENGLISH";
+  const clean = String(code).trim().toLowerCase();
   const map = {
     "en": "ENGLISH",
+    "english": "ENGLISH",
     "id": "INDONESIAN (BAHASA INDONESIA)",
+    "in": "INDONESIAN (BAHASA INDONESIA)",
+    "indonesian": "INDONESIAN (BAHASA INDONESIA)",
+    "bahasa": "INDONESIAN (BAHASA INDONESIA)",
+    "bahasa indonesia": "INDONESIAN (BAHASA INDONESIA)",
     "es": "SPANISH",
+    "spanish": "SPANISH",
+    "espa\xF1ol": "SPANISH",
+    "espanol": "SPANISH",
     "fr": "FRENCH",
+    "french": "FRENCH",
+    "fran\xE7ais": "FRENCH",
+    "francais": "FRENCH",
     "de": "GERMAN",
+    "german": "GERMAN",
+    "deutsch": "GERMAN",
     "it": "ITALIAN",
+    "italian": "ITALIAN",
+    "italiano": "ITALIAN",
     "pt": "PORTUGUESE",
+    "portuguese": "PORTUGUESE",
+    "portugu\xEAs": "PORTUGUESE",
+    "portugues": "PORTUGUESE",
     "ja": "JAPANESE",
+    "japanese": "JAPANESE",
     "ko": "KOREAN",
+    "korean": "KOREAN",
     "ru": "RUSSIAN",
+    "russian": "RUSSIAN",
     "th": "THAI",
+    "thai": "THAI",
     "tr": "TURKISH",
+    "turkish": "TURKISH",
     "nl": "DUTCH",
-    "pl": "POLISH"
+    "dutch": "DUTCH",
+    "pl": "POLISH",
+    "polish": "POLISH",
+    "zh": "CHINESE",
+    "chinese": "CHINESE"
   };
-  return map[code || "en"] || "ENGLISH";
+  return map[clean] || (clean.length > 2 ? clean.toUpperCase() : "ENGLISH");
 };
 function buildMasterKeywordCandidatePool(aiCandidates, visualFacts, targetCount) {
   const normalized = aiCandidates.map((k) => sanitizeForIndexing(k)).filter(Boolean).filter((k) => !isProhibitedKeyword(k));
@@ -3790,7 +3426,7 @@ var ADOBE_KEYWORD_FILLER = /* @__PURE__ */ new Set([
   "grey",
   "colorful"
 ]);
-var ADOBE_KEYWORD_IP_PATTERN = /\b(google|apple|iphone|ipad|macbook|ios|android|microsoft|windows|xbox|surface|sony|playstation|ps4|ps5|nintendo|switch|samsung|galaxy|dell|lenovo|canon|nikon|leica|gopro|dji|amazon|meta|facebook|instagram|tiktok|whatsapp|twitter|netflix|spotify|openai|chatgpt|midjourney|firefly|nike|adidas|jordan|yeezy|puma|reebok|gucci|prada|chanel|hermes|birkin|rolex|cartier|coca[\s-]?cola|pepsi|starbucks|mcdonalds|ferrari|lamborghini|porsche|bmw|mercedes|audi|tesla|cybertruck|disney|marvel|spiderman|batman|superman|star[\s-]?wars|pokemon|pikachu|barbie|lego|transformers|harry[\s-]?potter|van[\s-]?gogh|picasso|warhol|dali|nasa|fbi|cia|interpol|olympics)\b/i;
+var ADOBE_KEYWORD_IP_PATTERN = /\b(google|apple|microsoft|amazon|facebook|instagram|youtube|nike|adidas|coca[\s-]?cola|pepsi|disney|netflix|openai|tesla)\b/i;
 var ADOBE_KEYWORD_TECHNICAL_PATTERN = /\b(?:iso|f\/?\d+(?:\.\d+)?|1\/\d+s|\d+(?:\.\d+)?\s*mm|megapixel|megapixels|fps|4k|8k|hd|uhd|jpeg|jpg|png|raw|tiff|psd|ai|eps|svg|mb|gb)\b/i;
 var ADOBE_KEYWORD_NUMBER_PATTERN = /\b\d+(?:\.\d+)?\b/;
 function normalizeAdobeKeyword(value) {
@@ -4278,52 +3914,9 @@ var callGeminiWithRetry = async (modelName, contents, config, maxAttempts = 3) =
   }
   throw lastError;
 };
-var resolveImagePart = async (frame) => {
-  if (!frame || typeof frame !== "string") {
-    return {
-      inlineData: {
-        mimeType: "image/jpeg",
-        data: ""
-      }
-    };
-  }
-  const trimmed = frame.trim();
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    try {
-      const resp = await fetch(trimmed);
-      if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status} fetching ${trimmed}`);
-      }
-      const arrayBuffer = await resp.arrayBuffer();
-      const base64Data = Buffer.from(arrayBuffer).toString("base64");
-      const contentType = resp.headers.get("content-type") || "image/jpeg";
-      let mimeType = contentType.split(";")[0].trim().toLowerCase();
-      const validMimes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
-      if (!validMimes.includes(mimeType)) {
-        if (trimmed.endsWith(".png")) mimeType = "image/png";
-        else if (trimmed.endsWith(".webp")) mimeType = "image/webp";
-        else mimeType = "image/jpeg";
-      }
-      return {
-        inlineData: {
-          mimeType,
-          data: base64Data
-        }
-      };
-    } catch (err) {
-      console.warn(`[resolveImagePart] Error fetching remote image URL (${trimmed}):`, err.message || err);
-      return {
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: ""
-        }
-      };
-    }
-  }
-  return processFrameServer(trimmed);
-};
 var processFrameServer = (frame) => {
-  if (typeof frame !== "string" || !frame) {
+  if (typeof frame !== "string") {
+    console.error("[processFrameServer] Expected string, got:", typeof frame, frame);
     return {
       inlineData: {
         mimeType: "image/jpeg",
@@ -4331,30 +3924,35 @@ var processFrameServer = (frame) => {
       }
     };
   }
-  const trimmed = frame.trim();
-  if (trimmed.includes(";base64,")) {
-    const parts = trimmed.split(";base64,");
-    if (parts.length >= 2) {
-      const mimePart = parts[0];
-      const dataPart = parts[1];
-      const mimeSplit = mimePart.split(":");
-      let mimeType = mimeSplit.length > 1 ? mimeSplit[1].toLowerCase() : "image/jpeg";
-      const validMimes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
-      if (!validMimes.includes(mimeType)) {
-        mimeType = "image/jpeg";
+  if (!frame.includes(";base64,")) {
+    return {
+      inlineData: {
+        mimeType: "image/jpeg",
+        data: frame
       }
-      return {
-        inlineData: {
-          mimeType,
-          data: dataPart
-        }
-      };
-    }
+    };
+  }
+  const parts = frame.split(";base64,");
+  if (parts.length < 2) {
+    return {
+      inlineData: {
+        mimeType: "image/jpeg",
+        data: frame
+      }
+    };
+  }
+  const mimePart = parts[0];
+  const dataPart = parts[1];
+  const mimeSplit = mimePart.split(":");
+  let mimeType = mimeSplit.length > 1 ? mimeSplit[1] : "image/jpeg";
+  const validMimes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+  if (!validMimes.includes(mimeType)) {
+    mimeType = "image/jpeg";
   }
   return {
     inlineData: {
-      mimeType: "image/jpeg",
-      data: trimmed
+      mimeType,
+      data: dataPart
     }
   };
 };
@@ -4771,7 +4369,7 @@ async function applyMetadataGenKeywordLogic(options) {
   const source = Array.isArray(rawKeywords) ? rawKeywords : [];
   for (const raw of source) {
     if (typeof raw !== "string") continue;
-    const phrase = raw.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, " ");
+    const phrase = raw.toLowerCase().trim().replace(/[^\p{L}\p{N}\s-]/gu, "").replace(/\s+/g, " ");
     if (phrase.length <= 1) continue;
     if (!isProhibitedKeyword(phrase)) {
       cleaned.push(phrase);
@@ -4912,7 +4510,7 @@ var generateStockMetadata = async (frames, keywordCount, customPrompt = "", tool
   }
   const categoriesText = ADOBE_CATEGORIES.map((c) => `${c.id}: ${c.name}`).join(", ");
   const shutterstockCategoriesText = (toolType === "video" /* VIDEO */ ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(", ");
-  const imageParts = await Promise.all(frames.map((frame) => resolveImagePart(frame)));
+  const imageParts = frames.map((frame) => processFrameServer(frame));
   let exifInstruction = "";
   if (exifMetadata && Object.keys(exifMetadata).length > 0) {
     exifInstruction = `
@@ -4927,16 +4525,16 @@ Gunakan data teknis di atas hanya sebagai bukti sekunder untuk memvalidasi temua
   const requestedKeywordCount = parseInt(String(keywordCount), 10) || 25;
   const targetCount = Math.min(ADOBE_STOCK_MAX_KEYWORDS, Math.max(0, requestedKeywordCount));
   const directives = getToolTypeDirectives(toolType);
-  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
+  let keywordRuleSchemaDesc = `Generate microstock keywords strictly in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
   if (keywordMode === "single") {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
+    keywordRuleSchemaDesc = `Generate microstock keywords strictly in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `
 
 SINGLE-KEYWORD MODE OVERRIDE:
 Generate ONLY strictly single words (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. For example, use "coffee" and "cup" separately, never "coffee cup". NO colors. NO patterns.`;
   } else if (keywordMode === "multi") {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
+    keywordRuleSchemaDesc = `Generate microstock keywords strictly in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `
 
 MULTI-KEYWORD MODE OVERRIDE:
@@ -5099,27 +4697,21 @@ MANDATORY RULES FOR TARGET KEYWORDS & TITLE (STRICT PRIORITY):
   const mediaContext = mediaTypeContext;
   const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
-OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)} YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
+OUTPUT MUST BE STRICTLY IN ${getLanguageName(metadataLanguage)} for Title, Description, and Keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}${exifInstruction}
 
-CRITICAL RULES FOR TITLES, DESCRIPTIONS & KEYWORDS (MUST FOLLOW STRICTLY):
-1. ZERO-TOLERANCE INTELLECTUAL PROPERTY (IP) & TRADEMARK POLICY (Strict compliance with Adobe Stock Refusal Guidelines - https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
-   - NEVER use brand names, company names, trademarks, or identifiable product packaging (e.g., Apple, Nike, iPhone, MacBook, Samsung, Coca-Cola, Starbucks, Sony, Gucci, Rolex). Use purely generic descriptions (e.g., "smartphone", "laptop", "athletic shoes", "cola drink", "coffeehouse", "luxury wristwatch").
-   - NEVER name commercial products with distinctive designs (e.g., Barbie, Lego, Rubik's cube, Polaroid, Crocs, Vespa, Birkin bag). Use generic equivalents (e.g., "fashion doll", "plastic building blocks", "puzzle cube", "instant camera", "foam clogs", "motor scooter", "designer handbag").
-   - NEVER include trademarked terms that have become genericized (e.g., "Popsicle" -> "ice pop", "Velcro" -> "hook and loop fastener", "Band-Aid" -> "adhesive bandage", "Post-it" -> "sticky note", "Frisbee" -> "flying disc").
-   - NEVER name restricted landmarks, monuments, or modern architecture without property releases (e.g., Eiffel Tower at night, Hollywood sign, Sydney Opera House, Burj Khalifa, Empire State Building, Louvre Pyramid). Use generic descriptions (e.g., "illuminated historic wrought iron tower", "famous hillside sign", "coastal sail-roof opera house", "modern skyscraper").
-   - NEVER include government agencies, military seals, or protected emblems (e.g., NASA, FBI, CIA, Interpol, Red Cross emblem, Olympic rings).
+CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
+1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
 2. NO FAMOUS PEOPLE, ARTISTS, OR CHARACTERS (STRICT ADOBE STOCK CONTENT POLICY COMPLIANCE - Based on https://helpx.adobe.com/stock/contributor/submit-your-content/submit-generative-ai-content/content-policy-artist-names-real-known-people-fictional-characters.html):
    - You must NEVER submit or include names of real, known people (including celebrities, politicians, athletes, public figures, or historical figures) in the Title, Description, or Keywords.
-   - You must NEVER include names of fictional characters or franchises from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Pokemon, Pikachu, Harry Potter, Star Wars, Darth Vader, etc.).
-   - You must NEVER include specific artist names (living or deceased) whose work is protected by copyright in your titles, descriptions, or keywords (e.g., "in the style of Van Gogh", "drawn by Picasso", "inspired by Andy Warhol", "Banksy").
+   - You must NEVER include names of fictional characters from books, movies, comics, games, or television programs (e.g., Disney characters, Mickey Mouse, Batman, Spider-Man, Anime characters, Harry Potter, etc.).
+   - You must NEVER include specific artist names (living or deceased) whose work is protected by copyright in your titles, descriptions, or keywords (e.g., "in the style of Van Gogh", "drawn by Picasso", "inspired by Andy Warhol").
 3. NO CREATIVE WORKS: NEVER include names of movies, franchises, comics, art, design, or architecture.
-4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of" with respect to copyrighted artists. Style descriptions must remain completely generic (e.g., "post-impressionist painting", "cubist abstract artwork", "pop art silkscreen").
+4. NO "STYLE OF": NEVER use phrases like "in the style of", "inspired by", "influenced by", or "in the tradition of" with respect to copyrighted artists. Style descriptions must remain completely generic.
 5. RESPECTFUL LANGUAGE: ALWAYS use thoughtful, respectful, and inclusive language when describing people. NEVER use derogatory, insulting, or harmful language.
 6. NO MEDIA TYPE WORDS EXCEPT EXEMPTIONS: NEVER include words like "photography", "photo", "illustration", "vector", "image", "picture" in the Title or Keywords. Focus purely on the actual subject matter.
    ${directives.prohibitedExemptions}
-7. NO MARKETING BUZZWORDS OR QUALITY SPAM: NEVER include words like "high quality", "high-quality", "premium", "masterpiece", "trending", "wallpaper", "bestseller", "award winning", "4k", "8k", "photorealistic" in titles, descriptions, or keywords. Adobe Stock automatically rejects metadata containing spam quality claims.
 
 
 Rules for Titles:
@@ -5131,7 +4723,7 @@ Rules for Titles:
 5. DO NOT treat the title like a list of keywords. No commas separating words.
 
 Rules for Descriptions:
-1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
+1. Description MUST be a complete sentence (kalimat lengkap) written fluently in ${getLanguageName(metadataLanguage)}. Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
 2. SPECIFIC DESCRIPTION GUIDELINES FOR THE ASSET TYPE:
    ${directives.descriptionRule}
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
@@ -5163,7 +4755,7 @@ OUTPUT FORMAT:
   "keywords": ["keyword1", "keyword2", "keyword3"],
   "category_id": 1,
   "shutterstock_category_1": "Abstract",
-  "shutterstock_category_2": "Backgrounds/Textures"
+  "shutterstock_category_2": "Backgrounds/Textures",
       "dreamstime_category": "",
       "miricanvas_category": "",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
@@ -5233,7 +4825,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
   console.log("DRAFT BEFORE AUDIT", JSON.stringify(draftMetadata, null, 2));
   const validatorSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ${getLanguageName(metadataLanguage)} for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
+OUTPUT MUST BE STRICTLY IN ${getLanguageName(metadataLanguage)} for Title, Description, and Keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
 
@@ -5315,7 +4907,7 @@ OUTPUT FORMAT:
   "keywords": [],
   "category_id": 0,
   "shutterstock_category_1": "",
-  "shutterstock_category_2": ""
+  "shutterstock_category_2": "",
       "dreamstime_category": "",
       "miricanvas_category": "",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
@@ -5427,7 +5019,7 @@ OUTPUT FORMAT:
       recovery.title = String(recovery.title || recovery.name || recovery.headline || "Stock asset").trim();
       recovery.description = String(recovery.description || recovery.desc || recovery.caption || recovery.title || "Visual stock asset").trim();
       const rawKeywords = Array.isArray(recovery.keywords) ? recovery.keywords : [];
-      const safeKeywords = rawKeywords.filter((k) => typeof k === "string").map((k) => k.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, " ")).filter((k) => k.length > 1 && !isProhibitedKeyword(k));
+      const safeKeywords = rawKeywords.filter((k) => typeof k === "string").map((k) => k.toLowerCase().trim().replace(/[^\p{L}\p{N}\s-]/gu, "").replace(/\s+/g, " ")).filter((k) => k.length > 1 && !isProhibitedKeyword(k));
       try {
         recovery.keywords = await applyMetadataGenKeywordLogic({
           rawKeywords: safeKeywords,
@@ -5495,16 +5087,16 @@ var generateBatchStockMetadata = async (items, keywordCount, customPrompt = "", 
   const categoriesText = ADOBE_CATEGORIES.map((c) => `${c.id}: ${c.name}`).join(", ");
   const shutterstockCategoriesText = (toolType === "video" /* VIDEO */ ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(", ");
   const targetCount = parseInt(String(keywordCount), 10) || 50;
-  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
+  let keywordRuleSchemaDesc = `Generate microstock keywords strictly in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
   if (keywordMode === "single") {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
+    keywordRuleSchemaDesc = `Generate microstock keywords strictly in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `
 
 SINGLE-KEYWORD MODE OVERRIDE:
 Generate ONLY strictly single words (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. For example, use "coffee" and "cup" separately, never "coffee cup". NO colors. NO patterns.`;
   } else if (keywordMode === "multi") {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
+    keywordRuleSchemaDesc = `Generate microstock keywords strictly in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `
 
 MULTI-KEYWORD MODE OVERRIDE:
@@ -5521,7 +5113,7 @@ Generate a balanced mix of single words and 2-4 word natural search phrases. DO 
   const visionModelToUse = activeModel && activeModel.startsWith("gemini-") ? activeModel : fallbackGeminiModel;
   console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 \u2014 Gemini Vision (Visual Facts Detection)...`);
   for (let i = 0; i < items.length; i++) {
-    const imageParts = await Promise.all(items[i].frames.map((frame) => resolveImagePart(frame)));
+    const imageParts = items[i].frames.map((frame) => processFrameServer(frame));
     const mediaTypeContext = directives.mediaTypeContext;
     const visionSystemInstruction = `ROLE:
 You are a Visual Metadata Analyzer.
@@ -5619,14 +5211,6 @@ OUTPUT FORMAT:
     "colors": [],
     "actions": [],
     "composition": [],
-    "yolo_detected_objects": [
-      {
-        "name": "specific detected physical object, subject, product, tool, or animal",
-        "confidence": 0.95,
-        "box_2d": [100, 150, 850, 900],
-        "category": "subject | tool | product | animal | environment | vehicle"
-      }
-    ],
     "deeper_meaning_and_symbolism": "Describe the deeper artistic meaning, theme, emotional mood, symbolic message, or conceptual representation of the asset (makna, pesan artistik, atau analogi konsep dari aset tersebut) that represents its true value.",
     "semantic_category_analysis": {
       "adobe_id": 0,
@@ -5638,7 +5222,7 @@ OUTPUT FORMAT:
     }
   }
 }`;
-    const promptText = toolType === "video" /* VIDEO */ ? `Tugas (Asset #${i + 1}): Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform YOLO object grounding with confidence and bounding boxes. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]` : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform YOLO object detection and grounding on all visible physical objects with confidence and bounding boxes. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
+    const promptText = toolType === "video" /* VIDEO */ ? `Tugas (Asset #${i + 1}): Analyze the 3 video frames (Start, Middle, End). Detect every visible primary and secondary subject, background element, visible text, action, narrative flow, overall storyline (alur), composition, and color. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]` : `Tugas (Asset #${i + 1}): Detect every visible primary and secondary subject, background element, visible text, action, color, and composition. Perform visual semantic category analysis against official list. Return VISUAL_FACTS JSON only. [RunID: ${Date.now()}-${Math.random()}]`;
     let itemVisionInstruction = visionSystemInstruction;
     let itemExifDesc = "";
     if (items[i].exifMetadata && Object.keys(items[i].exifMetadata).length > 0) {
@@ -5702,7 +5286,7 @@ MANDATORY RULES FOR TARGET KEYWORDS & TITLE (STRICT PRIORITY):
 5. ASSET RELEVANCE: While following this instruction completely, ensure you still ground the description in the actual visual facts of the asset.` : "";
   const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
-OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
+OUTPUT MUST BE STRICTLY IN ${getLanguageName(metadataLanguage)} for Title, Description, and Keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
 
@@ -5765,7 +5349,7 @@ OUTPUT FORMAT:
       "keywords": [],
       "category_id": 1,
       "shutterstock_category_1": "Abstract",
-      "shutterstock_category_2": "Backgrounds/Textures"
+      "shutterstock_category_2": "Backgrounds/Textures",
       "dreamstime_category": "",
       "miricanvas_category": "",
       "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
@@ -5835,7 +5419,7 @@ OUTPUT FORMAT:
   console.log("DRAFT BEFORE AUDIT", JSON.stringify(draftMetadataArray, null, 2));
   const validatorSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ${getLanguageName(metadataLanguage)} for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
+OUTPUT MUST BE STRICTLY IN ${getLanguageName(metadataLanguage)} for Title, Description, and Keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
 
@@ -5920,7 +5504,7 @@ OUTPUT FORMAT:
       "keywords": [],
       "category_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": ""
+      "shutterstock_category_2": "",
       "dreamstime_category": "",
       "miricanvas_category": "",
       "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
@@ -6037,14 +5621,6 @@ OUTPUT FORMAT:
         metadata.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : validShutterstockCats.find((cat) => cat !== metadata.shutterstock_category_1) || "Backgrounds/Textures";
       }
       metadata.category_reason = metadata.category_reason || assetVisualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
-      if (Array.isArray(assetVisualFacts?.yolo_detected_objects) && assetVisualFacts.yolo_detected_objects.length > 0) {
-        metadata.yolo_detected_objects = assetVisualFacts.yolo_detected_objects.map((y) => ({
-          label: y.name || y.label || "object",
-          confidence: Number(y.confidence) || 0.9,
-          box_2d: Array.isArray(y.box_2d) ? y.box_2d : void 0,
-          category: y.category || "subject"
-        }));
-      }
       const targetId = items[index] ? items[index].id : items[0]?.id || "unknown";
       return { id: targetId, metadata };
     }));
@@ -6178,41 +5754,34 @@ var generateOptimizedPrompt = async (options) => {
     "Voxel Art": ' - Focus on 3D pixel art constructed from volumetric cubes (voxels). Emphasize a blocky, retro video game aesthetic similar to Minecraft, with low-resolution 3D geometry but modern high-quality lighting (raytracing, global illumination). Use sharp pixelated textures, crisp cube edges, and a rigid grid-based structure. CRITICAL: Do not use the word "Minecraft" or specific game IP; instead use "voxel art", "3D blocky pixel art", or "cubical world". AVOID: Realism, photorealistic rendering, real-world natural aesthetics, or smooth continuous surfaces.',
     "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject\u2014focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.',
     "Corporate Technology Concept": " - Focus on realistic photography and business themes combined with holographic UI overlays such as floating icons, glowing digital lights, and advanced tech elements. Emphasize a photorealistic corporate environment infused with futuristic, high-tech digital interfaces and data streams.",
-    "Graphic Design": `You are an expert Commercial Graphic Designer specializing in high-demand advertising and branding assets\u2014banners, flyers, posters, social media promos, commercial templates, and marketing materials\u2014crafted using professional design tools like Adobe Illustrator, Adobe Photoshop, and CorelDRAW.
+    "Graphic Design": `You are an elite Commercial Art Director and Graphic Designer creating premium, high-selling commercial assets tailored for Adobe Stock, advertising campaigns, and professional marketing media.
 
-When generating or refining prompts for the "Graphic Design" style, you MUST strictly follow these rules:
+When generating prompts for the "Graphic Design" style, you MUST embody the TRUE, AUTHENTIC characteristics of professional graphic design\u2014NOT generic templates, and NOT mere flat vector clip-art:
 
-1. CORE PURPOSE & VISUAL IDENTITY (CRITICAL)
-   - Focus purely on COMMERCIAL GRAPHIC DESIGN output: promotional banners, advertising flyers, sale posters, event backdrops, social media graphics, branding templates, and marketing collateral.
-   - The output MUST look like it was made in Adobe Illustrator, Photoshop, or CorelDRAW \u2014 flat vector composition, geometric shapes, clean bold layouts, creative typography placeholders, and vibrant commercial color palettes.
-   - STRICTLY ZERO REALISM. NO photographs, NO photorealistic rendering, NO real-world textures, NO natural landscapes, NO 3D CGI, NO human faces or realistic skin.
-   - The design must be 100% VECTOR-BASED and SHAPE-BASED: think flat design icons, geometric abstract compositions, isometric shapes, overlapping semi-transparent polygons, bold line art, halftone patterns, and stylized graphic elements.
+1. AUTHENTIC GRAPHIC DESIGN IDENTITY (TRUE COMMERCIAL DESIGN):
+   - Graphic Design is the art of VISUAL COMMUNICATION, STRUCTURED LAYOUT, and VISUAL HIERARCHY.
+   - It is NOT just flat 2D vector icons. Graphic design artfully unites hero subjects (commercial products, human models, food, technology, fashion, or stylized illustrations) with intentional graphic design layout systems: geometric framing, grid structures, color blocking, duotone or bold tonal treatments, and designated negative copy space.
+   - The result must look like a finished, high-production commercial advertisement, editorial spread, marketing key visual, or promotional poster created by a top-tier design agency.
 
-2. DESIGN TOOL AESTHETIC (IMPORTANT)
-   - Emulate professional design software output: clean vector paths, flat solid fills, smooth gradient meshes, precise geometric alignment, drop shadows, blending modes, and layer-style effects.
-   - Style references: Adobe Illustrator vector artwork, Photoshop poster compositions, CorelDRAW banner layouts, Canva template aesthetics, Figma UI design vibes.
+2. ANTI-TEMPLATE & ANTI-COOKIE-CUTTER MANDATE (CRITICAL FOR ADOBE STOCK):
+   - DO NOT write repetitive, formulaic prompts that feel like lazy generic templates (e.g., repeatedly tacking on "modern banner template with geometric shapes and copy space").
+   - Every single prompt variation MUST feature a completely DIFFERENT, CREATIVE, and ART-DIRECTED visual concept:
+     * Shift the layout system dramatically across variations (e.g., Swiss grid system vs. Bauhaus diagonal tension vs. contemporary editorial framing vs. neo-brutalist color blocking vs. minimalist luxury staging).
+     * Shift the color palette entirely (e.g., high-contrast cobalt and amber duotone vs. warm terracotta editorial neutral vs. sleek corporate navy and electric cyan vs. energetic pop-art saturated contrast).
+     * Vary the graphic elements naturally (e.g., subtle halftone texture accents, delicate hairline grid guides, bold drop-shadow planes, circular framing vignettes, layered paper-cut edges).
 
-3. STRUCTURED LAYOUT & VISUAL HIERARCHY
-   - Use bold grid-based compositions, asymmetrical dynamic layouts, or centered poster-style structures.
-   - Include visual flow elements: sweeping curves, diagonal dividers, overlapping shape clusters, ribbon banners, badge frames, and corner ornaments.
-   - The composition must look like a finished commercial design ready for a client presentation\u2014not an art piece.
+3. SUBJECT AS COMMERCIAL HERO:
+   - The core subject "${subject}" must be the clear, unmistakable HERO of the composition.
+   - Treat the subject with commercial finesse: studio-lit commercial presentation, sharp cutout contour, duotone color grading, or stylized graphic treatment that interacts organically with the layout's geometric planes and framing elements.
 
-4. MANDATORY COPY SPACE & NO TEXT (CRITICAL)
-   - ALWAYS reserve generous, clean negative space (empty areas) for headlines, taglines, logos, and CTAs.
-   - NEVER generate readable text, letters, or words. Use abstract placeholder bars, geometric text blocks, or curved ribbon shapes instead.
+4. ADOBE STOCK COMPLIANCE: MANDATORY CLEAN COPY SPACE & ZERO GIBBERISH TEXT:
+   - Adobe Stock reviewers immediately reject generative AI designs that contain garbled, illegible pseudo-letters or broken text.
+   - STRICT BAN: NEVER generate readable words, random letters, fake typography, or AI gibberish text.
+   - MANDATORY FUNCTIONAL COPY SPACE: Every prompt MUST integrate generous, clean, uncluttered negative space / copy space naturally into the composition (e.g., "spacious clean negative copy space on the upper right for headline typography", "uncluttered layout with broad negative space designed for commercial text overlay", "generous blank area framed by minimalist geometric dividing lines"). Stock buyers need this pristine space to insert their own client text.
 
-5. GRAPHIC ELEMENTS & AESTHETICS
-   - Primary visual language: bold geometric shapes (circles, triangles, hexagons, abstract blobs), smooth gradient meshes, isometric cubes, overlapping translucent layers, dynamic diagonal slashes, dotted halftone textures, sleek line art dividers, and ornamental frame borders.
-   - Color palette: vibrant commercial advertising colors \u2014 electric blue, hot pink, neon green, golden yellow, deep purple, teal, coral orange, with striking duotone or triadic color schemes.
-   - The design should be RICH and DETAILED but purely artificial \u2014 like a premium stock vector template from Freepik or Shutterstock.
-
-6. KEYWORDS TO INJECT
-   - Integrate terms like: "flat vector graphic design, commercial advertising poster, promotional banner template, geometric abstract composition, bold vibrant colors, clean copy space, Adobe Illustrator style, non-realistic vector art, isometric shapes, halftone pattern, gradient mesh, corporate branding layout, purely digital graphic art, shape-based design, NO PHOTOGRAPHY."
-
-7. STRICT PROHIBITIONS
-   - NO photographs, NO realism, NO 3D CGI renders, NO natural environments, NO human subjects, NO realistic textures.
-   - NO minimalism \u2014 the design must be visually rich, bold, and commercially impactful.
-   - This is PURE GRAPHIC DESIGN \u2014 flat, vector, shape-based, digital, commercial.`
+5. COMMERCIAL UTILITY & MARKET DEMAND:
+   - Craft assets that commercial designers actually buy on Adobe Stock: advertising key visuals, seasonal promo posters, social media campaign headers, product launch visuals, event announcements, and corporate marketing layouts.
+   - Under no circumstances include trademarked logos, brand names, or copyrighted character IPs. Keep all concepts generic, universal, and commercially viable.`
   };
   let currentDirective = styleSpecificDirectives[styleCategory] || "";
   if (styleCategory === "Dark Horror Aesthetic") {
@@ -6351,7 +5920,11 @@ Rules for the Generated Prompts:
         * Variasikan skenario kehidupan nyata: persiapan, aksi penggunaan, momen candid, interaksi, detail bahan baku.
         * Variasikan framing & pencahayaan alami: macro close-up, eye-level portrait, overhead knolling flat lay, wide environmental landscape, golden hour, morning window light, clean softbox studio.
 
-      \u2500 FOR VECTOR & GRAPHIC DESIGN STYLES (Vector Art, Graphic Design, Flat Icon, Sticker, Line Art):
+      \u2500 FOR GRAPHIC DESIGN (Commercial Advertising, Poster, Promo Banner, Editorial Layout):
+        * Variasikan layout komersial & hierarki visual: Swiss grid poster dengan asymmetric negative space, promotional banner dengan floating geometric frames & badge accents, contemporary editorial layout dengan elegant framing & clean copy space, Bauhaus-inspired dynamic diagonal layout, neo-brutalist marketing visual dengan bold color blocking, minimalist luxury product staging dengan geometric pedestals.
+        * Variasikan perlakuan desain & copy space: subjek sebagai hero komersial (studio cutout, duotone grading, graphic framing) dipadukan dengan ruang kosong (copy space) yang luas, bersih, dan bebas teks untuk penempatan tipografi pembeli stok. HINDARI formula template yang monoton.
+
+      \u2500 FOR VECTOR & FLAT DESIGN STYLES (Vector Art, Flat Icon, Sticker, Line Art):
         * Variasikan layout grafis & hierarki desain: layout banner promosi horizontal, kartu poster vertikal dengan negative space, komposisi emblem/lencana terpusat, tata letak infografis modular, susunan siluet dinamis.
         * Variasikan palet warna & teknik vektor: palet warna duotone kontras tinggi, palet pastel kontemporer, kombinasi monokromatik elegan, ketebalan garis (stroke weight), dan bentuk lengkungan geometris/organik.
 
@@ -6371,7 +5944,8 @@ Rules for the Generated Prompts:
       - Every single prompt variation MUST begin with "${effectiveStyleCategory}" as its stylistic prefix.
       - NEVER contaminate or mix the vocabulary of the chosen style with another style.
       - \u{1F4F8} PHOTOGRAPHIC (Photorealistic, Cinematic, Vintage Photography): Use ONLY camera lenses (50mm, 85mm, 35mm), lighting setups, aperture (f/1.8, f/2.8), and natural textures. FORBIDDEN: "vector", "3D render", "illustration", "flat art", "drawing", "CGI".
-      - \u{1F3A8} VECTOR & FLAT DESIGN (Vector Art, Flat Icon, Line Art, Sticker Illustration, Graphic Design): Use ONLY clean vector paths, flat solid colors, sharp outlines, and 2D vector shapes. FORBIDDEN: "shot on", "aperture", "DSLR", "realistic skin/eyes", "photograph", "3D render", "unreal engine".
+      - \u{1F4D0} COMMERCIAL GRAPHIC DESIGN (Graphic Design): Emphasize structured commercial layouts, visual hierarchy, intentional graphic framing, color blocking, and generous negative copy space for typography. The subject is presented as an art-directed commercial hero asset. FORBIDDEN: readable gibberish text/letters, repetitive template formulas, messy unorganized snapshots, lack of layout structure.
+      - \u{1F3A8} VECTOR & FLAT DESIGN (Vector Art, Flat Icon, Line Art, Sticker Illustration): Use ONLY clean vector paths, flat solid colors, sharp outlines, and 2D vector shapes. FORBIDDEN: "shot on", "aperture", "DSLR", "realistic skin/eyes", "photograph", "3D render", "unreal engine".
       - \u{1F9F1} 3D / CGI & RENDER (3D Render, 3D CGI, Lowpoly, Voxel Art, Isometric): Use ONLY 3D geometry, polygon meshes, PBR materials, global illumination, and ray-tracing. FORBIDDEN: "2D flat drawing", "vector path", "real physical photograph".
       - \u{1F58C}\uFE0F TRADITIONAL FINE ART (Oil Painting, Watercolor, HandDrawn Sketch, Paper Cut, Embroidery, Origami): Use ONLY tactile physical medium characteristics (brushstrokes, impasto pigments, paper grain, stitched thread, folded paper). FORBIDDEN: "digital 3D CGI", "DSLR camera lens", "vector shapes".
       - \u{1F3AE} STYLIZED & TOY (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style, Claymation): Use ONLY the specific medium vocabulary (cel-shaded animation, 8-bit pixels, interlocking plastic brick studs, hand-molded clay). FORBIDDEN: "realistic photo", "photorealistic".
@@ -6459,7 +6033,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     },
     required: ["prompts", "negativePrompt", "styleExplanation"]
   };
-  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview", "gemini-2.5-flash"];
+  const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-flash-latest"];
   let lastError = null;
   const safetySettings = [
     { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
@@ -6470,8 +6044,13 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
   ];
   const visualParts = [];
   if (referenceImages && referenceImages.length > 0) {
-    const resolvedParts = await Promise.all(referenceImages.map((img) => resolveImagePart(img)));
-    visualParts.push(...resolvedParts);
+    referenceImages.forEach((img) => {
+      try {
+        visualParts.push(processFrameServer(img));
+      } catch (e) {
+        console.warn("[generateOptimizedPrompt] Failed processing reference image:", e);
+      }
+    });
   }
   let instructionText = `Expand the concept into ${count} unique immersive prompt variations of type "${styleCategory}" strictly featuring the exact core subject: "${subject}".
 
@@ -6603,16 +6182,16 @@ CRITICAL DIRECTIVES:
   let resolvedSubject = translatedWords.join(" ");
   const styleFallbackMap = {
     "Graphic Design": [
-      "flat vector graphic design, Adobe Illustrator style composition, bold geometric shapes, clean commercial layout, vibrant duotone gradient, no realism",
-      "promotional banner template, isometric abstract geometry, halftone dot pattern, dynamic diagonal slashes, smooth gradient mesh, purely digital art",
-      "commercial advertising poster design, overlapping translucent polygons, bold line art elements, ornate frame border, striking color contrast, clean copy space",
-      "CorelDRAW banner style, geometric abstract composition, ribbon badge placeholder, modern flat vector shapes, electric blue and hot pink palette, no photography",
-      "social media promo template, layered geometric shapes, smooth drop shadows, sleek vector paths, golden yellow and deep purple gradient, shape-based design",
-      "Adobe Photoshop poster composition, asymmetrical dynamic layout, gradient mesh background, abstract blob elements, neon green and teal accents, purely digital",
-      "corporate branding layout, isometric cube cluster, sweeping curve dividers, bold triadic color scheme, clean negative space, professional design tool aesthetic",
-      "event backdrop banner design, overlapping circles and triangles, smooth blending modes, halftone texture overlay, coral orange and electric blue duotone",
-      "marketing flyer template, geometric frame border, abstract placeholder text bars, vibrant commercial colors, sleek layer-style effects, zero realism",
-      "stock vector template style, flat art composition, dynamic shape cluster, clean typography placeholder, rich gradient background, purely graphic art"
+      "commercial advertising poster layout, bold hero subject, geometric framing accents, Swiss style grid alignment, high-contrast duotone palette, generous clean copy space for typography, professional graphic design composition",
+      "promotional banner visual, dynamic diagonal color blocking, floating graphic badge accents, modern commercial layout, vibrant advertising color harmony, structured negative space for headline text overlay",
+      "contemporary editorial layout, elegant minimalist framing, subtle geometric borders, sophisticated neutral color palette, refined commercial aesthetic, ample pristine copy space for text",
+      "Bauhaus-inspired commercial design, striking circular and rectangular geometric elements, bold primary color contrast, dynamic visual hierarchy, structured composition with clean text copy space",
+      "modern social media marketing visual, vibrant gradient backdrop, sleek card overlay with soft drop shadow, bold commercial styling, spacious blank copy space for promotional copy",
+      "neo-brutalist advertising poster, high-contrast saturated color blocking, bold graphic dividing lines, playful sticker accent framing, dynamic commercial layout with designated copy space",
+      "corporate tech promo banner, sleek deep navy and cyan duotone gradient, subtle futuristic geometric grid lines, polished commercial layout, wide empty copy space for headline and logo",
+      "commercial product showcase layout, centered hero presentation on circular graphic pedestal, abstract geometric shape accents, premium studio lighting, generous copy space for branding typography",
+      "event marketing flyer composition, dynamic overlapping translucent shape clusters, subtle halftone texture accents, energetic complementary colors, uncluttered layout with designated text area",
+      "minimalist luxury commercial poster, clean asymmetric composition, fine hairline borders, sophisticated monochrome with warm metallic gold accents, generous negative copy space for brand title"
     ],
     "Cinematic": [
       "anamorphic lens, volumetric lighting, hyper-realistic cinematic key shot, intense atmospheric depth, cinematic lighting",
@@ -7002,7 +6581,7 @@ CRITICAL DIRECTIVES:
 var analyzeImageToPrompt = async (image, styleCategory = "Default", variation = 5, model) => {
   const store = apiKeyStorage.getStore();
   const provider = store && store.provider || "gemini";
-  const count = Math.min(Math.max(variation, 1), 100);
+  const count = Math.min(Math.max(variation, 5), 15);
   let styleHandlingInstruction = "";
   if (styleCategory === "Default" || styleCategory === "Original Style" || styleCategory === "Match Image") {
     styleHandlingInstruction = `3. STYLE PRESERVATION (DEFAULT / MATCH ORIGINAL IMAGE STYLE):
@@ -7013,10 +6592,12 @@ var analyzeImageToPrompt = async (image, styleCategory = "Default", variation = 
    - Convert the aesthetic completely into a clean, modern 2D Flat Vector Illustration style.
    - Emphasize crisp vector outlines, flat harmonious color palettes, clean geometric and organic shapes, minimalist shading, generous clean copy space, and aesthetic editorial illustration qualities typical of professional flat vector art.`;
   } else if (styleCategory === "Graphic Design") {
-    styleHandlingInstruction = `3. STYLE TRANSLATION TO COMMERCIAL GRAPHIC DESIGN (ZERO TYPOGRAPHY RULE):
-   - Convert the aesthetic completely into a professional commercial advertising layout, banner template, or poster composition crafted in Adobe Illustrator/Photoshop style with geometric shapes, flat vector elements, and vibrant commercial color palettes.
-   - STRICT BAN ON ALL TYPOGRAPHY & TEXT: You are STRICTLY FORBIDDEN from including any readable text, fake words, letters, gibberish characters, placeholder fonts, or printed typography in the prompt.
-   - MANDATORY GENEROUS COPY SPACE: Every single prompt variation MUST explicitly feature spacious, clean, uncluttered empty copy space / negative space (e.g., "spacious clean negative copy space on the right, blank layout area for text overlay, no typography, no letters, purely graphic background"). This makes the asset 100% editable and commercially sellable on microstock platforms.`;
+    styleHandlingInstruction = `3. STYLE TRANSLATION TO AUTHENTIC COMMERCIAL GRAPHIC DESIGN (ADOBE STOCK COMPLIANT):
+   - Transform the visual concept into a high-converting commercial advertising poster, promotional banner, or modern editorial graphic layout.
+   - Emphasize visual hierarchy, structured layout frameworks (such as Swiss grid, Bauhaus diagonal, modern minimalist framing, or neo-brutalist blocking), geometric framing accents, color theory harmonies, and intentional art direction. Avoid generic repetitive template formulas.
+   - The primary subject from the image becomes the commercial hero focal point, integrated with graphic layout elements such as color blocks, framing lines, drop shadows, or floating graphic accents.
+   - STRICT ZERO GIBBERISH TEXT RULE: Never generate readable words, letters, pseudo-text, or garbled fonts.
+   - MANDATORY GENEROUS COPY SPACE: Every single prompt variation MUST feature spacious, clean, uncluttered negative space / copy space engineered for client typography overlay (e.g., "generous clean copy space for typography, blank layout area for headline overlay, no text, no letters, commercially ready graphic design composition").`;
   } else {
     styleHandlingInstruction = `3. STYLE TRANSLATION TO "${styleCategory}":
    - Convert the aesthetic completely into the domain of "${styleCategory}" (e.g. 3D Render uses UE5/PBR, Vector uses flat 2D paths, Watercolor uses paint washes, Photorealistic uses natural camera specs).`;
@@ -7057,122 +6638,42 @@ CRITICAL OUTPUT FORMAT:
     },
     required: ["prompts", "description"]
   };
-  const imagePart = await resolveImagePart(image);
-  const promptText = `Reverse-engineer this image and generate ${count} unique, varied sister prompt variations matching style: "${styleCategory}".`;
-  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview", "gemini-2.5-flash"];
+  const imagePart = processFrameServer(image);
+  const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash"];
   let lastError;
   let responseText = "";
-  const dynamicMaxTokens = count > 50 ? 8192 : count > 20 ? 6144 : count > 10 ? 4096 : 2048;
-  if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const activeModel = model || PROVIDER_DEFAULT_MODELS[provider] || "gpt-4o";
+  const modelsToTryList = model && model.startsWith("gemini") ? [model, ...modelsToTry] : modelsToTry;
+  for (const modelName of modelsToTryList) {
     try {
-      responseText = await callOpenAICompatibleWithRetry({
+      const response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: `Reverse-engineer this image and generate ${count} unique, varied sister prompt variations matching style: "${styleCategory}".` }] }, {
         systemInstruction,
-        contents: [imagePart, { text: promptText }],
         responseMimeType: "application/json",
         responseSchema,
-        config: { temperature: 0.7, maxOutputTokens: dynamicMaxTokens },
-        model: activeModel
+        temperature: 0.65
       });
+      responseText = response.text || "{}";
+      break;
     } catch (err) {
       lastError = err;
-      console.warn(`[analyzeImageToPrompt] Non-Gemini failed with model ${activeModel}:`, err.message || err);
-    }
-  } else {
-    const modelsToTryList = model && model.startsWith("gemini") ? [model, ...modelsToTry] : modelsToTry;
-    for (const modelName of modelsToTryList) {
-      try {
-        const response = await callGeminiWithRetry(modelName, { parts: [imagePart, { text: promptText }] }, {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema,
-          temperature: 0.7,
-          maxOutputTokens: dynamicMaxTokens
-        });
-        responseText = response.text || "{}";
-        break;
-      } catch (err) {
-        lastError = err;
-        console.warn(`[analyzeImageToPrompt] Failed with ${modelName}:`, err.message || err);
-        if (err.message && err.message.includes("API_KEY")) throw err;
-      }
+      console.warn(`[analyzeImageToPrompt] Failed with ${modelName}:`, err.message || err);
+      if (err.message && err.message.includes("API_KEY")) throw err;
     }
   }
-  const ensureExactVariationCount = (inputPrompts) => {
-    let list = (inputPrompts || []).filter((p) => typeof p === "string" && p.trim().length > 0);
-    if (list.length === 0) {
-      list = [`${styleCategory !== "Default" ? styleCategory + " style, " : ""}commercial stock visual asset reverse-engineered from visual subject, clean negative space`];
-    }
-    if (list.length < count) {
-      const diversityModifiers = [
-        "macro close-up detail focus, shallow depth of field, crisp textures",
-        "eye-level candid perspective, natural authentic ambient lighting",
-        "three-quarter dynamic portrait framing, balanced negative copy space",
-        "overhead flat lay knolling perspective, organized aesthetic layout",
-        "wide-angle environmental establishing scene, contextual depth",
-        "dramatic low-angle heroic viewpoint, imposing visual presence",
-        "high-angle bird's-eye composition, clean geometric background",
-        "soft directional side-lighting, elegant shadow gradients",
-        "golden hour warm sunlight illumination, rich atmospheric glow",
-        "clean commercial studio lighting setup, tack-sharp focal detail",
-        "subtle morning window backlight, gentle rim lighting with soft bokeh",
-        "minimalist off-center composition with expansive clean copy space",
-        "asymmetrical editorial framing, modern advertising aesthetic",
-        "cinematic shallow depth-of-field, smooth creamy background blur",
-        "rich textural focus, organic tactile surfaces and fine micro-details",
-        "cool twilight atmospheric glow, moody cinematic depth",
-        "bright diffused daylight, soft natural shadows, commercial grade",
-        "dynamic diagonal leading lines, compelling visual balance",
-        "curated color harmony, vibrant highlights and controlled contrast",
-        "panoramic scenic perspective, expansive commercial layout"
-      ];
-      const basePool = [...list];
-      let modIdx = 0;
-      while (list.length < count) {
-        const base = basePool[list.length % basePool.length];
-        const mod = diversityModifiers[modIdx % diversityModifiers.length];
-        const cleanBase = base.trim().replace(/[.,;]+$/, "");
-        list.push(`${cleanBase}, ${mod}`);
-        modIdx++;
-      }
-    } else if (list.length > count) {
-      list = list.slice(0, count);
-    }
-    return list;
-  };
   if (!responseText) {
-    console.warn("analyzeImageToPrompt fallback triggered:", lastError?.message);
-    const fallbackPrompts = [];
-    for (let i = 0; i < count; i++) {
-      fallbackPrompts.push(`${styleCategory !== "Default" ? styleCategory + " style, " : ""}high-end commercial stock asset reverse-engineered from visual subject, clean composition, professional lighting, copy space (variation #${i + 1})`);
-    }
-    return {
-      prompts: ensureExactVariationCount(fallbackPrompts),
-      prompt: fallbackPrompts[0],
-      description: "Analisis visual dan ekstraksi variasi prompt selesai."
-    };
+    console.warn("analyzeImageToPrompt bypassed:", lastError?.message);
+    throw lastError || new Error("Failed to analyze image. Please try again.");
   }
   try {
     const data = JSON.parse(extractJSON(responseText));
-    const rawList = Array.isArray(data.prompts) && data.prompts.length > 0 ? data.prompts : data.prompt ? [data.prompt] : [`${styleCategory} style representation of visual subject`];
-    const finalList = ensureExactVariationCount(rawList);
+    const promptList = Array.isArray(data.prompts) && data.prompts.length > 0 ? data.prompts : data.prompt ? [data.prompt] : [`${styleCategory} style representation of visual subject`];
     return {
-      prompts: finalList,
-      prompt: finalList[0] || "",
-      description: data.description || `Analisis visual selesai, berhasil mengekstrak ${finalList.length} variasi prompt.`
+      prompts: promptList,
+      prompt: promptList[0] || "",
+      description: data.description || "Analisis visual dan ekstraksi variasi prompt selesai."
     };
   } catch (error) {
-    console.warn("Image Analysis Parse Error:", error, responseText);
-    const fallbackPrompts = [];
-    for (let i = 0; i < count; i++) {
-      fallbackPrompts.push(`${styleCategory !== "Default" ? styleCategory + " style, " : ""}commercial stock visual asset, exquisite lighting, clean negative space (variation #${i + 1})`);
-    }
-    const finalList = ensureExactVariationCount(fallbackPrompts);
-    return {
-      prompts: finalList,
-      prompt: finalList[0],
-      description: `Analisis visual selesai, berhasil mengekstrak ${finalList.length} variasi prompt.`
-    };
+    console.warn("Gemini Parse Error:", error, responseText);
+    throw new Error("Failed to parse AI response. Please try again.");
   }
 };
 var analyzeBatchImageToPrompt = async (images, styleCategory = "Cinematic", variation = 5, model) => {
@@ -7390,52 +6891,6 @@ Return ONLY a JSON array of objects.`;
     style: p.style === "documentary" ? "documentary" : "cinematic"
   }));
 }
-async function generateHighResolutionAuditCrops(buffer) {
-  try {
-    const meta = await (0, import_sharp.default)(buffer).metadata();
-    const w = meta.width || 1e3;
-    const h = meta.height || 1e3;
-    if (w < 200 || h < 200) return [];
-    const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
-    const z1W = clamp(Math.round(w * 0.45), 120, w);
-    const z1H = clamp(Math.round(h * 0.4), 120, h);
-    const z1X = clamp(Math.round(w * 0.15), 0, w - z1W);
-    const z1Y = clamp(Math.round(h * 0.35), 0, h - z1H);
-    const z2W = clamp(Math.round(w * 0.42), 120, w);
-    const z2H = clamp(Math.round(h * 0.38), 120, h);
-    const z2X = clamp(Math.round(w * 0.35), 0, w - z2W);
-    const z2Y = clamp(Math.round(h * 0.38), 0, h - z2H);
-    const z3W = clamp(Math.round(w * 0.5), 120, w);
-    const z3H = clamp(Math.round(h * 0.42), 120, h);
-    const z3X = clamp(Math.round(w * 0.15), 0, w - z3W);
-    const z3Y = clamp(Math.round(h * 0.05), 0, h - z3H);
-    const z4W = clamp(Math.round(w * 0.5), 120, w);
-    const z4H = clamp(Math.round(h * 0.38), 120, h);
-    const z4X = clamp(Math.round(w * 0.22), 0, w - z4W);
-    const z4Y = clamp(Math.round(h * 0.62), 0, h - z4H);
-    const z5W = clamp(Math.round(w * 0.45), 120, w);
-    const z5H = clamp(Math.round(h * 0.55), 120, h);
-    const z5X = clamp(Math.round(w * 0.55), 0, w - z5W);
-    const z5Y = clamp(Math.round(h * 0.15), 0, h - z5H);
-    const [z1Buf, z2Buf, z3Buf, z4Buf, z5Buf] = await Promise.all([
-      (0, import_sharp.default)(buffer).extract({ left: z1X, top: z1Y, width: z1W, height: z1H }).jpeg({ quality: 92 }).toBuffer().catch(() => null),
-      (0, import_sharp.default)(buffer).extract({ left: z2X, top: z2Y, width: z2W, height: z2H }).jpeg({ quality: 92 }).toBuffer().catch(() => null),
-      (0, import_sharp.default)(buffer).extract({ left: z3X, top: z3Y, width: z3W, height: z3H }).jpeg({ quality: 92 }).toBuffer().catch(() => null),
-      (0, import_sharp.default)(buffer).extract({ left: z4X, top: z4Y, width: z4W, height: z4H }).jpeg({ quality: 92 }).toBuffer().catch(() => null),
-      (0, import_sharp.default)(buffer).extract({ left: z5X, top: z5Y, width: z5W, height: z5H }).jpeg({ quality: 92 }).toBuffer().catch(() => null)
-    ]);
-    const result = [];
-    if (z1Buf) result.push({ label: "ZONA 1 \u2014 DETAIL 100% ZOOM: INTERAKSI TANGAN, ALAT/OBJEK & SUBJEK (AREA KIRI/TENGAH)", part: { inlineData: { mimeType: "image/jpeg", data: z1Buf.toString("base64") } } });
-    if (z2Buf) result.push({ label: "ZONA 2 \u2014 DETAIL 100% ZOOM: INTERAKSI TANGAN, ALAT/OBJEK & SUBJEK (AREA KANAN/TENGAH)", part: { inlineData: { mimeType: "image/jpeg", data: z2Buf.toString("base64") } } });
-    if (z3Buf) result.push({ label: "ZONA 3 \u2014 DETAIL 100% ZOOM: AREA FOKUS UTAMA, WAJAH/EKSPRESI & KETAJAMAN DETAIL", part: { inlineData: { mimeType: "image/jpeg", data: z3Buf.toString("base64") } } });
-    if (z4Buf) result.push({ label: "ZONA 4 \u2014 DETAIL 100% ZOOM: LANDASAN, TEKSTUR PERMUKAAN, PIKSEL TANAH/PASIR/LANTAI & DETAIL SUBJEK BAWAH", part: { inlineData: { mimeType: "image/jpeg", data: z4Buf.toString("base64") } } });
-    if (z5Buf) result.push({ label: "ZONA 5 \u2014 DETAIL 100% ZOOM: KEDALAMAN LATAR BELAKANG, BOKEH & ATMOSFER LINGKUNGAN", part: { inlineData: { mimeType: "image/jpeg", data: z5Buf.toString("base64") } } });
-    return result;
-  } catch (err) {
-    console.warn("[generateHighResolutionAuditCrops] Error:", err.message || err);
-    return [];
-  }
-}
 async function checkImageQuality(image, tolerance = "MEDIUM", language = "Bahasa", model, fileType, imageMetadata) {
   const store = apiKeyStorage.getStore();
   const provider = store && store.provider || "gemini";
@@ -7607,43 +7062,7 @@ PANDUAN KEPUTUSAN JUJUR, OBJEKTIF & TEGAS:
     },
     required: ["visual_scan_analysis", "legal_status", "requires_model_release", "requires_property_release", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps", "yolo_detected_objects"]
   };
-  let mainBuffer = null;
-  const primaryImg = Array.isArray(image) ? image[0] : image;
-  if (typeof primaryImg === "string") {
-    if (primaryImg.startsWith("http://") || primaryImg.startsWith("https://")) {
-      try {
-        const fetchRes = await fetch(primaryImg);
-        if (fetchRes.ok) {
-          mainBuffer = Buffer.from(await fetchRes.arrayBuffer());
-        }
-      } catch (_) {
-      }
-    } else if (primaryImg.includes(";base64,")) {
-      try {
-        mainBuffer = Buffer.from(primaryImg.split(";base64,")[1], "base64");
-      } catch (_) {
-      }
-    }
-  }
-  const baseImageParts = await Promise.all((Array.isArray(image) ? image : [image]).map((img) => resolveImagePart(img)));
-  let highResCrops = [];
-  if (mainBuffer) {
-    highResCrops = await generateHighResolutionAuditCrops(mainBuffer);
-  }
-  const allVisualParts = [];
-  allVisualParts.push({ text: "GAMBAR KESELURUHAN (FULL VIEW SCENE):" });
-  for (const part of baseImageParts) {
-    if (part && part.inlineData && typeof part.inlineData.data === "string" && part.inlineData.data.length > 50) {
-      allVisualParts.push(part);
-    }
-  }
-  for (const crop of highResCrops) {
-    if (crop && crop.part && crop.part.inlineData && typeof crop.part.inlineData.data === "string" && crop.part.inlineData.data.length > 50) {
-      allVisualParts.push({ text: `
-INSPEKSI FORENSIK 100% ZOOM \u2014 ${crop.label}:` });
-      allVisualParts.push(crop.part);
-    }
-  }
+  const imageParts = Array.isArray(image) ? image.map((img) => processFrameServer(img)) : [processFrameServer(image)];
   let selectedModel = model || "gemini-3.1-pro-preview";
   if (selectedModel === "auto" || !selectedModel.startsWith("gemini")) {
     selectedModel = "gemini-3.1-pro-preview";
@@ -7651,7 +7070,7 @@ INSPEKSI FORENSIK 100% ZOOM \u2014 ${crop.label}:` });
   const modelsToTry = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.1-pro-preview", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash"];
   let responseText = "";
   let lastError;
-  const promptText = `Sebagai Kurator & Moderator Konten Senior Adobe Stock, lakukan review kurasi dan audit forensik menyeluruh terhadap gambar ini (termasuk 5 zona crop 100% zoom resolusi tinggi yang disertakan) berdasarkan pedoman resmi Adobe Stock Quality and Technical Standards (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html):
+  const promptText = `Sebagai Kurator & Moderator Konten Senior Adobe Stock, lakukan review kurasi dan audit forensik menyeluruh terhadap gambar ini (termasuk crop 100% zoom resolusi tinggi yang disertakan) berdasarkan pedoman resmi Adobe Stock Quality and Technical Standards (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html):
 
 CHECKLIST FORENSIK 13 POIN ANOMALI AI & CACAT TEKNIS ADOBE STOCK:
 1. Tangan & Jari: Periksa perbesaran 100% di setiap tangan. Hitung jari (harus 5), cek apakah ada jari menyatu, meleleh, hilang, bengkok tidak alami, terbalik, kuku rusak, atau ruas berlebih.
@@ -7669,7 +7088,7 @@ CHECKLIST FORENSIK 13 POIN ANOMALI AI & CACAT TEKNIS ADOBE STOCK:
 13. Detail Kecil Aneh: Gagang kacamata hilang sebelah, ritsleting tanpa gigi, kancing melayang, tali jam tangan putus, jeruji roda sepeda hilang.
 
 STANDAR TEKNIS FOTOGRAFI & LEGAL:
-- Ketajaman Subjek Utama: Subjek utama WAJIB tajam (tack-sharp) pada 100% zoom crop (Zona 1-5). Jika subjek utama buram / soft-focus / camera shake -> blur: FAIL!
+- Ketajaman Subjek Utama: Subjek utama WAJIB tajam (tack-sharp) pada 100% zoom crop. Jika subjek utama buram / soft-focus / camera shake -> blur: FAIL!
 - Pencahayaan & Eksposur: Tidak boleh ada blown highlights (putih mati kehilangan detail) atau crushed shadows (hitam pekat tanpa detail).
 - Noise & Sensor: Bebas dari chromatic noise kotor, artefak kompresi, dan bercak debu sensor.
 - Intellectual Property: Bebas dari logo merek komersial (Apple, Nike, dll.) dan watermark tanpa izin.
@@ -7689,7 +7108,7 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
     try {
       responseText = await callOpenAICompatibleWithRetry({
         systemInstruction,
-        contents: [...allVisualParts, { text: promptText }],
+        contents: [...imageParts, { text: promptText }],
         responseMimeType: "application/json",
         responseSchema,
         config: { temperature: 0, topP: 0.1 },
@@ -7704,7 +7123,7 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
     const modelsToTryList = activeModel && activeModel.startsWith("gemini") ? [activeModel, ...modelsToTry] : modelsToTry;
     for (const modelName of modelsToTryList) {
       try {
-        const res = await callGeminiWithRetry(modelName, { parts: [...allVisualParts, { text: promptText }] }, {
+        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema
@@ -8307,25 +7726,28 @@ Rules:
       responseText = res.text || "{}";
     }
   }
-  try {
-    const parsedData = JSON.parse(extractJSON(responseText));
-    if (parsedData && Array.isArray(parsedData.keywords) && parsedData.keywords.length > 0) {
-      return { keywords: parsedData.keywords };
+  let parsedData = JSON.parse(extractJSON(responseText));
+  if (parsedData && parsedData.ai_vision_checks) {
+    const checks = parsedData.ai_vision_checks;
+    const criticalFails = ["ai_artifacts", "structural_defects", "anatomical_errors", "text", "ip_risk", "over_edited", "proportion_defects"];
+    let hasCriticalFail = false;
+    for (const key of criticalFails) {
+      if (checks[key] && checks[key].status === "FAIL") {
+        hasCriticalFail = true;
+        break;
+      }
     }
-  } catch (e) {
-    console.warn("Failed to parse event keywords response:", e, responseText);
+    if (hasCriticalFail) {
+      parsedData.recommendation = "FAIL";
+      if (parsedData.overall_score >= 70) {
+        parsedData.overall_score = Math.floor(Math.random() * (68 - 55 + 1)) + 55;
+      }
+      if (!parsedData.detailed_feedback.includes("Sistem keamanan pasca-pemrosesan")) {
+        parsedData.detailed_feedback += " (Penolakan Otomatis: Sistem mendeteksi kegagalan kritis pada artefak AI, struktur, atau teks yang memicu penolakan wajib untuk Adobe Stock).";
+      }
+    }
   }
-  const fallbackKeywords = [
-    eventName.toLowerCase(),
-    `${eventName.toLowerCase()} celebration`,
-    "festive concept",
-    "commercial holiday",
-    "advertising template",
-    "cultural event",
-    "background banner",
-    "seasonal trend"
-  ];
-  return { keywords: fallbackKeywords };
+  return parsedData;
 }
 async function suggestKeywords(title, description, existingKeywords, requestCount = 5, model) {
   const store = apiKeyStorage.getStore();
@@ -8598,8 +8020,7 @@ async function checkVideoQuality(frames, tolerance = "MEDIUM", language = "Bahas
     const maxFrames = Math.min(frames.length, 3);
     const step = Math.max(1, Math.floor(frames.length / maxFrames));
     for (let i = 0; i < frames.length && frameCount < maxFrames; i += step) {
-      const part = await resolveImagePart(frames[i]);
-      imageParts.push(part);
+      imageParts.push(processFrameServer(frames[i]));
       frameCount++;
     }
   }
@@ -8766,19 +8187,6 @@ Language: ${targetLanguageName}. Return pure JSON.`;
   }
   try {
     const parsed = JSON.parse(extractJSON(responseText));
-    if (parsed.quality_checks && Object.keys(technicalChecks).length > 0) {
-      Object.assign(parsed.quality_checks, technicalChecks);
-    }
-    const anyVideoIpFail = parsed.quality_checks?.logo?.status === "FAIL" || parsed.quality_checks?.watermark?.status === "FAIL" || parsed.legal_status === "VIOLATION";
-    const anyVideoCriticalAiFail = parsed.quality_checks?.bad_anatomy?.status === "FAIL" || parsed.quality_checks?.deformed_object?.status === "FAIL" || parsed.quality_checks?.ai_artifact?.status === "FAIL" || parsed.quality_checks?.temporal_morphing?.status === "FAIL";
-    const anyVideoTechFail = parsed.quality_checks?.black_frame?.status === "FAIL" || parsed.quality_checks?.frozen_frame?.status === "FAIL" || parsed.quality_checks?.blur?.status === "FAIL" || parsed.quality_checks?.out_of_focus?.status === "FAIL" || technicalScore < 70;
-    const isVideoFailing = anyVideoIpFail || anyVideoCriticalAiFail || anyVideoTechFail || parsed.recommendation === "FAIL";
-    if (isVideoFailing) {
-      parsed.recommendation = "FAIL";
-      parsed.adobe_stock_readiness = "Reject Risk";
-      parsed.overall_score = Math.min(typeof parsed.overall_score === "number" ? parsed.overall_score : 50, 55);
-      if (anyVideoIpFail) parsed.legal_status = "VIOLATION";
-    }
     return parsed;
   } catch (parseErr) {
     console.warn("[checkVideoQuality] JSON parse error on AI response:", parseErr);
@@ -8803,87 +8211,14 @@ async function generateMotionCode(userPrompt, options) {
   const store = apiKeyStorage.getStore();
   const provider = store && store.provider || "gemini";
   const model = options?.model;
-  const systemInstruction = `You are a world-class Motion Graphics and Creative Director specializing in Structured Remotion Compositions.
-Your task is to generate a structured, type-safe Motion Graphic JSON Project that is interpreted deterministically by a built-in Remotion Dynamic Renderer.
-
-CRITICAL SCHEMA RULES:
-Generate a valid JSON object matching this schema:
-{
-  "title": "Short Title",
-  "description": "Short description of the motion design",
-  "fps": 30,
-  "durationInFrames": 150,
-  "background": {
-    "type": "gradient" | "mesh" | "radial" | "particles" | "grid" | "solid",
-    "colors": ["#0f172a", "#1e1b4b", "#312e81"],
-    "angle": 135,
-    "animated": true
-  },
-  "scenes": [
-    {
-      "id": "scene-1",
-      "from": 0,
-      "durationInFrames": 150,
-      "transition": "fade",
-      "elements": [
-        {
-          "id": "badge-1",
-          "type": "badge",
-          "content": "NEW RELEASE 2026",
-          "iconName": "sparkles" | "zap" | "flame" | "star" | "shield" | "award" | "trending-up" | "play" | "gift" | "dollar" | "shopping-cart" | "cpu",
-          "layout": { "align": "center" },
-          "style": { "color": "#818cf8", "backgroundColor": "rgba(99, 102, 241, 0.15)", "borderRadius": 999, "fontSize": 16, "fontWeight": 700 },
-          "animation": { "type": "spring-in", "delay": 0, "damping": 12 }
-        },
-        {
-          "id": "heading-1",
-          "type": "heading",
-          "content": "Next-Gen Motion AI",
-          "layout": { "align": "center" },
-          "style": { "fontSize": 64, "fontWeight": 800, "gradient": ["#ffffff", "#cbd5e1", "#818cf8"] },
-          "animation": { "type": "slide-up", "delay": 5, "damping": 12 }
-        },
-        {
-          "id": "subtitle-1",
-          "type": "subtitle",
-          "content": "Create cinematic animations with pure microsecond precision.",
-          "layout": { "align": "center", "maxWidth": "700px" },
-          "style": { "fontSize": 24, "color": "#94a3b8" },
-          "animation": { "type": "fade-in", "delay": 12 }
-        },
-        {
-          "id": "cta-1",
-          "type": "button",
-          "content": "Start Creating Free",
-          "iconName": "zap",
-          "layout": { "align": "center" },
-          "style": { "fontSize": 20, "fontWeight": 700, "gradient": ["#6366f1", "#a855f7", "#ec4899"], "borderRadius": 16, "boxShadow": "0 10px 30px rgba(99, 102, 241, 0.5)" },
-          "animation": { "type": "bounce-in", "delay": 18 }
-        }
-      ]
-    }
-  ]
-}
-
-ELEMENT TYPES SUPPORTED:
-- 'heading': Large impact typography, supports 'gradient' colors array, 'fontSize' (40-80), 'fontWeight' (700-900).
-- 'subtitle' / 'text': Clean descriptive body copy, 'fontSize' (18-28).
-- 'badge': Pill badge with optional 'iconName' (e.g. 'flame', 'sparkles', 'zap', 'shield', 'award').
-- 'card': Glassmorphic floating container.
-- 'button': High-converting CTA button with gradient backgrounds and glow shadow.
-- 'counter': Animated number counting up from 0 to target value with optional 'prefix' (e.g. '$', '+') and 'suffix' (e.g. 'K', '%', ' OFF').
-- 'icon': Standalone glowing vector icon.
-
-ANIMATIONS SUPPORTED:
-- 'spring-in', 'bounce-in', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom-in', 'float', 'pulse', 'glow-pulse', 'typewriter', 'rotate-continuous'.
-
-ALWAYS output a rich, modern, aesthetic color scheme and clean typography. Return valid JSON only.`;
+  const systemInstruction = `You are an expert Remotion developer. Your task is to generate a self-contained React component that composes a stunning, modern motion graphics animation. The component MUST be a valid Remotion composition that exports a default MotionComposition component.
+RULES: Use @remotion packages appropriately. The animation should be smooth, professional, and visually impressive. Use React hooks as needed. Use useCurrentFrame() and useVideoConfig() from remotion. Export as: export default MotionComposition. Keep the code self-contained and production-ready. Return ONLY valid, runnable JSX/TSX code.`;
   const { width = 1920, height = 1080, fps = 30, durationSeconds = 5 } = options || {};
   const durationInFrames = fps * durationSeconds;
   const contextParts = [];
-  contextParts.push(`Canvas: ${width}x${height}, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s duration).`);
-  if (options?.currentCode?.trim()) contextParts.push(`Existing motion schema/code:
-\`\`\`json
+  contextParts.push(`Canvas: ${width}x${height}, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s).`);
+  if (options?.currentCode?.trim()) contextParts.push(`Existing code:
+\`\`\`jsx
 ${options.currentCode}
 \`\`\``);
   if (options?.history?.length) {
@@ -8893,144 +8228,147 @@ ${h.map((m) => `${m.role}: ${m.content}`).join("\n")}`);
   }
   contextParts.push(`Request: "${userPrompt}"`);
   const fullContents = contextParts.join("\n\n");
-  const responseSchema = {
-    type: import_genai.Type.OBJECT,
-    properties: {
-      title: { type: import_genai.Type.STRING },
-      summary: { type: import_genai.Type.STRING },
-      code: { type: import_genai.Type.STRING }
-    },
-    required: ["title", "summary", "code"]
-  };
+  const responseSchema = { type: import_genai.Type.OBJECT, properties: { title: { type: import_genai.Type.STRING }, summary: { type: import_genai.Type.STRING }, code: { type: import_genai.Type.STRING } }, required: ["title", "summary", "code"] };
   let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.8 }, model });
+    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.9 }, model });
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model?.startsWith("gemini") ? model : "gemini-2.5-pro", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.8 }, 2);
+      const res = await callGeminiWithRetry(model?.startsWith("gemini") ? model : "gemini-2.5-pro", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
       responseText = res.text || "{}";
     } catch (err) {
-      const res = await callGeminiWithRetry("gemini-2.5-flash", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.8 }, 1);
+      const res = await callGeminiWithRetry("gemini-2.5-flash", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
       responseText = res.text || "{}";
     }
   }
   const parsed = JSON.parse(extractJSON(responseText));
-  let finalCode = "";
   if (typeof parsed.code === "string") {
-    finalCode = parsed.code.replace(/^```(json|jsx|javascript|js|tsx)?\s*/i, "").replace(/```\s*$/i, "").trim();
-  } else if (typeof parsed.code === "object") {
-    finalCode = JSON.stringify(parsed.code, null, 2);
-  } else if (parsed.scenes) {
-    finalCode = JSON.stringify(parsed, null, 2);
-  } else {
-    throw new Error("AI response missing code or project schema field.");
-  }
-  try {
-    const parsedObj = JSON.parse(finalCode);
-    if (!parsedObj.durationInFrames) parsedObj.durationInFrames = durationInFrames;
-    if (!parsedObj.fps) parsedObj.fps = fps;
-    finalCode = JSON.stringify(parsedObj, null, 2);
-  } catch (_) {
-  }
-  return {
-    title: parsed.title || "Untitled Motion",
-    summary: parsed.summary || "Generated modern Motion schema",
-    code: finalCode
-  };
+    parsed.code = parsed.code.replace(/^```(jsx|javascript|js|tsx)?\s*/i, "").replace(/```\s*$/i, "").trim();
+    if (!/MotionComposition/.test(parsed.code)) throw new Error("AI response did not include a MotionComposition export.");
+  } else throw new Error("AI response missing code field.");
+  return { title: parsed.title || "Untitled Motion", summary: parsed.summary || "", code: parsed.code };
 }
 async function generateAutoSubject(styleCategory, model, currentSubject, promptMode) {
   const store = apiKeyStorage.getStore();
   const provider = store && store.provider || "gemini";
+  const creativeSeedsByStyle = {
+    "Cinematic": [
+      "solitary cyberpunk detective standing in neon-lit rain reflections near a noodle bar",
+      "cinematic golden hour drone shot of a futuristic solar energy farm in Iceland",
+      "dramatic chiaroscuro portrait of a seasoned female astronaut overlooking Martian sunrise",
+      "epic atmospheric cinematic shot of an ancient Scandinavian fishing village surrounded by morning fog",
+      "wide anamorphic cinematic scene of a sleek hypercar charging at a glowing forest waypoint at dusk",
+      "moody cinematic street photography of Tokyo alleyways during a heavy monsoon rain with neon reflections",
+      "cinematic aerial shot of a luxury mountain lodge surrounded by snow-covered pines with warm glowing interior lights"
+    ],
+    "3D CGI": [
+      "floating translucent glass orbs with glistening internal golden liquid and soft studio caustics",
+      "futuristic biometric smartwatch with holographic interface hovering over a matte ceramic podium",
+      "intricate 3D cross-section of a glowing crystalline cybernetic heart with glowing fiber optic arteries",
+      "claymorphic pastel cute 3D coffee machine with pillowy steam clouds and glossy finish",
+      "ultra-detailed 3D isometric laboratory room with glowing specimen tubes and sleek synthetic panels",
+      "smooth matte 3D geometric abstract composition with floating chrome spheres and velvet textures"
+    ],
+    "Photorealistic": [
+      "macro close-up photography of a dewdrop reflecting a blooming cherry blossom at sunrise",
+      "authentic editorial portrait of a diverse modern pottery artisan working on a clay wheel in sunlit studio",
+      "high-end culinary flat lay of artisanal sourdough bread, fresh rosemary, and organic olive oil on dark slate",
+      "crisp architectural photography of a minimalist Scandinavian concrete villa with floor-to-ceiling glass windows",
+      "candid street lifestyle photography of remote digital nomads working in a bright Bali garden cafe",
+      "hyper-detailed macro photography of a colorful chameleon perched on an exotic tropical monstera leaf"
+    ],
+    "Flat Illustration": [
+      "vibrant modern flat vector illustration of an eco-friendly smart city with wind turbines and electric transit",
+      "minimalist flat corporate illustration of team collaboration around floating analytics dashboard with Alegria style",
+      "charming 2D flat botanical greenhouse illustration with lush potted plants and sunny window grid",
+      "isometric flat vector scene of a cozy home office setup with dual monitors and indoor greenery",
+      "retro-modern 2D flat travel poster of Mount Fuji with cherry blossoms and clean geometric lines",
+      "colorful flat vector collection of organic gardening tools, seed packets, and fresh harvest vegetables"
+    ],
+    "Vector Art": [
+      "clean minimalist linear vector landscape of mountain ranges with geometric rising sun",
+      "high-contrast continuous line art portrait of a woman surrounded by blooming floral elements",
+      "corporate flat vector illustration of cloud data synchronization with dynamic gradient accents",
+      "retro vintage badge vector design featuring a camping campfire and pine forest silhouette",
+      "modern isometric flat vector infographic depicting renewable energy grid network"
+    ],
+    "Dark Horror Aesthetic": [
+      "grimdark ancient gothic cathedral sanctuary overgrown with thorned black roses and eerie green mist",
+      "atmospheric macabre scene of a cloaked entity holding an ethereal glowing lantern in an enchanted dead forest",
+      "Lovecraftian cosmic entity submerged beneath abyssal ocean trenches surrounded by bioluminescent runes",
+      "haunting biomechanical skeletal throne fused with industrial machinery and dim candlelight",
+      "cinematic chiaroscuro dark fantasy ritual chamber with floating arcane symbols and swirling shadows"
+    ],
+    "Anime/Manga": [
+      "vibrant anime style illustration of a high school rooftop overlooking sunset cityscape with fluffy clouds",
+      "cyberpunk anime warrior standing on a skyscraper ledge gazing at massive holographic billboards in Neo-Tokyo",
+      "whimsical Ghibli-inspired countryside train ride passing through endless golden rice fields under summer sky",
+      "magical anime alchemist apprentice brewing glowing starlight potions in a cozy rustic workshop"
+    ],
+    "Watercolor Painting": [
+      "loose dreamy watercolor painting of wildflowers blooming along a coastal cliff edge overlooking azure ocean",
+      "delicate transparent watercolor wash of a steaming matcha latte surrounded by botanical eucalyptus leaves",
+      "soft wet-on-wet watercolor landscape of misty autumn pine mountains with subtle golden splatter accents",
+      "expressive splash watercolor illustration of a hummingbird sipping nectar from a vibrant hibiscus flower"
+    ]
+  };
+  const pngSeeds = [
+    "cute 3D isometric coffee cup icon with fluffy foam heart, isolated on white background",
+    "glossy golden shield security badge icon with glowing checkmark, isolated on white background",
+    "delicate watercolor botanical monstera leaf branch element, isolated on transparent background",
+    "futuristic holographic AI brain processor chip with glowing circuits, isolated on black background",
+    "playful cartoon Shiba Inu astronaut character floating with small rocket, isolated on white background",
+    "hand-drawn vintage bakery logo emblem with wheat stalks and rolling pin, isolated on white background",
+    "sleek flat vector analytics bar chart icon with upward growth arrow, isolated on transparent background",
+    "detailed 3D render of a sparkling emerald gemstone with facet refractions, isolated on white background",
+    "minimalist continuous line art icon of a human hand holding a seedling, isolated on transparent background",
+    "glossy ceramic 3D cloud with golden lightning bolt weather icon, isolated on white background"
+  ];
   const isPng = promptMode === "png";
-  const GLOBAL_MARKET_SECTORS = [
-    // 1. Business, Corporate Innovation & Hybrid Workspace
-    "diverse corporate executive team analyzing holographic predictive growth charts in sunlit modern boardroom",
-    "multinational business professionals collaborating around digital tablet in glass-walled hybrid coworking space",
-    "confident female creative director presenting sustainable corporate strategy on high-definition interactive display",
-    "financial analysts reviewing real-time global stock exchange telemetry across curved multi-monitor trading desk",
-    "diverse project managers conducting agile stand-up meeting with color-coded sticky notes on transparent glass wall",
-    "entrepreneur conducting international video conference call with modern wireless headset in architectural loft office",
-    // 2. Healthcare, Medicine & Biotechnology
-    "research scientists in cleanroom lab coats examining molecular cell cultures through automated digital microscope",
-    "compassionate female physician explaining diagnostic results to an elderly patient using a medical digital tablet",
-    "advanced surgical team operating robotic assisted-surgery arms in high-tech sterile operating theater",
-    "geneticist analyzing 3D DNA sequence helix data on glowing laboratory workstation in biomedical facility",
-    "radiologist and neurologist examining high-resolution brain MRI scans on diagnostic workstation",
-    "caring modern nurse taking blood pressure reading of smiling senior woman in bright wellness clinic",
-    "pharmacist dispensing prescription medication with handheld digital barcode scanner in modern pharmacy",
-    // 3. Renewable Energy, ESG & Environmental Sustainability
-    "renewable energy engineers in hardhats inspecting vast industrial solar panel farm across sun-drenched valley",
-    "offshore wind turbine technician wearing safety harness securing blade assembly against vast ocean horizon",
-    "environmental scientists taking river water quality samples with digital sensory probes in pristine forest",
-    "architect and green building engineer examining sustainable timber construction blueprints on active site",
-    "electric vehicle driver plugging ultra-fast charging cable into modern EV car at green solar-powered station",
-    "sustainable urban rooftop community garden with volunteers harvesting organic leafy greens against city skyline",
-    "circular economy recycling facility workers operating automated optical sorter for sustainable packaging",
-    // 4. Technology, AI, Cybersecurity & Industry 4.0
-    "cybersecurity intelligence team monitoring simulated global network intrusion alerts in dark command center",
-    "industrial automation engineer testing collaborative robotic arm in smart manufacturing factory",
-    "cloud infrastructure engineer inspecting fiber-optic cabling and glowing server racks in enterprise data center",
-    "autonomous electric delivery van fleet parked in smart logistics depot with automated loading conveyors",
-    "software developers collaborating on dual-screen coding terminal with digital neural network diagrams",
-    "drone pilot operating high-precision agricultural quadcopter monitoring precision irrigation fields",
-    // 5. Modern Lifestyle, Wellness & Authentic Human Connection
-    "active multi-ethnic senior citizens practicing morning yoga outdoors in lush green public park",
-    "mindful young professional meditating in sunlit apartment filled with air-purifying indoor plants",
-    "multi-generational diverse family cooking healthy Mediterranean meal together in bright open-plan kitchen",
-    "father teaching young daughter how to ride bicycle in suburban neighborhood during gentle golden afternoon",
-    "artisan barista carefully crafting specialty espresso drink with poured latte art at minimalist cafe counter",
-    "digital nomad working peacefully on laptop at wooden patio table overlooking tropical mountain greenery",
-    // 6. Education, STEM & Future Workforce
-    "elementary school students collaborating enthusiastically on educational robotics kit in modern STEM laboratory",
-    "female university engineering student assembling electronic circuit board with soldering iron and digital multimeter",
-    "high school science teacher demonstrating interactive physics experiment with students watching intently",
-    "vocational technical apprentice learning precision mechanical calibration under guidance of seasoned mentor",
-    // 7. E-Commerce, Retail & Supply Chain
-    "warehouse logistics workers packing eco-friendly cardboard parcels alongside autonomous mobile transport robots",
-    "satisfied customer completing instant contactless mobile payment at modern boutique coffee and bakery counter",
-    "cargo logistics dispatcher planning international container ship routes on digital maritime shipping map"
+  const categorySeeds = !isPng && creativeSeedsByStyle[styleCategory] ? creativeSeedsByStyle[styleCategory] : !isPng ? creativeSeedsByStyle["Photorealistic"] : pngSeeds;
+  const randomFallback = categorySeeds[Math.floor(Math.random() * categorySeeds.length)];
+  const creativeSeedsGeneral = [
+    "cyberpunk coffee shop",
+    "organic biotechnology",
+    "whimsical woodland creatures",
+    "cosmic ocean nebula",
+    "minimalist brutalist concrete villa",
+    "ancient steampunk mechanical workshop",
+    "vibrant neon desert oasis",
+    "surreal levitating glass islands",
+    "cozy Scandinavian hygge attic",
+    "retro-futuristic astronaut exploring mossy ruins",
+    "mythical crystal cavern glow",
+    "zen botanical garden with koi fish",
+    "underwater city ruins populated by bioluminescent jellyfish",
+    "futuristic alpine research station",
+    "nostalgic 80s arcade neon glow",
+    "surreal origami paper bird swarm",
+    "ethereal cloud castle with golden gates",
+    "mystical potion brewing room",
+    "abandoned gothic cathedral claimed by blooming roses",
+    "sleek futuristic electric motorcycle on rain-slicked highway",
+    "rustic clay pottery workshop with sun-dappled shadows",
+    "extravagant Victorian masquerade ball",
+    "modern smart greenhouse farming robotics",
+    "abstract flowing liquid marble waves",
+    "enchanted treehouse village inside a giant hollow oak",
+    "cinematic desert caravan at golden hour",
+    "surreal clockwork solar system globe",
+    "vibrant pop-art stylized fruit display",
+    "cozy winter cabin library with crackling fireplace",
+    "majestic phoenix rising from colorful smoke",
+    "futuristic luxury yacht sailing on liquid silver",
+    "magical floating lantern festival"
   ];
-  const GLOBAL_MARKET_PNG_ASSETS = [
-    "isolated modern fintech credit card with glowing digital security shield and upward economic growth line",
-    "isolated green sustainability leaf emblem with circular recycling arrows and fresh water droplet",
-    "isolated medical diagnostic stethoscope resting beside digital healthcare tablet with vital heartbeat graph",
-    "isolated smart logistics cardboard parcel box with digital QR tracking barcode and priority shipping label",
-    "isolated artificial intelligence processor microchip with glowing gold circuit board pathways",
-    "isolated clean energy solar panel module with sunbeam icon and high-capacity battery level indicator",
-    "isolated golden winner trophy cup surrounded by floating victory stars and ribbon badge",
-    "isolated modern smartphone mockup with blank bezel-less screen and floating notification badges",
-    "isolated cybersecurity padlock hardware device with illuminated digital biometric fingerprint scanner",
-    "isolated electric vehicle fast-charging connector plug with green lightning bolt energy badge",
-    "isolated graduation cap resting atop hardcover educational textbooks with tied diploma scroll",
-    "isolated precision laboratory microscope with glass sample slide and calibrated adjustment knobs"
-  ];
-  const pool = isPng ? GLOBAL_MARKET_PNG_ASSETS : GLOBAL_MARKET_SECTORS;
-  const randomFallback = pool[Math.floor(Math.random() * pool.length)];
-  const systemInstruction = isPng ? `You are the Chief Market Research Director for global commercial microstock agencies (Adobe Stock, Shutterstock, Getty Images).
-Your goal is to generate a single high-demand, commercially viable ISOLATED SUBJECT IDEA based strictly on GLOBAL MICROSTOCK MARKET RESEARCH and buyer demand trends.
-RULES:
-1. FOCUS ON MARKET DEMAND: Focus on objects, icons, devices, or assets that graphic designers and marketing agencies worldwide frequently buy to place in their layouts (fintech, green energy, medical, AI, logistics, business).
-2. STYLE-AGNOSTIC: NEVER mention any art styles (do NOT say "3D render", "flat vector", "watercolor", "photorealistic", etc.). Only describe the physical subject, its parts, and its commercial details so ANY style can be applied to it later.
-3. OUTPUT FORMAT: Return ONLY 1 concise, descriptive sentence describing the isolated subject. No prefixes, no quotes, no markdown.` : `You are the Chief Market Research Director for global commercial microstock agencies (Adobe Stock, Shutterstock, Getty Images).
-Your goal is to generate a single high-demand, commercially viable SCENE SUBJECT IDEA based strictly on GLOBAL MICROSTOCK MARKET RESEARCH and buyer demand trends.
-RULES:
-1. FOCUS ON GLOBAL MARKET RESEARCH: Focus on scenes that corporate buyers, advertising agencies, and publishers worldwide actively purchase:
-   - Business, Hybrid Workspace & Global Fintech
-   - Healthcare, Biotechnology & Senior Wellness
-   - Renewable Energy, ESG & Ecological Sustainability
-   - Advanced Robotics, AI Integration & Smart Logistics
-   - Authentic Modern Lifestyle, Diversity & Mental Well-being
-   - STEM Education & Future Workforce Training
-2. STYLE-AGNOSTIC (CRITICAL): NEVER mention or dictate any visual art style (do NOT use words like "cinematic photo of", "flat vector illustration of", "watercolor painting of", "3D CGI of", "shot on DSLR"). Describe ONLY the authentic human actions, environment, and physical visual subject so that ANY visual style can be applied seamlessly later.
-3. COMMERCIAL QUALITY: Must be clean, professional, and free of any trademarked logos or specific brand names.
-4. OUTPUT FORMAT: Return ONLY 1 to 2 clear, vivid sentences describing the scene. No prefixes, no quotes, no markdown.`;
+  const randomSeedKeyword = isPng ? "isolated commercial stock asset icon or character" : creativeSeedsGeneral[Math.floor(Math.random() * creativeSeedsGeneral.length)];
+  let systemInstruction = isPng ? `You are an elite commercial microstock art director specializing in isolated PNG assets, icons, stickers, and standalone design elements. Generate a highly unique, modern, high-demand commercial subject idea for an isolated element. Return ONLY the plain text subject idea in 1 concise, vivid sentence describing the object, materials, and isolated composition. Do NOT use prefixes, quotes, or markdown formatting.` : `You are an elite creative director for a global microstock agency (Adobe Stock, Shutterstock). Generate a highly unique, modern, and high-demand commercial subject idea for a text-to-image generator. Return ONLY the plain text subject idea in 1-2 vivid, descriptive sentences, without quotes, prefixes, or formatting.`;
   let promptText = "";
   if (currentSubject && currentSubject.trim()) {
-    promptText = isPng ? `Based on global microstock market research, transform and enhance the subject "${currentSubject.trim()}" into a top-selling, high-demand isolated commercial asset. Do NOT include any visual art style names. Return ONLY 1 descriptive sentence.` : `Based on global microstock market research, expand and elevate the topic "${currentSubject.trim()}" into a rich, top-selling commercial microstock scene concept. Do NOT mention any visual art styles. Return ONLY 1-2 descriptive sentences.`;
+    promptText = isPng ? `Transform and enhance the concept "${currentSubject.trim()}" into a high-demand isolated commercial asset/icon/sticker idea tailored for style: "${styleCategory || "General"}". Return ONLY 1 descriptive sentence.` : `Expand and enhance the concept "${currentSubject.trim()}" into a rich, commercial microstock visual scene for style: "${styleCategory || "General"}". Use rich, compound long-tail keyword descriptors. Return ONLY 1-2 descriptive sentences.`;
   } else {
-    const randomSectorSeed = pool[Math.floor(Math.random() * pool.length)];
-    promptText = isPng ? `Generate a fresh, top-selling isolated commercial asset concept based on global microstock market research. Inspiration sector: "${randomSectorSeed}". Do NOT mention any visual art styles. Return ONLY 1 descriptive sentence.` : `Generate a fresh, top-selling commercial microstock scene concept based on global microstock market research and current buyer demand. Inspiration sector: "${randomSectorSeed}". Do NOT mention any visual art styles. Return ONLY 1-2 descriptive sentences.`;
+    promptText = isPng ? `Generate a fresh, highly creative standalone isolated asset idea for style: "${styleCategory || "General"}". Ensure it is distinct and commercial. Inspiration angle: "${randomSeedKeyword}". Return ONLY 1 descriptive sentence.` : `Generate a fresh, highly creative commercial subject idea for style: "${styleCategory || "General"}". Ensure absolute uniqueness across repeated clicks using this seed angle: "${randomSeedKeyword}". Return ONLY 1-2 descriptive sentences.`;
   }
   const activeModel = model || "gemini-2.5-flash";
   try {
@@ -9039,7 +8377,7 @@ RULES:
       rawText = await callOpenAICompatibleWithRetry({
         systemInstruction,
         contents: { parts: [{ text: promptText }] },
-        config: { temperature: 0.92, maxOutputTokens: 150 },
+        config: { temperature: 0.95, maxOutputTokens: 150 },
         model: activeModel
       });
     } else {
@@ -9047,18 +8385,18 @@ RULES:
         parts: [{ text: promptText }]
       }, {
         systemInstruction,
-        temperature: 0.95,
+        temperature: 0.98,
         maxOutputTokens: 150
       });
       rawText = response.text || "";
     }
-    let cleaned = (rawText || "").trim().replace(/^["']|["']$/g, "").replace(/^(Subject Idea|Ide Subjek|Prompt Idea|Concept|Subject|Market Concept):\s*/i, "").replace(/\b(in\s+)?(photorealistic|cinematic|flat\s+vector|3d\s+render|watercolor|anime|cartoon|digital\s+art|illustration)\s+(style|format|aesthetic)?\b/gi, "").trim();
-    if (cleaned && cleaned.length > 10) {
+    let cleaned = (rawText || "").trim().replace(/^["']|["']$/g, "").replace(/^(Subject Idea|Ide Subjek|Prompt Idea|Concept|Subject):\s*/i, "").trim();
+    if (cleaned && cleaned.length > 5) {
       return cleaned;
     }
     return randomFallback;
   } catch (err) {
-    console.warn("[AutoSubject] AI market research generation failed, using curated global market fallback:", err?.message);
+    console.warn("[AutoSubject] AI generation failed, using rich procedural fallback:", err?.message);
     return randomFallback;
   }
 }
