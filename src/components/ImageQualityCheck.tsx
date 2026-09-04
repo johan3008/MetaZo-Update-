@@ -19,6 +19,12 @@ export interface QualityReport {
   detailed_feedback: string;
   heatmaps?: { type: "noise" | "focus" | "lighting" | "ip_violation" | "artifact" | "gen_ai_anomaly" | "composition"; x: number; y: number; intensity: number; raw_value: string }[];
   yolo_detected_objects?: { label: string; confidence: number; box_2d?: [number, number, number, number]; category?: string }[];
+  inspection_pipeline?: {
+    architecture?: string;
+    crops_inspected?: number;
+    crop_labels?: string[];
+  };
+  tolerance?: string;
   technical_gate?: {
     passed?: boolean;
     failures?: { key: string; reason_en?: string; reason_id?: string }[];
@@ -488,7 +494,9 @@ export const ImageQualityCheck: React.FC<{
       }
     }
 
-    onStepChange('Menganalisis piksel, forensik OpenCV & AI Vision...');
+    onStepChange(t.language === 'Bahasa' 
+      ? 'Audit 2-Layer: Analisis global scene & smart crop 100% zoom...' 
+      : '2-Layer Audit: Global scene & native zoom crops...');
 
     let response;
 
@@ -572,7 +580,9 @@ export const ImageQualityCheck: React.FC<{
       throw new Error(errData.error || `Gagal menganalisis ${file.name} (Status: ${response.status})`);
     }
 
-    onStepChange('Memverifikasi standar kurasi & skor...');
+    onStepChange(t.language === 'Bahasa' 
+      ? 'Sintesis hasil 2-layer & verifikasi standar Adobe Stock...' 
+      : 'Synthesizing 2-layer findings & Adobe Stock curation standards...');
     const reportData: QualityReport = await response.json();
     return reportData;
   };
@@ -1798,6 +1808,12 @@ export const ImageQualityCheck: React.FC<{
                                             <span className="text-[9px] font-mono text-slate-400">
                                               Tolerance: {tolerance}
                                             </span>
+                                            {r.inspection_pipeline && (
+                                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
+                                                <Layers className="w-2.5 h-2.5" />
+                                                2-Layer: Full Scene + {r.inspection_pipeline.crops_inspected || 0} Detail Crops (100% Zoom)
+                                              </span>
+                                            )}
                                           </div>
                                           <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
                                             {isPass 
