@@ -509,24 +509,54 @@ const getTitleLengthRule = (titleLength?: string) => {
 };
 
 const getLanguageName = (code?: string) => {
+  if (!code) return 'ENGLISH';
+  const clean = String(code).trim().toLowerCase();
   const map: Record<string, string> = {
     'en': 'ENGLISH',
+    'english': 'ENGLISH',
     'id': 'INDONESIAN (BAHASA INDONESIA)',
+    'in': 'INDONESIAN (BAHASA INDONESIA)',
+    'indonesian': 'INDONESIAN (BAHASA INDONESIA)',
+    'bahasa': 'INDONESIAN (BAHASA INDONESIA)',
+    'bahasa indonesia': 'INDONESIAN (BAHASA INDONESIA)',
     'es': 'SPANISH',
+    'spanish': 'SPANISH',
+    'español': 'SPANISH',
+    'espanol': 'SPANISH',
     'fr': 'FRENCH',
+    'french': 'FRENCH',
+    'français': 'FRENCH',
+    'francais': 'FRENCH',
     'de': 'GERMAN',
+    'german': 'GERMAN',
+    'deutsch': 'GERMAN',
     'it': 'ITALIAN',
+    'italian': 'ITALIAN',
+    'italiano': 'ITALIAN',
     'pt': 'PORTUGUESE',
+    'portuguese': 'PORTUGUESE',
+    'português': 'PORTUGUESE',
+    'portugues': 'PORTUGUESE',
     'ja': 'JAPANESE',
+    'japanese': 'JAPANESE',
     'ko': 'KOREAN',
+    'korean': 'KOREAN',
     'ru': 'RUSSIAN',
+    'russian': 'RUSSIAN',
     'th': 'THAI',
+    'thai': 'THAI',
     'tr': 'TURKISH',
+    'turkish': 'TURKISH',
     'nl': 'DUTCH',
-    'pl': 'POLISH'
+    'dutch': 'DUTCH',
+    'pl': 'POLISH',
+    'polish': 'POLISH',
+    'zh': 'CHINESE',
+    'chinese': 'CHINESE'
   };
-  return map[code || 'en'] || 'ENGLISH';
+  return map[clean] || (clean.length > 2 ? clean.toUpperCase() : 'ENGLISH');
 };
+
 
 // ============================================================================
 // KEYWORD MARKET INTELLIGENCE V5
@@ -3415,7 +3445,7 @@ async function applyMetadataGenKeywordLogic(options: {
     const phrase = raw
       .toLowerCase()
       .trim()
-      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/[^\p{L}\p{N}\s-]/gu, '')
       .replace(/\s+/g, ' ');
     if (phrase.length <= 1) continue;
 
@@ -3604,13 +3634,13 @@ export const generateStockMetadata = async (
   const directives = getToolTypeDirectives(toolType);
 
   // Dynamic keyword rules: no fixed slots, no category quotas.
-  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
+  let keywordRuleSchemaDesc = `Generate microstock keywords strictly in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
+    keywordRuleSchemaDesc = `Generate microstock keywords strictly in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE:\nGenerate ONLY strictly single words (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. For example, use "coffee" and "cup" separately, never "coffee cup". NO colors. NO patterns.`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
+    keywordRuleSchemaDesc = `Generate microstock keywords strictly in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMULTI-KEYWORD MODE OVERRIDE:\nGenerate ONLY multi-word phrases (2-4 words). No standalone single words at all. NO colors. NO patterns.`;
   } else {
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMIXED-KEYWORD MODE OVERRIDE:\nGenerate a balanced mix of single words and 2-4 word natural search phrases. DO NOT artificially split compound words that are naturally searched together. NO colors. NO patterns.`;
@@ -3783,7 +3813,7 @@ MANDATORY RULES FOR TARGET KEYWORDS & TITLE (STRICT PRIORITY):
   const mediaContext = mediaTypeContext;
   const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
-OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)} YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY.
+OUTPUT MUST BE STRICTLY IN ${getLanguageName(metadataLanguage)} for Title, Description, and Keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}${exifInstruction}
 
@@ -3809,7 +3839,7 @@ Rules for Titles:
 5. DO NOT treat the title like a list of keywords. No commas separating words.
 
 Rules for Descriptions:
-1. Description MUST be a complete sentence (kalimat lengkap). Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
+1. Description MUST be a complete sentence (kalimat lengkap) written fluently in ${getLanguageName(metadataLanguage)}. Write the description perfectly in natural, everyday language (bahasa keseharian). It must flow effortlessly like a human writing naturally. Avoid any robotic tone, rigid sentences, or weird synonyms.
 2. SPECIFIC DESCRIPTION GUIDELINES FOR THE ASSET TYPE:
    ${directives.descriptionRule}
 3. Provide a thorough visual breakdown of the scene, including colors, composition, and specific details, rich in high-density SEO synonyms. ABSOLUTELY NO subjective quality descriptors (e.g., do not say "a high quality image of...", just describe the image itself).
@@ -3841,7 +3871,7 @@ OUTPUT FORMAT:
   "keywords": ["keyword1", "keyword2", "keyword3"],
   "category_id": 1,
   "shutterstock_category_1": "Abstract",
-  "shutterstock_category_2": "Backgrounds/Textures"
+  "shutterstock_category_2": "Backgrounds/Textures",
       "dreamstime_category": "",
       "miricanvas_category": "",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
@@ -3915,7 +3945,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
 
   const validatorSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ${getLanguageName(metadataLanguage)} for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
+OUTPUT MUST BE STRICTLY IN ${getLanguageName(metadataLanguage)} for Title, Description, and Keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
 
@@ -3997,7 +4027,7 @@ OUTPUT FORMAT:
   "keywords": [],
   "category_id": 0,
   "shutterstock_category_1": "",
-  "shutterstock_category_2": ""
+  "shutterstock_category_2": "",
       "dreamstime_category": "",
       "miricanvas_category": "",
   "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
@@ -4149,7 +4179,7 @@ OUTPUT FORMAT:
       const rawKeywords = Array.isArray(recovery.keywords) ? recovery.keywords : [];
       const safeKeywords = rawKeywords
         .filter((k: any) => typeof k === 'string')
-        .map((k: string) => k.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' '))
+        .map((k: string) => k.toLowerCase().trim().replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s+/g, ' '))
         .filter((k: string) => k.length > 1 && !isProhibitedKeyword(k));
 
       try {
@@ -4239,13 +4269,13 @@ export const generateBatchStockMetadata = async (
 
   // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 50; // Dynamic keyword rules: no fixed slots, no category quotas.
-  let keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
+  let keywordRuleSchemaDesc = `Generate microstock keywords strictly in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. Generate a natural mix of single words and multi-word phrases.`;
   let keywordRulePromptText = UNIVERSAL_KEYWORD_RULES;
   if (keywordMode === 'single') {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
+    keywordRuleSchemaDesc = `Generate microstock keywords strictly in ${getLanguageName(metadataLanguage)}. NO colors. NO patterns. STRICTLY single words only (exactly 1 word per keyword).`;
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nSINGLE-KEYWORD MODE OVERRIDE:\nGenerate ONLY strictly single words (exactly 1 word per keyword). ABSOLUTELY NO multi-word phrases. For example, use "coffee" and "cup" separately, never "coffee cup". NO colors. NO patterns.`;
   } else if (keywordMode === 'multi') {
-    keywordRuleSchemaDesc = `Generate simple basic-English microstock keywords in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
+    keywordRuleSchemaDesc = `Generate microstock keywords strictly in ${getLanguageName(metadataLanguage)}. STRICTLY ONLY multi-word commercial phrases. NO colors. NO patterns.`;
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMULTI-KEYWORD MODE OVERRIDE:\nGenerate ONLY multi-word phrases (2-4 words). No standalone single words at all. NO colors. NO patterns.`;
   } else {
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMIXED-KEYWORD MODE OVERRIDE:\nGenerate a balanced mix of single words and 2-4 word natural search phrases. DO NOT artificially split compound words that are naturally searched together. NO colors. NO patterns.`;
@@ -4363,7 +4393,7 @@ OUTPUT FORMAT:
     "semantic_category_analysis": {
       "adobe_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": ""
+      "shutterstock_category_2": "",
       "dreamstime_category": "",
       "miricanvas_category": "",
       "reason": "Explain carefully why these official Adobe and Shutterstock categories match the visual content semantically based on primary subjects, context, and deeper theme"
@@ -4434,7 +4464,7 @@ MANDATORY RULES FOR TARGET KEYWORDS & TITLE (STRICT PRIORITY):
 
   const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
-OUTPUT MUST BE IN ENGLISH for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
+OUTPUT MUST BE STRICTLY IN ${getLanguageName(metadataLanguage)} for Title, Description, and Keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
 
@@ -4497,7 +4527,7 @@ OUTPUT FORMAT:
       "keywords": [],
       "category_id": 1,
       "shutterstock_category_1": "Abstract",
-      "shutterstock_category_2": "Backgrounds/Textures"
+      "shutterstock_category_2": "Backgrounds/Textures",
       "dreamstime_category": "",
       "miricanvas_category": "",
       "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly"
@@ -4569,7 +4599,7 @@ OUTPUT FORMAT:
 
   const validatorSystemInstruction = `You are a professional Adobe Stock and Shutterstock metadata specialist. 
 Your goal is to maximize the discoverability of visual assets.
-OUTPUT MUST BE IN ${getLanguageName(metadataLanguage)} for titles and keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
+OUTPUT MUST BE STRICTLY IN ${getLanguageName(metadataLanguage)} for Title, Description, and Keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
 ${mediaContext}${customPromptCommand}
 
@@ -4654,7 +4684,7 @@ OUTPUT FORMAT:
       "keywords": [],
       "category_id": 0,
       "shutterstock_category_1": "",
-      "shutterstock_category_2": ""
+      "shutterstock_category_2": "",
       "dreamstime_category": "",
       "miricanvas_category": "",
       "category_reason": "Provide a brief 1-sentence visual semantic reason detailing why these categories match the image perfectly",
@@ -4992,41 +5022,34 @@ export const generateOptimizedPrompt = async (options: {
     "Voxel Art": ' - Focus on 3D pixel art constructed from volumetric cubes (voxels). Emphasize a blocky, retro video game aesthetic similar to Minecraft, with low-resolution 3D geometry but modern high-quality lighting (raytracing, global illumination). Use sharp pixelated textures, crisp cube edges, and a rigid grid-based structure. CRITICAL: Do not use the word "Minecraft" or specific game IP; instead use "voxel art", "3D blocky pixel art", or "cubical world". AVOID: Realism, photorealistic rendering, real-world natural aesthetics, or smooth continuous surfaces.',
     "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject—focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.',
     "Corporate Technology Concept": ' - Focus on realistic photography and business themes combined with holographic UI overlays such as floating icons, glowing digital lights, and advanced tech elements. Emphasize a photorealistic corporate environment infused with futuristic, high-tech digital interfaces and data streams.',
-    "Graphic Design": `You are an expert Commercial Graphic Designer specializing in high-demand advertising and branding assets—banners, flyers, posters, social media promos, commercial templates, and marketing materials—crafted using professional design tools like Adobe Illustrator, Adobe Photoshop, and CorelDRAW.
+    "Graphic Design": `You are an elite Commercial Art Director and Graphic Designer creating premium, high-selling commercial assets tailored for Adobe Stock, advertising campaigns, and professional marketing media.
 
-When generating or refining prompts for the "Graphic Design" style, you MUST strictly follow these rules:
+When generating prompts for the "Graphic Design" style, you MUST embody the TRUE, AUTHENTIC characteristics of professional graphic design—NOT generic templates, and NOT mere flat vector clip-art:
 
-1. CORE PURPOSE & VISUAL IDENTITY (CRITICAL)
-   - Focus purely on COMMERCIAL GRAPHIC DESIGN output: promotional banners, advertising flyers, sale posters, event backdrops, social media graphics, branding templates, and marketing collateral.
-   - The output MUST look like it was made in Adobe Illustrator, Photoshop, or CorelDRAW — flat vector composition, geometric shapes, clean bold layouts, creative typography placeholders, and vibrant commercial color palettes.
-   - STRICTLY ZERO REALISM. NO photographs, NO photorealistic rendering, NO real-world textures, NO natural landscapes, NO 3D CGI, NO human faces or realistic skin.
-   - The design must be 100% VECTOR-BASED and SHAPE-BASED: think flat design icons, geometric abstract compositions, isometric shapes, overlapping semi-transparent polygons, bold line art, halftone patterns, and stylized graphic elements.
+1. AUTHENTIC GRAPHIC DESIGN IDENTITY (TRUE COMMERCIAL DESIGN):
+   - Graphic Design is the art of VISUAL COMMUNICATION, STRUCTURED LAYOUT, and VISUAL HIERARCHY.
+   - It is NOT just flat 2D vector icons. Graphic design artfully unites hero subjects (commercial products, human models, food, technology, fashion, or stylized illustrations) with intentional graphic design layout systems: geometric framing, grid structures, color blocking, duotone or bold tonal treatments, and designated negative copy space.
+   - The result must look like a finished, high-production commercial advertisement, editorial spread, marketing key visual, or promotional poster created by a top-tier design agency.
 
-2. DESIGN TOOL AESTHETIC (IMPORTANT)
-   - Emulate professional design software output: clean vector paths, flat solid fills, smooth gradient meshes, precise geometric alignment, drop shadows, blending modes, and layer-style effects.
-   - Style references: Adobe Illustrator vector artwork, Photoshop poster compositions, CorelDRAW banner layouts, Canva template aesthetics, Figma UI design vibes.
+2. ANTI-TEMPLATE & ANTI-COOKIE-CUTTER MANDATE (CRITICAL FOR ADOBE STOCK):
+   - DO NOT write repetitive, formulaic prompts that feel like lazy generic templates (e.g., repeatedly tacking on "modern banner template with geometric shapes and copy space").
+   - Every single prompt variation MUST feature a completely DIFFERENT, CREATIVE, and ART-DIRECTED visual concept:
+     * Shift the layout system dramatically across variations (e.g., Swiss grid system vs. Bauhaus diagonal tension vs. contemporary editorial framing vs. neo-brutalist color blocking vs. minimalist luxury staging).
+     * Shift the color palette entirely (e.g., high-contrast cobalt and amber duotone vs. warm terracotta editorial neutral vs. sleek corporate navy and electric cyan vs. energetic pop-art saturated contrast).
+     * Vary the graphic elements naturally (e.g., subtle halftone texture accents, delicate hairline grid guides, bold drop-shadow planes, circular framing vignettes, layered paper-cut edges).
 
-3. STRUCTURED LAYOUT & VISUAL HIERARCHY
-   - Use bold grid-based compositions, asymmetrical dynamic layouts, or centered poster-style structures.
-   - Include visual flow elements: sweeping curves, diagonal dividers, overlapping shape clusters, ribbon banners, badge frames, and corner ornaments.
-   - The composition must look like a finished commercial design ready for a client presentation—not an art piece.
+3. SUBJECT AS COMMERCIAL HERO:
+   - The core subject "${subject}" must be the clear, unmistakable HERO of the composition.
+   - Treat the subject with commercial finesse: studio-lit commercial presentation, sharp cutout contour, duotone color grading, or stylized graphic treatment that interacts organically with the layout's geometric planes and framing elements.
 
-4. MANDATORY COPY SPACE & NO TEXT (CRITICAL)
-   - ALWAYS reserve generous, clean negative space (empty areas) for headlines, taglines, logos, and CTAs.
-   - NEVER generate readable text, letters, or words. Use abstract placeholder bars, geometric text blocks, or curved ribbon shapes instead.
+4. ADOBE STOCK COMPLIANCE: MANDATORY CLEAN COPY SPACE & ZERO GIBBERISH TEXT:
+   - Adobe Stock reviewers immediately reject generative AI designs that contain garbled, illegible pseudo-letters or broken text.
+   - STRICT BAN: NEVER generate readable words, random letters, fake typography, or AI gibberish text.
+   - MANDATORY FUNCTIONAL COPY SPACE: Every prompt MUST integrate generous, clean, uncluttered negative space / copy space naturally into the composition (e.g., "spacious clean negative copy space on the upper right for headline typography", "uncluttered layout with broad negative space designed for commercial text overlay", "generous blank area framed by minimalist geometric dividing lines"). Stock buyers need this pristine space to insert their own client text.
 
-5. GRAPHIC ELEMENTS & AESTHETICS
-   - Primary visual language: bold geometric shapes (circles, triangles, hexagons, abstract blobs), smooth gradient meshes, isometric cubes, overlapping translucent layers, dynamic diagonal slashes, dotted halftone textures, sleek line art dividers, and ornamental frame borders.
-   - Color palette: vibrant commercial advertising colors — electric blue, hot pink, neon green, golden yellow, deep purple, teal, coral orange, with striking duotone or triadic color schemes.
-   - The design should be RICH and DETAILED but purely artificial — like a premium stock vector template from Freepik or Shutterstock.
-
-6. KEYWORDS TO INJECT
-   - Integrate terms like: "flat vector graphic design, commercial advertising poster, promotional banner template, geometric abstract composition, bold vibrant colors, clean copy space, Adobe Illustrator style, non-realistic vector art, isometric shapes, halftone pattern, gradient mesh, corporate branding layout, purely digital graphic art, shape-based design, NO PHOTOGRAPHY."
-
-7. STRICT PROHIBITIONS
-   - NO photographs, NO realism, NO 3D CGI renders, NO natural environments, NO human subjects, NO realistic textures.
-   - NO minimalism — the design must be visually rich, bold, and commercially impactful.
-   - This is PURE GRAPHIC DESIGN — flat, vector, shape-based, digital, commercial.`,
+5. COMMERCIAL UTILITY & MARKET DEMAND:
+   - Craft assets that commercial designers actually buy on Adobe Stock: advertising key visuals, seasonal promo posters, social media campaign headers, product launch visuals, event announcements, and corporate marketing layouts.
+   - Under no circumstances include trademarked logos, brand names, or copyrighted character IPs. Keep all concepts generic, universal, and commercially viable.`,
   };
 
   let currentDirective = styleSpecificDirectives[styleCategory] || '';
@@ -5175,7 +5198,11 @@ Rules for the Generated Prompts:
         * Variasikan skenario kehidupan nyata: persiapan, aksi penggunaan, momen candid, interaksi, detail bahan baku.
         * Variasikan framing & pencahayaan alami: macro close-up, eye-level portrait, overhead knolling flat lay, wide environmental landscape, golden hour, morning window light, clean softbox studio.
 
-      ─ FOR VECTOR & GRAPHIC DESIGN STYLES (Vector Art, Graphic Design, Flat Icon, Sticker, Line Art):
+      ─ FOR GRAPHIC DESIGN (Commercial Advertising, Poster, Promo Banner, Editorial Layout):
+        * Variasikan layout komersial & hierarki visual: Swiss grid poster dengan asymmetric negative space, promotional banner dengan floating geometric frames & badge accents, contemporary editorial layout dengan elegant framing & clean copy space, Bauhaus-inspired dynamic diagonal layout, neo-brutalist marketing visual dengan bold color blocking, minimalist luxury product staging dengan geometric pedestals.
+        * Variasikan perlakuan desain & copy space: subjek sebagai hero komersial (studio cutout, duotone grading, graphic framing) dipadukan dengan ruang kosong (copy space) yang luas, bersih, dan bebas teks untuk penempatan tipografi pembeli stok. HINDARI formula template yang monoton.
+
+      ─ FOR VECTOR & FLAT DESIGN STYLES (Vector Art, Flat Icon, Sticker, Line Art):
         * Variasikan layout grafis & hierarki desain: layout banner promosi horizontal, kartu poster vertikal dengan negative space, komposisi emblem/lencana terpusat, tata letak infografis modular, susunan siluet dinamis.
         * Variasikan palet warna & teknik vektor: palet warna duotone kontras tinggi, palet pastel kontemporer, kombinasi monokromatik elegan, ketebalan garis (stroke weight), dan bentuk lengkungan geometris/organik.
 
@@ -5195,7 +5222,8 @@ Rules for the Generated Prompts:
       - Every single prompt variation MUST begin with "${effectiveStyleCategory}" as its stylistic prefix.
       - NEVER contaminate or mix the vocabulary of the chosen style with another style.
       - 📸 PHOTOGRAPHIC (Photorealistic, Cinematic, Vintage Photography): Use ONLY camera lenses (50mm, 85mm, 35mm), lighting setups, aperture (f/1.8, f/2.8), and natural textures. FORBIDDEN: "vector", "3D render", "illustration", "flat art", "drawing", "CGI".
-      - 🎨 VECTOR & FLAT DESIGN (Vector Art, Flat Icon, Line Art, Sticker Illustration, Graphic Design): Use ONLY clean vector paths, flat solid colors, sharp outlines, and 2D vector shapes. FORBIDDEN: "shot on", "aperture", "DSLR", "realistic skin/eyes", "photograph", "3D render", "unreal engine".
+      - 📐 COMMERCIAL GRAPHIC DESIGN (Graphic Design): Emphasize structured commercial layouts, visual hierarchy, intentional graphic framing, color blocking, and generous negative copy space for typography. The subject is presented as an art-directed commercial hero asset. FORBIDDEN: readable gibberish text/letters, repetitive template formulas, messy unorganized snapshots, lack of layout structure.
+      - 🎨 VECTOR & FLAT DESIGN (Vector Art, Flat Icon, Line Art, Sticker Illustration): Use ONLY clean vector paths, flat solid colors, sharp outlines, and 2D vector shapes. FORBIDDEN: "shot on", "aperture", "DSLR", "realistic skin/eyes", "photograph", "3D render", "unreal engine".
       - 🧱 3D / CGI & RENDER (3D Render, 3D CGI, Lowpoly, Voxel Art, Isometric): Use ONLY 3D geometry, polygon meshes, PBR materials, global illumination, and ray-tracing. FORBIDDEN: "2D flat drawing", "vector path", "real physical photograph".
       - 🖌️ TRADITIONAL FINE ART (Oil Painting, Watercolor, HandDrawn Sketch, Paper Cut, Embroidery, Origami): Use ONLY tactile physical medium characteristics (brushstrokes, impasto pigments, paper grain, stitched thread, folded paper). FORBIDDEN: "digital 3D CGI", "DSLR camera lens", "vector shapes".
       - 🎮 STYLIZED & TOY (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style, Claymation): Use ONLY the specific medium vocabulary (cel-shaded animation, 8-bit pixels, interlocking plastic brick studs, hand-molded clay). FORBIDDEN: "realistic photo", "photorealistic".
@@ -5446,16 +5474,16 @@ CRITICAL DIRECTIVES:
 
   const styleFallbackMap: Record<string, string[]> = {
     "Graphic Design": [
-      "flat vector graphic design, Adobe Illustrator style composition, bold geometric shapes, clean commercial layout, vibrant duotone gradient, no realism",
-      "promotional banner template, isometric abstract geometry, halftone dot pattern, dynamic diagonal slashes, smooth gradient mesh, purely digital art",
-      "commercial advertising poster design, overlapping translucent polygons, bold line art elements, ornate frame border, striking color contrast, clean copy space",
-      "CorelDRAW banner style, geometric abstract composition, ribbon badge placeholder, modern flat vector shapes, electric blue and hot pink palette, no photography",
-      "social media promo template, layered geometric shapes, smooth drop shadows, sleek vector paths, golden yellow and deep purple gradient, shape-based design",
-      "Adobe Photoshop poster composition, asymmetrical dynamic layout, gradient mesh background, abstract blob elements, neon green and teal accents, purely digital",
-      "corporate branding layout, isometric cube cluster, sweeping curve dividers, bold triadic color scheme, clean negative space, professional design tool aesthetic",
-      "event backdrop banner design, overlapping circles and triangles, smooth blending modes, halftone texture overlay, coral orange and electric blue duotone",
-      "marketing flyer template, geometric frame border, abstract placeholder text bars, vibrant commercial colors, sleek layer-style effects, zero realism",
-      "stock vector template style, flat art composition, dynamic shape cluster, clean typography placeholder, rich gradient background, purely graphic art"
+      "commercial advertising poster layout, bold hero subject, geometric framing accents, Swiss style grid alignment, high-contrast duotone palette, generous clean copy space for typography, professional graphic design composition",
+      "promotional banner visual, dynamic diagonal color blocking, floating graphic badge accents, modern commercial layout, vibrant advertising color harmony, structured negative space for headline text overlay",
+      "contemporary editorial layout, elegant minimalist framing, subtle geometric borders, sophisticated neutral color palette, refined commercial aesthetic, ample pristine copy space for text",
+      "Bauhaus-inspired commercial design, striking circular and rectangular geometric elements, bold primary color contrast, dynamic visual hierarchy, structured composition with clean text copy space",
+      "modern social media marketing visual, vibrant gradient backdrop, sleek card overlay with soft drop shadow, bold commercial styling, spacious blank copy space for promotional copy",
+      "neo-brutalist advertising poster, high-contrast saturated color blocking, bold graphic dividing lines, playful sticker accent framing, dynamic commercial layout with designated copy space",
+      "corporate tech promo banner, sleek deep navy and cyan duotone gradient, subtle futuristic geometric grid lines, polished commercial layout, wide empty copy space for headline and logo",
+      "commercial product showcase layout, centered hero presentation on circular graphic pedestal, abstract geometric shape accents, premium studio lighting, generous copy space for branding typography",
+      "event marketing flyer composition, dynamic overlapping translucent shape clusters, subtle halftone texture accents, energetic complementary colors, uncluttered layout with designated text area",
+      "minimalist luxury commercial poster, clean asymmetric composition, fine hairline borders, sophisticated monochrome with warm metallic gold accents, generous negative copy space for brand title"
     ],
     "Cinematic": [
       "anamorphic lens, volumetric lighting, hyper-realistic cinematic key shot, intense atmospheric depth, cinematic lighting",
@@ -5873,10 +5901,12 @@ export const analyzeImageToPrompt = async (
    - Convert the aesthetic completely into a clean, modern 2D Flat Vector Illustration style.
    - Emphasize crisp vector outlines, flat harmonious color palettes, clean geometric and organic shapes, minimalist shading, generous clean copy space, and aesthetic editorial illustration qualities typical of professional flat vector art.`;
   } else if (styleCategory === 'Graphic Design') {
-    styleHandlingInstruction = `3. STYLE TRANSLATION TO COMMERCIAL GRAPHIC DESIGN (ZERO TYPOGRAPHY RULE):
-   - Convert the aesthetic completely into a professional commercial advertising layout, banner template, or poster composition crafted in Adobe Illustrator/Photoshop style with geometric shapes, flat vector elements, and vibrant commercial color palettes.
-   - STRICT BAN ON ALL TYPOGRAPHY & TEXT: You are STRICTLY FORBIDDEN from including any readable text, fake words, letters, gibberish characters, placeholder fonts, or printed typography in the prompt.
-   - MANDATORY GENEROUS COPY SPACE: Every single prompt variation MUST explicitly feature spacious, clean, uncluttered empty copy space / negative space (e.g., "spacious clean negative copy space on the right, blank layout area for text overlay, no typography, no letters, purely graphic background"). This makes the asset 100% editable and commercially sellable on microstock platforms.`;
+    styleHandlingInstruction = `3. STYLE TRANSLATION TO AUTHENTIC COMMERCIAL GRAPHIC DESIGN (ADOBE STOCK COMPLIANT):
+   - Transform the visual concept into a high-converting commercial advertising poster, promotional banner, or modern editorial graphic layout.
+   - Emphasize visual hierarchy, structured layout frameworks (such as Swiss grid, Bauhaus diagonal, modern minimalist framing, or neo-brutalist blocking), geometric framing accents, color theory harmonies, and intentional art direction. Avoid generic repetitive template formulas.
+   - The primary subject from the image becomes the commercial hero focal point, integrated with graphic layout elements such as color blocks, framing lines, drop shadows, or floating graphic accents.
+   - STRICT ZERO GIBBERISH TEXT RULE: Never generate readable words, letters, pseudo-text, or garbled fonts.
+   - MANDATORY GENEROUS COPY SPACE: Every single prompt variation MUST feature spacious, clean, uncluttered negative space / copy space engineered for client typography overlay (e.g., "generous clean copy space for typography, blank layout area for headline overlay, no text, no letters, commercially ready graphic design composition").`;
   } else {
     styleHandlingInstruction = `3. STYLE TRANSLATION TO "${styleCategory}":
    - Convert the aesthetic completely into the domain of "${styleCategory}" (e.g. 3D Render uses UE5/PBR, Vector uses flat 2D paths, Watercolor uses paint washes, Photorealistic uses natural camera specs).`;
@@ -6453,10 +6483,6 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
         }
       }
 
-      // Normalisasi false positives khusus konsep 3D / Cyber / Hologram / Medis Makro / Latar Belakang Bokeh
-      const checks = parsedResult.ai_vision_checks;
-      if (checks) {
-        ['ai_artifacts', 'structural_defects'].forEach(key => {
       // Kunci kritis yang memicu penolakan stock (IP, Watermark, Mutasi Anatomi AI, Cacat Gadget/Struktur, atau AI artifact nyata)
       const criticalKeys = ['watermark', 'logo', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts', 'proportion_defects'];
       // Kunci teknis pendukung kualitas
