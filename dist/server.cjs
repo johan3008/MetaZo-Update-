@@ -2770,7 +2770,8 @@ function extractTargetKeywords(customPrompt) {
   const seen = /* @__PURE__ */ new Set();
   for (const seg of rawSegments) {
     const clean = sanitizeForIndexing(seg);
-    if (!clean || clean.length < 2 || isProhibitedKeyword(clean)) continue;
+    const isCJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/.test(clean);
+    if (!clean || !isCJK && clean.length < 2 || isProhibitedKeyword(clean)) continue;
     const words = clean.split(/\s+/).filter(Boolean);
     if (words.length >= 1 && words.length <= 4) {
       if (!seen.has(clean)) {
@@ -3469,23 +3470,31 @@ var TITLE_STOP_WORDS = /* @__PURE__ */ new Set([
 ]);
 function titleKeywordTerms(title) {
   return new Set(
-    normalizeAdobeKeyword(title).split(/\s+/).filter((word) => word.length > 1 && !TITLE_STOP_WORDS.has(word)).map((word) => adobeKeywordCanonical(word))
+    normalizeAdobeKeyword(title).split(/\s+/).filter((word) => {
+      const isCJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/.test(word);
+      return (isCJK ? word.length >= 1 : word.length > 1) && !TITLE_STOP_WORDS.has(word);
+    }).map((word) => adobeKeywordCanonical(word))
   );
 }
 function isAdobeKeywordCompliant(keyword, visualFacts, title) {
   const normalized = normalizeAdobeKeyword(keyword);
-  if (!normalized || normalized.length < 2) return false;
+  const isCJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/.test(normalized);
+  if (!normalized || !isCJK && normalized.length < 2) return false;
   if (ADOBE_KEYWORD_FILLER.has(normalized)) return false;
   if (isProhibitedKeyword(normalized) || ADOBE_KEYWORD_IP_PATTERN.test(normalized)) return false;
   if (ADOBE_KEYWORD_TECHNICAL_PATTERN.test(normalized)) return false;
   if (ADOBE_KEYWORD_NUMBER_PATTERN.test(normalized)) return false;
   const wordCount = normalized.split(/\s+/).length;
   if (wordCount > 3) return false;
-  if (wordCount > 1) {
+  const isPureAscii = /^[\x00-\x7F]+$/.test(normalized);
+  const isEnglish = !visualFacts?.metadataLanguage || visualFacts.metadataLanguage === "en";
+  if (wordCount > 1 && isPureAscii && isEnglish) {
     const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
-    const phraseWords = normalized.split(/\s+/);
-    const allWordsSupported = phraseWords.every((word) => factsText.includes(word));
-    if (!allWordsSupported) return false;
+    if (factsText && factsText.length > 2) {
+      const phraseWords = normalized.split(/\s+/);
+      const allWordsSupported = phraseWords.every((word) => factsText.includes(word));
+      if (!allWordsSupported) return false;
+    }
   }
   return true;
 }
@@ -3924,6 +3933,15 @@ var processFrameServer = (frame) => {
       }
     };
   }
+  if (frame.startsWith("http://") || frame.startsWith("https://")) {
+    console.warn("[processFrameServer] Warning: Raw URL passed to processFrameServer, cannot inline into Gemini payload:", frame);
+    return {
+      inlineData: {
+        mimeType: "image/jpeg",
+        data: ""
+      }
+    };
+  }
   if (!frame.includes(";base64,")) {
     return {
       inlineData: {
@@ -4079,9 +4097,12 @@ function stemWord(word) {
 }
 function sanitizeForIndexing(kw) {
   if (!kw) return "";
-  let clean = kw.toLowerCase().trim().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+  let clean = String(kw).normalize("NFKC").toLowerCase().trim().replace(/[^\p{L}\p{N}\s-]/gu, "").replace(/\s+/g, " ").trim();
+  if (!clean) return "";
+  const hasCJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/.test(clean);
+  if (hasCJK) return clean;
   const words = clean.split(" ").filter((w) => w.length >= 2);
-  return words.join(" ");
+  return words.length > 0 ? words.join(" ") : clean;
 }
 function semanticKeySignature(phrase) {
   return phrase.toLowerCase().split(/\s+/).filter((w) => !["a", "an", "the", "at", "in", "on", "of"].includes(w)).map(stemWord).sort().join(" ");
@@ -4370,14 +4391,16 @@ async function applyMetadataGenKeywordLogic(options) {
   for (const raw of source) {
     if (typeof raw !== "string") continue;
     const phrase = raw.toLowerCase().trim().replace(/[^\p{L}\p{N}\s-]/gu, "").replace(/\s+/g, " ");
-    if (phrase.length <= 1) continue;
+    const isCJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/.test(phrase);
+    if (!phrase || !isCJK && phrase.length <= 1) continue;
     if (!isProhibitedKeyword(phrase)) {
       cleaned.push(phrase);
     }
   }
   const rankingFacts = {
     ...visualFacts || {},
-    title: visualFacts?.title || visualFacts?.metadata_title || ""
+    title: visualFacts?.title || visualFacts?.metadata_title || "",
+    metadataLanguage
   };
   const masterPool = buildMasterKeywordCandidatePool(cleaned, rankingFacts, targetCount);
   let finalKeywords = ensureKeywordCount(
@@ -5019,7 +5042,10 @@ OUTPUT FORMAT:
       recovery.title = String(recovery.title || recovery.name || recovery.headline || "Stock asset").trim();
       recovery.description = String(recovery.description || recovery.desc || recovery.caption || recovery.title || "Visual stock asset").trim();
       const rawKeywords = Array.isArray(recovery.keywords) ? recovery.keywords : [];
-      const safeKeywords = rawKeywords.filter((k) => typeof k === "string").map((k) => k.toLowerCase().trim().replace(/[^\p{L}\p{N}\s-]/gu, "").replace(/\s+/g, " ")).filter((k) => k.length > 1 && !isProhibitedKeyword(k));
+      const safeKeywords = rawKeywords.filter((k) => typeof k === "string").map((k) => k.toLowerCase().trim().replace(/[^\p{L}\p{N}\s-]/gu, "").replace(/\s+/g, " ")).filter((k) => {
+        const isCJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/.test(k);
+        return (isCJK ? k.length >= 1 : k.length > 1) && !isProhibitedKeyword(k);
+      });
       try {
         recovery.keywords = await applyMetadataGenKeywordLogic({
           rawKeywords: safeKeywords,
@@ -7062,7 +7088,25 @@ PANDUAN KEPUTUSAN JUJUR, OBJEKTIF & TEGAS:
     },
     required: ["visual_scan_analysis", "legal_status", "requires_model_release", "requires_property_release", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps", "yolo_detected_objects"]
   };
-  const imageParts = Array.isArray(image) ? image.map((img) => processFrameServer(img)) : [processFrameServer(image)];
+  const rawImages = Array.isArray(image) ? image : [image];
+  const resolvedImages = [];
+  for (const item of rawImages) {
+    if (typeof item === "string" && (item.startsWith("http://") || item.startsWith("https://"))) {
+      try {
+        const resp = await fetch(item);
+        if (resp.ok) {
+          const buf = Buffer.from(await resp.arrayBuffer());
+          const mime = resp.headers.get("content-type") || "image/jpeg";
+          resolvedImages.push(`data:${mime};base64,${buf.toString("base64")}`);
+          continue;
+        }
+      } catch (err) {
+        console.warn("[checkImageQuality] Failed to fetch remote image URL directly:", err.message);
+      }
+    }
+    resolvedImages.push(item);
+  }
+  const imageParts = resolvedImages.map((img) => processFrameServer(img));
   let selectedModel = model || "gemini-3.1-pro-preview";
   if (selectedModel === "auto" || !selectedModel.startsWith("gemini")) {
     selectedModel = "gemini-3.1-pro-preview";
@@ -10382,6 +10426,7 @@ app.get("/api/generate-event-keywords", handleEventKeywordsRequest);
 app.post("/api/event-keywords", handleEventKeywordsRequest);
 app.get("/api/event-keywords", handleEventKeywordsRequest);
 app.post("/api/check-image-quality", upload.single("image"), async (req, res) => {
+  let cleanupDownload = null;
   try {
     let imagePayload;
     let fileType = req.body.fileType;
@@ -10395,10 +10440,25 @@ app.post("/api/check-image-quality", upload.single("image"), async (req, res) =>
         import_fs2.default.unlinkSync(req.file.path);
       } catch (_) {
       }
+    } else if (req.body.fileUrl || req.body.pathKey || typeof req.body.image === "string" && (req.body.image.startsWith("http://") || req.body.image.startsWith("https://"))) {
+      const targetUrl = req.body.fileUrl || (typeof req.body.image === "string" ? req.body.image : "");
+      const pathKey = req.body.pathKey;
+      let ext = ".jpeg";
+      try {
+        const parsedUrl = new URL(targetUrl || "http://localhost");
+        ext = import_path.default.extname(parsedUrl.pathname) || (fileType ? `.${fileType.replace(/^image\//, "")}` : ".jpeg");
+      } catch (_) {
+      }
+      const downloaded = await downloadFileFromStorage(targetUrl, pathKey, ext);
+      cleanupDownload = downloaded.cleanup;
+      const buffer = import_fs2.default.readFileSync(downloaded.localPath);
+      let mime = "image/jpeg";
+      if (ext.toLowerCase() === ".png") mime = "image/png";
+      else if (ext.toLowerCase() === ".webp") mime = "image/webp";
+      imagePayload = `data:${mime};base64,${buffer.toString("base64")}`;
+      fileType = fileType || mime;
     } else if (req.body.image) {
       imagePayload = req.body.image;
-    } else if (req.body.fileUrl) {
-      imagePayload = req.body.fileUrl;
     }
     if (!imagePayload) {
       return res.status(400).json({ error: "No image data provided for quality check" });
@@ -10411,9 +10471,22 @@ app.post("/api/check-image-quality", upload.single("image"), async (req, res) =>
     }
     const { tolerance, language, model } = req.body;
     const result = await checkImageQuality(imagePayload, tolerance || "MEDIUM", language || "Bahasa", model, fileType, metadata);
+    if (cleanupDownload) {
+      try {
+        cleanupDownload();
+      } catch (_) {
+      }
+      cleanupDownload = null;
+    }
     res.json(result);
   } catch (e) {
     console.warn("Server check-image-quality error:", e);
+    if (cleanupDownload) {
+      try {
+        cleanupDownload();
+      } catch (_) {
+      }
+    }
     if (req.file && req.file.path && import_fs2.default.existsSync(req.file.path)) {
       try {
         import_fs2.default.unlinkSync(req.file.path);
@@ -10425,7 +10498,7 @@ app.post("/api/check-image-quality", upload.single("image"), async (req, res) =>
 });
 app.post("/api/check-video-quality", upload.single("video"), async (req, res) => {
   try {
-    let { tolerance, language, model, frames, fileUrl } = req.body;
+    let { tolerance, language, model, frames, fileUrl, pathKey } = req.body;
     if (typeof frames === "string") {
       try {
         frames = JSON.parse(frames);
@@ -10438,19 +10511,15 @@ app.post("/api/check-video-quality", upload.single("video"), async (req, res) =>
     }
     let videoPath = req.file ? req.file.path : null;
     let tempDownloadedPath = null;
-    if (!videoPath && fileUrl) {
+    if (!videoPath && (fileUrl || pathKey)) {
       try {
-        const resp = await fetch(fileUrl);
-        if (resp.ok) {
-          const buffer = Buffer.from(await resp.arrayBuffer());
-          const parsedUrl = new URL(fileUrl, "http://localhost");
-          const ext = import_path.default.extname(parsedUrl.pathname) || ".mp4";
-          tempDownloadedPath = import_path.default.join(uploadDir, `downloaded_${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`);
-          import_fs2.default.writeFileSync(tempDownloadedPath, buffer);
-          videoPath = tempDownloadedPath;
-        }
+        const parsedUrl = new URL(fileUrl || "http://localhost");
+        const ext = import_path.default.extname(parsedUrl.pathname) || ".mp4";
+        const dl = await downloadFileFromStorage(fileUrl || "", pathKey, ext);
+        tempDownloadedPath = dl.localPath;
+        videoPath = tempDownloadedPath;
       } catch (dlErr) {
-        console.warn("[check-video-quality] Failed to download video from fileUrl:", dlErr.message);
+        console.warn("[check-video-quality] Failed to download video from storage/url:", dlErr.message);
       }
     }
     if (!videoPath || !import_fs2.default.existsSync(videoPath)) {
@@ -10701,11 +10770,24 @@ async function downloadFileFromStorage(fileUrl, pathKey, extension = ".mp4") {
   const localPath = import_path.default.join(uniqueTmpDir, `downloaded${extension}`);
   const fileStream = import_fs2.default.createWriteStream(localPath);
   const { finished } = await import("stream/promises");
-  if (pathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
-    console.log(`[Storage] Downloading from S3 with key ${pathKey}...`);
+  let effectivePathKey = pathKey;
+  if (!effectivePathKey && fileUrl) {
+    try {
+      const u = new URL(fileUrl);
+      const p = u.pathname.replace(/^\/+/, "");
+      if (p.startsWith("eps-uploads/") || p.startsWith("metazostorage/") || p.startsWith("video-muted/")) {
+        effectivePathKey = p;
+      } else if (process.env.S3_BUCKET_NAME && p.startsWith(process.env.S3_BUCKET_NAME + "/")) {
+        effectivePathKey = p.substring(process.env.S3_BUCKET_NAME.length + 1);
+      }
+    } catch (_) {
+    }
+  }
+  if (effectivePathKey && isR2Configured() && process.env.S3_BUCKET_NAME) {
+    console.log(`[Storage] Downloading from S3 with key ${effectivePathKey}...`);
     const command = new import_client_s3.GetObjectCommand({
       Bucket: process.env.S3_BUCKET_NAME,
-      Key: pathKey
+      Key: effectivePathKey
     });
     const response = await getS3Client().send(command);
     const stream = response.Body;
