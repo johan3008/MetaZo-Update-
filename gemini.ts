@@ -343,7 +343,8 @@ export function extractTargetKeywords(customPrompt?: string): string[] {
 
   for (const seg of rawSegments) {
     const clean = sanitizeForIndexing(seg);
-    if (!clean || clean.length < 2 || isProhibitedKeyword(clean)) continue;
+    const isCJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/.test(clean);
+    if (!clean || (!isCJK && clean.length < 2) || isProhibitedKeyword(clean)) continue;
     
     const words = clean.split(/\s+/).filter(Boolean);
     if (words.length >= 1 && words.length <= 4) {
@@ -1737,7 +1738,10 @@ function titleKeywordTerms(title?: string): Set<string> {
   return new Set(
     normalizeAdobeKeyword(title)
       .split(/\s+/)
-      .filter(word => word.length > 1 && !TITLE_STOP_WORDS.has(word))
+      .filter(word => {
+        const isCJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/.test(word);
+        return (isCJK ? word.length >= 1 : word.length > 1) && !TITLE_STOP_WORDS.has(word);
+      })
       .map(word => adobeKeywordCanonical(word))
   );
 }
@@ -1748,7 +1752,8 @@ function isAdobeKeywordCompliant(
   title?: string
 ): boolean {
   const normalized = normalizeAdobeKeyword(keyword);
-  if (!normalized || normalized.length < 2) return false;
+  const isCJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/.test(normalized);
+  if (!normalized || (!isCJK && normalized.length < 2)) return false;
   if (ADOBE_KEYWORD_FILLER.has(normalized)) return false;
   if (isProhibitedKeyword(normalized) || ADOBE_KEYWORD_IP_PATTERN.test(normalized)) return false;
   if (ADOBE_KEYWORD_TECHNICAL_PATTERN.test(normalized)) return false;
@@ -1759,11 +1764,15 @@ function isAdobeKeywordCompliant(
 
   // Adobe favors concise concepts. Keep multi-word phrases only when they
   // are explicitly supported by the visual facts rather than keyword stuffing.
-  if (wordCount > 1) {
+  const isPureAscii = /^[\x00-\x7F]+$/.test(normalized);
+  const isEnglish = !visualFacts?.metadataLanguage || visualFacts.metadataLanguage === 'en';
+  if (wordCount > 1 && isPureAscii && isEnglish) {
     const factsText = JSON.stringify(visualFacts || {}).toLowerCase();
-    const phraseWords = normalized.split(/\s+/);
-    const allWordsSupported = phraseWords.every(word => factsText.includes(word));
-    if (!allWordsSupported) return false;
+    if (factsText && factsText.length > 2) {
+      const phraseWords = normalized.split(/\s+/);
+      const allWordsSupported = phraseWords.every(word => factsText.includes(word));
+      if (!allWordsSupported) return false;
+    }
   }
 
   return true;
@@ -2308,6 +2317,18 @@ const callGeminiWithRetry = async (
 const processFrameServer = (frame: any) => {
   if (typeof frame !== 'string') {
     console.error('[processFrameServer] Expected string, got:', typeof frame, frame);
+    return {
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: ''
+      }
+    };
+  }
+
+  // Safety guard: NEVER put a raw HTTP/HTTPS URL into inlineData.data
+  // as Gemini API expects base64 bytes and will fail with 400 Bad Request!
+  if (frame.startsWith('http://') || frame.startsWith('https://')) {
+    console.warn('[processFrameServer] Warning: Raw URL passed to processFrameServer, cannot inline into Gemini payload:', frame);
     return {
       inlineData: {
         mimeType: 'image/jpeg',
@@ -2960,16 +2981,20 @@ function stemWord(word: string): string {
  */
 function sanitizeForIndexing(kw: string): string {
   if (!kw) return '';
-  let clean = kw
+  let clean = String(kw)
+    .normalize('NFKC')
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s]/g, '') // Hapus simbol, kutip, bracket, emoji, titik koma
+    .replace(/[^\p{L}\p{N}\s-]/gu, '') // Hapus simbol, kutip, bracket, emoji, titik koma (tetap pertahankan huruf semua bahasa & angka)
     .replace(/\s+/g, ' ')          // Normalisasi spasi
     .trim();
 
+  if (!clean) return '';
+  const hasCJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/.test(clean);
+  if (hasCJK) return clean;
+
   const words = clean.split(' ').filter(w => w.length >= 2);
-  
-  return words.join(' ');
+  return words.length > 0 ? words.join(' ') : clean;
 }
 
 function semanticKeySignature(phrase: string): string {
@@ -3447,7 +3472,8 @@ async function applyMetadataGenKeywordLogic(options: {
       .trim()
       .replace(/[^\p{L}\p{N}\s-]/gu, '')
       .replace(/\s+/g, ' ');
-    if (phrase.length <= 1) continue;
+    const isCJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/.test(phrase);
+    if (!phrase || (!isCJK && phrase.length <= 1)) continue;
 
     if (!isProhibitedKeyword(phrase)) {
       cleaned.push(phrase);
@@ -3456,7 +3482,8 @@ async function applyMetadataGenKeywordLogic(options: {
 
   const rankingFacts = {
     ...(visualFacts || {}),
-    title: visualFacts?.title || visualFacts?.metadata_title || ""
+    title: visualFacts?.title || visualFacts?.metadata_title || "",
+    metadataLanguage
   };
   const masterPool = buildMasterKeywordCandidatePool(cleaned, rankingFacts, targetCount);
   let finalKeywords = ensureKeywordCount(
@@ -4180,7 +4207,10 @@ OUTPUT FORMAT:
       const safeKeywords = rawKeywords
         .filter((k: any) => typeof k === 'string')
         .map((k: string) => k.toLowerCase().trim().replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s+/g, ' '))
-        .filter((k: string) => k.length > 1 && !isProhibitedKeyword(k));
+        .filter((k: string) => {
+          const isCJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/.test(k);
+          return (isCJK ? k.length >= 1 : k.length > 1) && !isProhibitedKeyword(k);
+        });
 
       try {
         recovery.keywords = await applyMetadataGenKeywordLogic({
@@ -6384,7 +6414,25 @@ PANDUAN KEPUTUSAN JUJUR, OBJEKTIF & TEGAS:
     required: ["visual_scan_analysis", "legal_status", "requires_model_release", "requires_property_release", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps", "yolo_detected_objects"]
   };
 
-  const imageParts = Array.isArray(image) ? image.map(img => processFrameServer(img)) : [processFrameServer(image)];
+  const rawImages = Array.isArray(image) ? image : [image];
+  const resolvedImages: string[] = [];
+  for (const item of rawImages) {
+    if (typeof item === 'string' && (item.startsWith('http://') || item.startsWith('https://'))) {
+      try {
+        const resp = await fetch(item);
+        if (resp.ok) {
+          const buf = Buffer.from(await resp.arrayBuffer());
+          const mime = resp.headers.get('content-type') || 'image/jpeg';
+          resolvedImages.push(`data:${mime};base64,${buf.toString('base64')}`);
+          continue;
+        }
+      } catch (err: any) {
+        console.warn('[checkImageQuality] Failed to fetch remote image URL directly:', err.message);
+      }
+    }
+    resolvedImages.push(item);
+  }
+  const imageParts = resolvedImages.map(img => processFrameServer(img));
   
   // QC routing: use original model configuration
   let selectedModel = model || 'gemini-3.1-pro-preview';
