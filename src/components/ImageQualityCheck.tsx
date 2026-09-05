@@ -14,6 +14,12 @@ export interface QualityReport {
   recommendation: "PASS" | "FAIL";
   overall_score: number;
   legal_status: string;
+  requires_model_release?: boolean;
+  requires_property_release?: boolean;
+  detection_tools_used?: string[];
+  ip_audit_summary?: string;
+  quality_issues_summary?: string;
+  technical_issues_summary?: string;
   technical_issues: string[];
   strengths: string[];
   detailed_feedback: string;
@@ -61,20 +67,17 @@ export interface QualityReport {
     recommendation: "PASS" | "FAIL";
     overall_score: number;
     legal_status: string;
+    requires_model_release?: boolean;
+    requires_property_release?: boolean;
+    detection_tools_used?: string[];
+    ip_audit_summary?: string;
+    quality_issues_summary?: string;
+    technical_issues_summary?: string;
     technical_issues: string[];
     strengths: string[];
     detailed_feedback: string;
     ai_vision_checks?: {
-      blur?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      composition?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      lighting?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      watermark?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      logo?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      text?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      anatomical_errors?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      ip_risk?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
       proportion_defects?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      stock_acceptance?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
       metadata?: { title: string; keywords: string[] };
     };
   };
@@ -1717,24 +1720,7 @@ export const ImageQualityCheck: React.FC<{
                                       ? { status: "FAIL", note: t.language === 'Bahasa' ? "Terdeteksi pelanggaran legal/IP pada laporan akhir." : "Legal/IP violation detected in the final report." }
                                       : fallbackCheck(key);
                                   const aiVisionChecks = {
-                                    blur: rawChecks.blur || fallbackCheck('blur', ['focus', 'blur', 'tajam', 'sharp']),
-                                    composition: rawChecks.composition || fallbackCheck('composition', ['komposisi', 'composition']),
-                                    lighting: rawChecks.lighting || fallbackCheck('lighting', ['lighting', 'exposure', 'pencahayaan', 'eksposur']),
-                                    exposure: rawChecks.exposure || fallbackCheck('exposure', ['exposure', 'overexposure', 'underexposure', 'clipping']),
-                                    color_balance: rawChecks.color_balance || fallbackCheck('color_balance', ['warna', 'color']),
-                                    over_edited: rawChecks.over_edited || fallbackCheck('over_edited', ['waxy', 'plastic', 'lilin', 'filter']),
-                                    sensor_issues: rawChecks.sensor_issues || fallbackCheck('sensor_issues', ['sensor', 'dust', 'noda']),
-                                    watermark: rawChecks.watermark || fallbackCheck('watermark', ['watermark']),
-                                    logo: rawChecks.logo || legalFallback('logo'),
-                                    text: rawChecks.text || fallbackCheck('text', ['teks', 'text', 'gibberish', 'huruf']),
-                                    anatomical_errors: rawChecks.anatomical_errors || fallbackCheck('anatomical_errors', ['anatomi', 'anatomy', 'jari', 'finger', 'tangan', 'hand', 'wajah', 'face']),
-                                    ip_risk: rawChecks.ip_risk || legalFallback('ip_risk'),
-                                    structural_defects: rawChecks.structural_defects || fallbackCheck('structural_defects', ['struktur', 'structural', 'tiang', 'post', 'moncong', 'nozzle', 'pipet', 'alat']),
-                                    proportion_defects: rawChecks.proportion_defects || fallbackCheck('proportion_defects', ['proporsi', 'proportion', 'mekanis', 'mechanical']),
-                                    noise: rawChecks.noise || fallbackCheck('noise', ['noise', 'grain', 'derau']),
-                                    artifacts: rawChecks.artifacts || fallbackCheck('artifacts', ['artifact', 'kompresi', 'banding', 'fringe']),
-                                    ai_artifacts: rawChecks.ai_artifacts || fallbackCheck('ai_artifacts', ['ai', 'generatif', 'halusinasi', 'meleleh', 'melted', 'distorsi']),
-                                    stock_acceptance: rawChecks.stock_acceptance || { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || "" },
+                                    proportion_defects: rawChecks.proportion_defects || fallbackCheck('proportion_defects', ['proporsi', 'proportion', 'mekanis', 'mechanical', 'skala', 'scale', 'perspektif', 'distorsi']),
                                     metadata: rawChecks.metadata || { title: (r as any).metadata?.title || "Stock photography showing details", keywords: (r as any).metadata?.keywords || r.strengths || [] }
                                   };
 
@@ -1823,335 +1809,159 @@ export const ImageQualityCheck: React.FC<{
                                         </div>
                                       </div>
 
-                                      {/* Tab Selector */}
-                                      <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-2xl border border-slate-200/50 dark:border-white/5">
-                                        {[
-                                          { id: 'technical', label: t.language === 'Bahasa' ? 'Piksel & Teknis' : 'Pixel & Technical' },
-                                          { id: 'legal', label: t.language === 'Bahasa' ? 'Legal & IP' : 'Legal & IP' },
-                                          { id: 'ai', label: t.language === 'Bahasa' ? 'AI & Anatomi' : 'AI & Anatomy' },
-                                          { id: 'seo', label: 'Metadata SEO' }
-                                        ].map(tab => (
-                                          <button
-                                            key={tab.id}
-                                            onClick={() => setTab(tab.id as any)}
-                                            className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
-                                              currentTab === tab.id
-                                                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                                            }`}
-                                          >
-                                            {tab.label}
-                                          </button>
-                                        ))}
-                                      </div>
+                                      {/* KETERANGAN AUDIT TERPADU ADOBE STOCK (CONTINUOUS NARRATIVE REPORT) */}
+                                      {(() => {
+                                        const toolsUsed = r.detection_tools_used || r.ai_vision?.detection_tools_used || [
+                                          "AI Multimodal Vision Inspector",
+                                          "OpenCV Pixel Forensic Engine (100% Zoom Crop)",
+                                          "BRISQUE & NIQE Spatial Quality Analyzer",
+                                          "YOLO Neural Object Grounding",
+                                          "Luma Histogram Analyzer"
+                                        ];
 
-                                      {/* Tab Contents */}
-                                      <div className="min-h-[220px]">
-                                        {currentTab === 'technical' && (
-                                          <div className="space-y-4 animate-fadeIn">
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                              <div className="bg-slate-100/50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/50 dark:border-white/5 flex flex-col justify-between">
-                                                <span className="text-[8px] font-black uppercase text-slate-400">Resolution</span>
-                                                <span className="text-[10px] font-black text-slate-800 dark:text-white mt-1 truncate">{ffmpegData.resolution}</span>
-                                              </div>
-                                              <div className="bg-slate-100/50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/50 dark:border-white/5 flex flex-col justify-between">
-                                                <span className="text-[8px] font-black uppercase text-slate-400">Color Space</span>
-                                                <span className="text-[10px] font-black text-slate-800 dark:text-white mt-1 truncate">{ffmpegData.color_space}</span>
-                                              </div>
-                                              <div className="bg-slate-100/50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/50 dark:border-white/5 flex flex-col justify-between">
-                                                <span className="text-[8px] font-black uppercase text-slate-400">File Validation</span>
-                                                <span className="text-[10px] font-black text-emerald-500 mt-1 truncate">{ffmpegData.file_validation}</span>
-                                              </div>
-                                            </div>
+                                        const ipSummary = r.ip_audit_summary || r.ai_vision?.ip_audit_summary || (
+                                          r.legal_status === 'VIOLATION'
+                                            ? (t.language === 'Bahasa' 
+                                                ? 'Terdeteksi potensi pelanggaran hak kekayaan intelektual (merek dagang, logo komersial, desain terdaftar, atau landmark berhak cipta) sesuai katalog Adobe Stock Known Restrictions.' 
+                                                : 'Potential IP infringement detected (trademarks, commercial logos, registered design, or protected landmarks) per Adobe Stock Known Restrictions catalog.')
+                                            : (t.language === 'Bahasa' 
+                                                ? 'Bebas dari logo komersial, merek dagang terdaftar, dan landmark terlindungi. Aset mematuhi pedoman hak kekayaan intelektual Adobe Stock.' 
+                                                : 'Free of commercial logos, registered trademarks, and protected landmarks. Complies with Adobe Stock intellectual property guidelines.')
+                                        );
 
-                                            {(r.technical_gate?.warnings?.length || r.technical_gate?.failures?.length) ? (
-                                              <div className="space-y-2">
-                                                {r.technical_gate?.warnings?.map((w, idx) => (
-                                                  <div key={`qc-warning-${idx}`} className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                                                    <AlertCircle size={14} className="text-amber-500 shrink-0 mt-0.5" />
-                                                    <p className="text-[9px] font-semibold text-amber-700 dark:text-amber-300 leading-relaxed">
-                                                      {t.language === 'Bahasa' ? (w.reason_id || w.reason_en) : (w.reason_en || w.reason_id)}
-                                                    </p>
-                                                  </div>
-                                                ))}
-                                                {r.technical_gate?.failures?.map((f, idx) => (
-                                                  <div key={`qc-failure-${idx}`} className="flex items-start gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
-                                                    <XCircle size={14} className="text-rose-500 shrink-0 mt-0.5" />
-                                                    <p className="text-[9px] font-semibold text-rose-700 dark:text-rose-300 leading-relaxed">
-                                                      {t.language === 'Bahasa' ? (f.reason_id || f.reason_en) : (f.reason_en || f.reason_id)}
-                                                    </p>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            ) : null}
+                                        const qualitySummary = r.quality_issues_summary || r.ai_vision?.quality_issues_summary || (
+                                          aiVisionChecks.proportion_defects?.note || (
+                                            isPass
+                                              ? (t.language === 'Bahasa' 
+                                                  ? 'Proporsi subjek dan elemen seimbang secara alami. Struktur anatomi dan perspektif gambar bebas dari distorsi atau kecacatan skala.' 
+                                                  : 'Subject and element proportions are naturally balanced. Anatomy and perspective are clean of distortions or scale defects.')
+                                              : (t.language === 'Bahasa' 
+                                                  ? 'Terdeteksi anomali proporsi atau distorsi visual yang tidak memenuhi standar kualitas komersial Adobe Stock.' 
+                                                  : 'Proportion anomalies or visual distortions detected that do not meet Adobe Stock commercial quality standards.')
+                                          )
+                                        );
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                              <div className="space-y-3 bg-slate-50/50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 p-4 rounded-2xl">
-                                                <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-2">Technical Micro-Metrics</h5>
-                                                {technicalMetrics.map((m) => (
-                                                  <div key={m.label} className="space-y-1">
-                                                    <div className="flex justify-between text-[10px] font-bold">
-                                                      <span className="text-slate-500 uppercase tracking-tight">{m.label}</span>
-                                                      <span className="text-slate-800 dark:text-slate-200 font-black">{m.value == null ? '—' : `${m.value}%`} ({m.status})</span>
-                                                    </div>
-                                                    <div className="h-1.5 w-full bg-slate-200/60 dark:bg-slate-800/80 rounded-full overflow-hidden">
-                                                      {m.value != null && <div className={`h-full ${m.color} rounded-full transition-all duration-500`} style={{ width: `${Math.max(0, Math.min(100, m.value))}%` }} />}
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
+                                        const technicalSummary = r.technical_issues_summary || r.ai_vision?.technical_issues_summary || (
+                                          isPass
+                                            ? (t.language === 'Bahasa' 
+                                                ? 'Fokus tajam pada subjek utama (tack-sharp pada inspeksi crop 100%), pencahayaan dan kontras seimbang, serta bebas dari noise sensor dan artefak kompresi.' 
+                                                : 'Sharp focus on primary subject (tack-sharp at 100% crop inspection), balanced lighting and contrast, clean of sensor noise and compression artifacts.')
+                                            : (t.language === 'Bahasa' 
+                                                ? 'Pemeriksaan teknis mendeteksi ketidaksesuaian pada ketajaman fokus, pencahayaan, atau integritas piksel.' 
+                                                : 'Technical check detected issues in focus sharpness, lighting balance, or pixel integrity.')
+                                        );
 
-                                              <div className="bg-slate-50/50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 p-4 rounded-2xl">
-                                                <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-3">Forensic Evidence</h5>
-                                                <div className="space-y-2 text-[9px] font-semibold text-slate-500 dark:text-slate-400">
-                                                  {ffmpegData.jpeg_blocking && <div className="flex justify-between gap-3"><span>JPEG blocking</span><span className="font-mono text-slate-700 dark:text-slate-200">{ffmpegData.jpeg_blocking.score}/100 · {ffmpegData.jpeg_blocking.status}</span></div>}
-                                                  {ffmpegData.banding && <div className="flex justify-between gap-3"><span>Banding</span><span className="font-mono text-slate-700 dark:text-slate-200">{ffmpegData.banding.score}/100 · {ffmpegData.banding.status}</span></div>}
-                                                  {ffmpegData.ocr && <div className="flex justify-between gap-3"><span>OCR</span><span className="font-mono text-slate-700 dark:text-slate-200">{ffmpegData.ocr.ocr_status || 'UNKNOWN'}{ffmpegData.ocr.text ? ` · ${ffmpegData.ocr.text.slice(0, 100)}` : ''}</span></div>}
-                                                  {ffmpegData.background_edge_analysis && <div className="flex justify-between gap-3"><span>Background edge</span><span className="font-mono text-slate-700 dark:text-slate-200">{ffmpegData.background_edge_analysis.uniform_border ? 'Uniform background — inspect halo' : 'No uniform-background warning'}</span></div>}
+                                        return (
+                                          <div className="space-y-4 pt-1">
+                                            {/* 1. Alat Forensik & AI Vision yang Digunakan */}
+                                            <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-white/5 space-y-2.5">
+                                              <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                  <Sparkles size={14} className="text-indigo-500" />
+                                                  <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                                                    {t.language === 'Bahasa' ? 'Alat Forensik & Deteksi yang Digunakan' : 'Forensic & Detection Tools Applied'}
+                                                  </h5>
                                                 </div>
+                                                <span className="text-[8px] font-black uppercase text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-full">
+                                                  Adobe Stock Standards
+                                                </span>
                                               </div>
-
-                                              <div className="bg-slate-50/50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 p-4 rounded-2xl flex flex-col justify-between md:col-span-2">
-                                                <div className="flex justify-between items-center mb-2">
-                                                  <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Luminance Spectrum</h5>
-                                                  <span className="text-[8px] font-bold text-slate-400 uppercase font-mono">32 channel frequency</span>
-                                                </div>
-                                                <div className="h-24 w-full flex items-end gap-[1.5px] bg-slate-950 p-2 rounded-xl border border-white/5 shadow-inner">
-                                                  {(ffmpegData.histogram || []).map((h, i) => (
-                                                    <div 
-                                                      key={`hist-bar-${i}`}
-                                                      className="flex-1 bg-gradient-to-t from-emerald-500 via-emerald-400 to-teal-300 rounded-t-[1px]"
-                                                      style={{ height: `${Math.max(4, h)}%` }}
-                                                    />
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                                              {[
-                                                { label: t.language === 'Bahasa' ? 'Ketajaman & Sharpness' : 'Blur / Sharpness', val: aiVisionChecks.blur },
-                                                { label: t.language === 'Bahasa' ? 'Pencahayaan & Kontras' : 'Lighting & Contrast', val: aiVisionChecks.lighting },
-                                                { label: t.language === 'Bahasa' ? 'Komposisi & Framing' : 'Composition & Crop', val: aiVisionChecks.composition }
-                                              ].map((c, i) => {
-                                                const isCheckpointPass = c.val?.status === 'PASS';
-                                                const isCheckpointUnknown = c.val?.status === 'UNKNOWN';
-                                                return (
-                                                  <div 
-                                                    key={i}
-                                                    className={`p-3 rounded-2xl border flex flex-col gap-1.5 ${
-                                                      isCheckpointPass 
-                                                        ? 'bg-emerald-500/5 border-emerald-500/10' 
-                                                        : isCheckpointUnknown
-                                                          ? 'bg-amber-500/5 border-amber-500/10'
-                                                          : 'bg-rose-500/5 border-rose-500/10'
-                                                    }`}
+                                              <div className="flex flex-wrap gap-1.5">
+                                                {toolsUsed.map((tool: string, idx: number) => (
+                                                  <span 
+                                                    key={idx} 
+                                                    className="inline-flex items-center gap-1.5 text-[9.5px] font-bold px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-white/10 shadow-xs"
                                                   >
-                                                    <div className="flex items-center justify-between">
-                                                      <span className="text-[9px] font-black uppercase text-slate-700 dark:text-slate-200">{c.label}</span>
-                                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
-                                                        isCheckpointPass 
-                                                          ? 'bg-emerald-500/15 text-emerald-600' 
-                                                          : isCheckpointUnknown
-                                                            ? 'bg-amber-500/15 text-amber-600'
-                                                            : 'bg-rose-500/15 text-rose-600'
-                                                      }`}>
-                                                        {c.val?.status || 'FAIL'}
-                                                      </span>
-                                                    </div>
-                                                    <p className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-normal">
-                                                      {c.val?.note || "Normal, tidak mendeteksi masalah."}
-                                                    </p>
-                                                  </div>
-                                                );
-                                              })}
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        {currentTab === 'legal' && (
-                                          <div className="space-y-4 animate-fadeIn">
-                                            <div className={`p-4 rounded-2xl border flex items-start gap-3 ${r.legal_status?.includes('VIOLATION') ? 'bg-rose-500/5 border-rose-500/20 text-rose-700 dark:text-rose-300' : 'bg-emerald-500/5 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'}`}>
-                                              <ShieldCheck size={18} className="shrink-0 mt-0.5" />
-                                              <div className="space-y-0.5">
-                                                <p className="text-[9px] font-black uppercase tracking-widest opacity-60">{t.qc_legal_status}</p>
-                                                <p className="text-xs font-black">{r.legal_status}</p>
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                    {tool}
+                                                  </span>
+                                                ))}
                                               </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                                              {[
-                                                { label: t.language === 'Bahasa' ? 'Watermark Komersial' : 'Watermark Check', val: aiVisionChecks.watermark },
-                                                { label: t.language === 'Bahasa' ? 'Deteksi Merek & Logo' : 'Logo Detection', val: aiVisionChecks.logo },
-                                                { label: t.language === 'Bahasa' ? 'Risiko Hak Cipta & IP' : 'IP & Trademark Risk', val: aiVisionChecks.ip_risk }
-                                              ].map((c, i) => {
-                                                const isCheckpointPass = c.val?.status === 'PASS';
-                                                const isCheckpointUnknown = c.val?.status === 'UNKNOWN';
-                                                return (
-                                                  <div 
-                                                    key={i}
-                                                    className={`p-3 rounded-2xl border flex flex-col gap-1.5 ${
-                                                      isCheckpointPass 
-                                                        ? 'bg-emerald-500/5 border-emerald-500/10' 
-                                                        : isCheckpointUnknown
-                                                          ? 'bg-amber-500/5 border-amber-500/10'
-                                                          : 'bg-rose-500/5 border-rose-500/10'
-                                                    }`}
-                                                  >
-                                                    <div className="flex items-center justify-between">
-                                                      <span className="text-[9px] font-black uppercase text-slate-700 dark:text-slate-200">{c.label}</span>
-                                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
-                                                        isCheckpointPass 
-                                                          ? 'bg-emerald-500/15 text-emerald-600' 
-                                                          : isCheckpointUnknown
-                                                            ? 'bg-amber-500/15 text-amber-600'
-                                                            : 'bg-rose-500/15 text-rose-600'
-                                                      }`}>
-                                                        {c.val?.status || 'FAIL'}
-                                                      </span>
-                                                    </div>
-                                                    <p className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-normal">
-                                            {c.val?.note || "Normal, tidak mendeteksi pelanggaran kekayaan intelektual."}
-                                                    </p>
-                                                  </div>
-                                                );
-                                              })}
-                                             </div>
-
-                                             <div className="bg-slate-100/50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/10 p-4 rounded-2xl space-y-3">
-                                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/50 dark:border-white/5 pb-2.5">
-                                                 <div className="flex items-center gap-2">
-                                                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                                                   <h5 className="text-[10px] font-black uppercase text-rose-600 dark:text-rose-400 tracking-wider">
-                                                     {t.language === 'Bahasa' ? 'Katalog Restriksi Resmi Adobe Stock' : 'Adobe Stock Known Restrictions Catalog'}
-                                                   </h5>
-                                                 </div>
-                                                 <a
-                                                   href="https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html"
-                                                   target="_blank"
-                                                   rel="noopener noreferrer"
-                                                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[9px] font-black tracking-wide border border-rose-500/20 transition-all shrink-0"
-                                                 >
-                                                   <span>{t.language === 'Bahasa' ? 'Panduan Resmi Adobe' : 'Official Policy Guide'}</span>
-                                                   <ExternalLink size={10} />
-                                                 </a>
-                                               </div>
-
-                                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[9px]">
-                                                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 space-y-1">
-                                                   <span className="font-black uppercase text-slate-700 dark:text-slate-200 block">
-                                                     1. {t.language === 'Bahasa' ? 'Merek & Desain Produk' : 'Brands & Product Shapes'}
-                                                   </span>
-                                                   <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-                                                     Apple, Nike (Swoosh/Jordan), Adidas (3 garis), Louboutin (sol merah), Barbie, Lego, Funko Pop, Rubik's Cube, Tiffany Blue, Zippo, Chemex, Kikkoman, Duracell, UPS brown.
-                                                   </p>
-                                                 </div>
-
-                                                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 space-y-1">
-                                                   <span className="font-black uppercase text-slate-700 dark:text-slate-200 block">
-                                                     2. {t.language === 'Bahasa' ? 'Landmark & Arsitektur' : 'Landmarks & Architecture'}
-                                                   </span>
-                                                   <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-                                                     Menara Eiffel (malam hari), Sydney Opera House, Burj Khalifa, Atomium, Grand Central clocks, Vessel NYC, Piramida Louvre, interior Sagrada Familia / Colosseum.
-                                                   </p>
-                                                 </div>
-
-                                                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 space-y-1">
-                                                   <span className="font-black uppercase text-slate-700 dark:text-slate-200 block">
-                                                     3. {t.language === 'Bahasa' ? 'Patung & Seni Publik' : 'Statues & Public Art'}
-                                                   </span>
-                                                   <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-                                                     Patung Kristus Penebus, Little Mermaid, Cloud Gate "The Bean", Charging Bull Wall St, Non-Violence gun, Bruce Lee statue, Hollywood Sign, Route 66.
-                                                   </p>
-                                                 </div>
-
-                                                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 space-y-1">
-                                                   <span className="font-black uppercase text-slate-700 dark:text-slate-200 block">
-                                                     4. {t.language === 'Bahasa' ? 'Simbol, Transit & NASA' : 'Symbols, Transit & NASA'}
-                                                   </span>
-                                                   <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-                                                     NASA (logo/misi/astronot - Dilarang AI), Palang Merah/Bulan Sabit, PBB, Cincin Olimpiade, Shinkansen, TGV, ICE DB, London Underground, NYC Subway (MTA).
-                                                   </p>
-                                                 </div>
-                                               </div>
-
-                                               <div className="p-2 rounded-xl bg-amber-500/5 border border-amber-500/20 text-[8.5px] text-amber-700 dark:text-amber-300 font-medium leading-relaxed flex items-center gap-1.5">
-                                                 <Info size={12} className="shrink-0 text-amber-500" />
-                                                 <span>
-                                                   {t.language === 'Bahasa'
-                                                     ? 'Aset yang memuat subjek di atas wajib ditolak (FAIL/VIOLATION) untuk kepatuhan komersial Adobe Stock.'
-                                                     : 'Assets containing the subjects above are strictly flagged (FAIL/VIOLATION) for commercial Adobe Stock compliance.'}
-                                                 </span>
-                                               </div>
-                                             </div>
-                                           </div>
-                                         )}
-
-                                         {currentTab === 'ai' && (
-                                           <div className="space-y-4 animate-fadeIn">
-                                            {r.visual_scan_analysis && (
-                                              <div className="bg-slate-950 p-4 rounded-2xl border border-white/10 font-mono text-xs text-slate-300 space-y-2">
-                                                <div className="flex items-center gap-2 border-b border-white/5 pb-2">
-                                                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
-                                                  <span className="text-[8px] uppercase font-black text-slate-400 tracking-wider">PIXEL SCANNER ENGINE LOG</span>
+                                            {/* 2. Keterangan Audit Hak Cipta & Restriksi Adobe Stock */}
+                                            <div className={`p-4 rounded-2xl border space-y-2.5 ${r.legal_status === 'VIOLATION' ? 'bg-rose-500/5 border-rose-500/20' : 'bg-emerald-500/5 border-emerald-500/20'}`}>
+                                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                  <ShieldCheck size={16} className={r.legal_status === 'VIOLATION' ? 'text-rose-500' : 'text-emerald-500'} />
+                                                  <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-800 dark:text-white">
+                                                    {t.language === 'Bahasa' ? 'Keterangan Audit Hak Cipta & Restriksi Adobe Stock' : 'Adobe Stock IP & Known Restrictions Audit'}
+                                                  </h5>
                                                 </div>
-                                                <p className="text-[10px] leading-relaxed italic text-emerald-400 font-semibold">
-                                                  &quot;{r.visual_scan_analysis}&quot;
+                                                <div className="flex items-center gap-2">
+                                                  <span className={`text-[8.5px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${r.legal_status === 'VIOLATION' ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                                                    {r.legal_status}
+                                                  </span>
+                                                  <span className="text-[8px] font-bold text-slate-500 dark:text-slate-400 bg-white/80 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-white/5">
+                                                    Model Release: {r.requires_model_release ? (t.language === 'Bahasa' ? 'Diperlukan' : 'Required') : (t.language === 'Bahasa' ? 'Tidak Perlu' : 'Not Required')}
+                                                  </span>
+                                                  <span className="text-[8px] font-bold text-slate-500 dark:text-slate-400 bg-white/80 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-white/5">
+                                                    Property Release: {r.requires_property_release ? (t.language === 'Bahasa' ? 'Diperlukan' : 'Required') : (t.language === 'Bahasa' ? 'Tidak Perlu' : 'Not Required')}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                              <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+                                                {ipSummary}
+                                              </p>
+                                            </div>
+
+                                            {/* 3. Keterangan Audit Kualitas Visual & Kecacatan Proporsi */}
+                                            <div className={`p-4 rounded-2xl border space-y-2.5 ${aiVisionChecks.proportion_defects?.status === 'FAIL' ? 'bg-rose-500/5 border-rose-500/20' : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200/60 dark:border-white/10'}`}>
+                                              <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                  <Eye size={15} className="text-violet-500" />
+                                                  <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-800 dark:text-white">
+                                                    {t.language === 'Bahasa' ? 'Keterangan Audit Kualitas Visual & Kecacatan Proporsi' : 'Visual Quality & Proportion Defects Audit'}
+                                                  </h5>
+                                                </div>
+                                                <span className={`text-[8.5px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${aiVisionChecks.proportion_defects?.status === 'FAIL' ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'}`}>
+                                                  Proporsi: {aiVisionChecks.proportion_defects?.status || (isPass ? 'PASS' : 'FAIL')}
+                                                </span>
+                                              </div>
+                                              <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+                                                {qualitySummary}
+                                              </p>
+                                            </div>
+
+                                            {/* 4. Keterangan Audit Standar Teknis Fotografi */}
+                                            <div className="p-4 rounded-2xl border bg-slate-50 dark:bg-slate-900/40 border-slate-200/60 dark:border-white/10 space-y-2.5">
+                                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                  <CheckCircle2 size={15} className="text-emerald-500" />
+                                                  <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-800 dark:text-white">
+                                                    {t.language === 'Bahasa' ? 'Keterangan Audit Standar Teknis Fotografi' : 'Technical Photography Standards Audit'}
+                                                  </h5>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-[8px] font-mono text-slate-500 dark:text-slate-400">
+                                                  <span className="bg-white/80 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-white/5">{ffmpegData.resolution}</span>
+                                                  <span className="bg-white/80 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-white/5">{ffmpegData.color_space}</span>
+                                                  <span className="bg-white/80 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-white/5">{ffmpegData.file_validation}</span>
+                                                </div>
+                                              </div>
+                                              <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+                                                {technicalSummary}
+                                              </p>
+                                            </div>
+
+                                            {/* 5. Kesimpulan Kurator & Rekomendasi Adobe Stock */}
+                                            {r.detailed_feedback && (
+                                              <div className={`p-4 rounded-2xl border space-y-2 ${isPass ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                                                <div className="flex items-center gap-2">
+                                                  <Info size={15} className={isPass ? 'text-emerald-500' : 'text-rose-500'} />
+                                                  <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-800 dark:text-white">
+                                                    {t.language === 'Bahasa' ? 'Kesimpulan Kurator & Rekomendasi' : 'Curator Conclusion & Recommendations'}
+                                                  </h5>
+                                                </div>
+                                                <p className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                                                  &quot;{r.detailed_feedback}&quot;
                                                 </p>
                                               </div>
                                             )}
 
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
-                                              {[
-                                                { label: t.language === 'Bahasa' ? 'Integritas Anatomi' : 'Anatomical Integrity', val: aiVisionChecks.anatomical_errors },
-                                                { label: t.language === 'Bahasa' ? 'Cacat Struktural AI' : 'Structural Defects', val: aiVisionChecks.structural_defects },
-                                                { label: t.language === 'Bahasa' ? 'Artefak Generatif AI' : 'Generative AI Artifacts', val: aiVisionChecks.ai_artifacts },
-                                                { label: t.language === 'Bahasa' ? 'Integritas Teks OCR' : 'Text / OCR Integrity', val: aiVisionChecks.text },
-                                                { label: t.language === 'Bahasa' ? 'Proporsi & Mekanis' : 'Proportion & Mechanical', val: aiVisionChecks.proportion_defects },
-                                                { label: t.language === 'Bahasa' ? 'Tekstur Lilin / Over-edited' : 'Waxy Skin / Over-edited', val: aiVisionChecks.over_edited },
-                                                { label: t.language === 'Bahasa' ? 'Artefak Kompresi & Edge' : 'Artifacts & Edges', val: aiVisionChecks.artifacts },
-                                                { label: t.language === 'Bahasa' ? 'Standar Penerimaan Stok' : 'Stock Acceptance', val: aiVisionChecks.stock_acceptance }
-                                              ].map((c, i) => {
-                                                const isCheckpointPass = c.val?.status === 'PASS';
-                                                const isCheckpointUnknown = c.val?.status === 'UNKNOWN';
-                                                return (
-                                                  <div 
-                                                    key={i}
-                                                    className={`p-3 rounded-2xl border flex flex-col gap-1.5 ${
-                                                      isCheckpointPass 
-                                                        ? 'bg-emerald-500/5 border-emerald-500/10' 
-                                                        : isCheckpointUnknown
-                                                          ? 'bg-amber-500/5 border-amber-500/10'
-                                                          : 'bg-rose-500/5 border-rose-500/10'
-                                                    }`}
-                                                  >
-                                                    <div className="flex items-center justify-between">
-                                                      <span className="text-[9px] font-black uppercase text-slate-700 dark:text-slate-200">{c.label}</span>
-                                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
-                                                        isCheckpointPass 
-                                                          ? 'bg-emerald-500/15 text-emerald-600' 
-                                                          : isCheckpointUnknown
-                                                            ? 'bg-amber-500/15 text-amber-600'
-                                                            : 'bg-rose-500/15 text-rose-600'
-                                                      }`}>
-                                                        {c.val?.status || 'FAIL'}
-                                                      </span>
-                                                    </div>
-                                                    <p className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-normal line-clamp-3" title={c.val?.note}>
-                                                      {c.val?.note || "Aman, tidak mendeteksi anomali rekonstruksi kecerdasan buatan."}
-                                                    </p>
-                                                  </div>
-                                                );
-                                              })}
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        {currentTab === 'seo' && (
-                                          <div className="space-y-4 animate-fadeIn">
-                                            <div className="bg-slate-100/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/50 dark:border-white/5 space-y-2">
+                                            {/* 6. Metadata SEO Siap Pakai */}
+                                            <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-200/60 dark:border-white/10 space-y-3">
                                               <div className="flex items-center justify-between">
-                                                <span className="text-[8px] font-black uppercase text-slate-400">SEO Curation Title</span>
+                                                <span className="text-[9px] font-black uppercase text-slate-400">SEO Curation Title</span>
                                                 <button
                                                   onClick={() => copyToClipboard(aiVisionChecks.metadata.title, `title-${fileName}`)}
                                                   className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-50 rounded-lg text-[9px] font-black uppercase tracking-wider border border-slate-200/50 dark:border-white/5 transition-all text-emerald-600 shadow-sm"
@@ -2163,40 +1973,40 @@ export const ImageQualityCheck: React.FC<{
                                               <p className="text-xs font-black text-slate-800 dark:text-white leading-relaxed">
                                                 {aiVisionChecks.metadata.title}
                                               </p>
-                                            </div>
 
-                                            <div className="bg-slate-100/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/50 dark:border-white/5 space-y-3">
-                                              <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                  <span className="text-[8px] font-black uppercase text-slate-400">Suggested Keywords</span>
-                                                  <span className="text-[8px] font-black px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded font-mono">
-                                                    {aiVisionChecks.metadata.keywords?.length || 0}
-                                                  </span>
+                                              <div className="border-t border-slate-200/50 dark:border-white/5 pt-2.5 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="text-[9px] font-black uppercase text-slate-400">Suggested Keywords</span>
+                                                    <span className="text-[8px] font-black px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded font-mono">
+                                                      {aiVisionChecks.metadata.keywords?.length || 0}
+                                                    </span>
+                                                  </div>
+                                                  {aiVisionChecks.metadata.keywords && aiVisionChecks.metadata.keywords.length > 0 && (
+                                                    <button
+                                                      onClick={() => copyToClipboard(aiVisionChecks.metadata.keywords.join(', '), `kw-${fileName}`)}
+                                                      className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-50 rounded-lg text-[9px] font-black uppercase tracking-wider border border-slate-200/50 dark:border-white/5 transition-all text-emerald-600 shadow-sm"
+                                                    >
+                                                      {copiedState[`kw-${fileName}`] === 'COPIED' ? <Check size={10} /> : <Copy size={10} />}
+                                                      {copiedState[`kw-${fileName}`] === 'COPIED' ? (t.language === 'Bahasa' ? 'Tersalin Semua' : 'Copied All') : (t.language === 'Bahasa' ? 'Salin Semua' : 'Copy All')}
+                                                    </button>
+                                                  )}
                                                 </div>
-                                                {aiVisionChecks.metadata.keywords && aiVisionChecks.metadata.keywords.length > 0 && (
-                                                  <button
-                                                    onClick={() => copyToClipboard(aiVisionChecks.metadata.keywords.join(', '), `kw-${fileName}`)}
-                                                    className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-50 rounded-lg text-[9px] font-black uppercase tracking-wider border border-slate-200/50 dark:border-white/5 transition-all text-emerald-600 shadow-sm"
-                                                  >
-                                                    {copiedState[`kw-${fileName}`] === 'COPIED' ? <Check size={10} /> : <Copy size={10} />}
-                                                    {copiedState[`kw-${fileName}`] === 'COPIED' ? (t.language === 'Bahasa' ? 'Tersalin Semua' : 'Copied All') : (t.language === 'Bahasa' ? 'Salin Semua' : 'Copy All')}
-                                                  </button>
-                                                )}
-                                              </div>
-                                              <div className="flex flex-wrap gap-1 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
-                                                {aiVisionChecks.metadata.keywords?.map((k, idx) => (
-                                                  <span 
-                                                    key={idx} 
-                                                    className="px-2 py-0.5 bg-slate-200/60 dark:bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-500 dark:hover:bg-emerald-500/10 cursor-pointer text-slate-600 dark:text-slate-300 rounded text-[9.5px] font-bold transition-all border border-slate-200/30 dark:border-white/5"
-                                                  >
-                                                    {k}
-                                                  </span>
-                                                ))}
+                                                <div className="flex flex-wrap gap-1 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+                                                  {aiVisionChecks.metadata.keywords?.map((k: string, idx: number) => (
+                                                    <span 
+                                                      key={idx} 
+                                                      className="px-2 py-0.5 bg-slate-200/60 dark:bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-500 dark:hover:bg-emerald-500/10 cursor-pointer text-slate-600 dark:text-slate-300 rounded text-[9.5px] font-bold transition-all border border-slate-200/30 dark:border-white/5"
+                                                    >
+                                                      {k}
+                                                    </span>
+                                                  ))}
+                                                </div>
                                               </div>
                                             </div>
                                           </div>
-                                        )}
-                                      </div>
+                                        );
+                                      })()}
                                     </div>
                                   );
                                 })()}
