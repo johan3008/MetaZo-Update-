@@ -5034,14 +5034,29 @@ const App: React.FC = () => {
                     {activeTool === ToolType.VECTOR && "EPS, SVG & AI graphic indexing assistant"}
                   </p>
                 </div>
-                {/* Live active form formats overlay */}
-                <div className="px-3.5 py-1.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border border-slate-200/80 dark:border-white/10 rounded-xl font-bold text-xs flex items-center space-x-2 text-slate-600 dark:text-slate-300 shadow-sm">
-                  <span className={`w-2 h-2 rounded-full animate-pulse ${activeTool === ToolType.IMAGE ? 'bg-violet-500' : activeTool === ToolType.VIDEO ? 'bg-purple-500' : 'bg-emerald-500'}`} />
-                  <span className="text-[11px] uppercase tracking-wide">
-                    {activeTool === ToolType.IMAGE && "Supports: JPEG, PNG, WEBP"}
-                    {activeTool === ToolType.VIDEO && "Supports: MP4, MOV, WEBM"}
-                    {activeTool === ToolType.VECTOR && "Supports: SVG, EPS, AI"}
-                  </span>
+                {/* Live active form formats & Dual-Vision status overlay */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="px-3.5 py-1.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-white/10 rounded-xl font-bold text-xs flex items-center space-x-2 text-slate-600 dark:text-slate-300 shadow-sm">
+                    <span className={`w-2 h-2 rounded-full animate-pulse ${activeTool === ToolType.IMAGE ? 'bg-violet-500' : activeTool === ToolType.VIDEO ? 'bg-purple-500' : 'bg-emerald-500'}`} />
+                    <span className="text-[11px] uppercase tracking-wide">
+                      {activeTool === ToolType.IMAGE && "Supports: JPEG, PNG, WEBP"}
+                      {activeTool === ToolType.VIDEO && "Supports: MP4, MOV, WEBM"}
+                      {activeTool === ToolType.VECTOR && "Supports: SVG, EPS, AI"}
+                    </span>
+                  </div>
+
+                  <div className="px-3 py-1.5 bg-gradient-to-r from-violet-500/10 via-indigo-500/10 to-purple-500/10 dark:from-violet-500/20 dark:via-indigo-500/20 dark:to-purple-500/20 backdrop-blur-md border border-violet-500/25 rounded-xl text-xs font-black flex items-center gap-2 text-violet-700 dark:text-violet-300 shadow-sm">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                      <span>✨ Dual-Vision</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-violet-600/15 dark:bg-violet-400/20 text-violet-700 dark:text-violet-300">
+                        Florence-2 + AI
+                      </span>
+                    </span>
+                  </div>
                 </div>
               </div>
 
