@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import * as JsxRuntime from 'react/jsx-runtime';
 import { Player, PlayerRef, Thumbnail } from '@remotion/player';
 import * as Babel from '@babel/standalone';
 import * as Remotion from 'remotion';
@@ -15,12 +16,11 @@ interface LiveRemotionRunnerProps {
     inputProps?: any;
 }
 
-// Register custom presets once at module level (Babel 8 compatible)
+// Register custom presets once at module level (Babel 8 / Babel 7 compatible)
 let presetsRegistered = false;
 function ensurePresetsRegistered() {
     if (presetsRegistered) return;
     try {
-        // In Babel 8 standalone, options must be passed via registered custom presets
         const reactPreset = (Babel as any).availablePresets?.['react'] || 'react';
         const envPreset = (Babel as any).availablePresets?.['env'] || 'env';
         
@@ -61,25 +61,30 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
     const compileAndEval = useCallback((sourceCode: string) => {
         ensurePresetsRegistered();
         
-        // Try Babel 8 API first (registered presets), fall back to Babel 7 style
-        let compiledCode: string;
+        let compiledCode: string = '';
         try {
-            // Babel 8: use registered preset names
             compiledCode = Babel.transform(sourceCode, {
-                presets: ['motion-react', 'motion-env'],
-            }).code;
+                presets: [
+                    ['react', { runtime: 'classic' }],
+                    ['env', { modules: 'commonjs' }]
+                ],
+                filename: 'MotionComposition.tsx'
+            }).code || '';
         } catch (e1) {
-            console.warn('[LiveRemotionRunner] Registered presets failed, trying inline options:', e1);
             try {
-                // Fallback: Babel 7 style inline options
                 compiledCode = Babel.transform(sourceCode, {
-                    presets: [
-                        ['react', { runtime: 'classic' }],
-                        ['env', { modules: 'commonjs' }]
-                    ]
-                }).code;
-            } catch (e2: any) {
-                throw new Error(`Babel compilation failed: ${e2.message || e2}`);
+                    presets: ['motion-react', 'motion-env'],
+                    filename: 'MotionComposition.tsx'
+                }).code || '';
+            } catch (e2) {
+                try {
+                    compiledCode = Babel.transform(sourceCode, {
+                        presets: ['react', 'env'],
+                        filename: 'MotionComposition.tsx'
+                    }).code || '';
+                } catch (e3: any) {
+                    throw new Error(`Babel compilation failed: ${e3.message || e3}`);
+                }
             }
         }
 
@@ -89,19 +94,19 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
         
         const requireMock = (moduleName: string) => {
             if (moduleName === 'react') return React;
+            if (moduleName === 'react/jsx-runtime') return JsxRuntime;
+            if (moduleName === 'react/jsx-dev-runtime') return JsxRuntime;
             if (moduleName === 'remotion') return { ...Remotion };
-            if (moduleName === 'react/jsx-runtime') return React;
-            // Handle common interop modules
-            if (moduleName === 'react-dom') return {};
             if (moduleName === '@remotion/player') return { Player, Thumbnail };
-            console.warn(`[LiveRemotionRunner] Unsupported module requested: ${moduleName}`);
+            if (moduleName === 'react-dom' || moduleName === 'react-dom/client') return {};
+            console.warn(`[LiveRemotionRunner] Module mock requested: ${moduleName}`);
             return {};
         };
 
         // Remove 'use strict' directives
         let safeCode = compiledCode.replace(/"use strict";?/g, '').replace(/'use strict';?/g, '');
         
-        // Handle _interopRequireDefault and _interopRequireWildcard helpers
+        // Handle Babel interop helpers and local variable extraction
         const helpersCode = `
             function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
             function _interopRequireWildcard(obj) { if (obj && obj.__esModule) return obj; var r = {}; if (obj != null) for (var k in obj) if (Object.prototype.hasOwnProperty.call(obj, k)) r[k] = obj[k]; r.default = obj; return r; }
@@ -111,13 +116,21 @@ export function LiveRemotionRunner({ code, fps, durationInFrames, width, height,
         const exportsObj: any = {};
         const moduleObj = { exports: exportsObj };
         
-        const evaluator = new Function('React', 'require', 'exports', 'module', helpersCode + '\n' + safeCode);
+        const scopeSafeguard = `
+            \nif (!exports.default && !exports.MotionComposition) {
+                if (typeof MotionComposition !== 'undefined') exports.MotionComposition = MotionComposition;
+                else if (typeof Composition !== 'undefined') exports.MotionComposition = Composition;
+                else if (typeof App !== 'undefined') exports.MotionComposition = App;
+            }
+        `;
+
+        const evaluator = new Function('React', 'require', 'exports', 'module', helpersCode + '\n' + safeCode + scopeSafeguard);
         evaluator(React, requireMock, exportsObj, moduleObj);
 
         console.log('[LiveRemotionRunner] Evaluated exports:', Object.keys(exportsObj));
         
         // Check both exports and module.exports
-        const finalExports = moduleObj.exports || exportsObj;
+        const finalExports = (moduleObj.exports && Object.keys(moduleObj.exports).length > 0) ? moduleObj.exports : exportsObj;
         return finalExports;
     }, []);
 

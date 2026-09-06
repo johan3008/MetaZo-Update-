@@ -9,6 +9,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import https from "node:https";
 
+import { extractFlorenceVisualInsights, formatFlorenceContextForPrompt, FlorenceOptions, FlorenceInsights } from "./florenceService.ts";
+
 // Thread-safe dynamic API Key storage
 export const apiKeyStorage = new AsyncLocalStorage<any>();
 
@@ -3673,8 +3675,28 @@ export const generateStockMetadata = async (
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMIXED-KEYWORD MODE OVERRIDE:\nGenerate a balanced mix of single words and 2-4 word natural search phrases. DO NOT artificially split compound words that are naturally searched together. NO colors. NO patterns.`;
   }
 
-  // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
+  // --- TAHAP 1: DUAL-VISION PIPELINE (FLORENCE-2 + GEMINI/VISION LLM) ---
   let visualFactsJson = "";
+  let florenceInsights: FlorenceInsights = { provider: 'none' };
+  try {
+    const florenceKey = store?.florence?.apiKey || process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY;
+    const florenceEndpoint = store?.florence?.endpoint || process.env.FLORENCE_API_ENDPOINT;
+    if (florenceKey || florenceEndpoint) {
+      console.log(`[Florence-2 Dual-Vision] Extracting micro-details & OCR with Florence-2...`);
+      florenceInsights = await extractFlorenceVisualInsights(frames[0], 'image/jpeg', {
+        apiKey: florenceKey,
+        endpoint: florenceEndpoint,
+        timeoutMs: 9000
+      });
+      if (florenceInsights.detailedCaption || florenceInsights.ocrText) {
+        console.log(`[Florence-2 Dual-Vision] Successfully extracted Florence-2 insights! Provider: ${florenceInsights.provider}`);
+      }
+    }
+  } catch (florenceErr: any) {
+    console.warn(`[Florence-2 Dual-Vision Warning] Non-blocking fallback:`, florenceErr?.message || florenceErr);
+  }
+
+  const florenceContextPrompt = formatFlorenceContextForPrompt(florenceInsights);
   
   console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
@@ -3730,6 +3752,7 @@ Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
 Asset Context: ${mediaTypeContext}
+${florenceContextPrompt}
 
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
@@ -3818,6 +3841,29 @@ OUTPUT FORMAT:
   } catch (e: any) {
     console.error("[JohMeta Pipeline] Invalid Gemini Vision response:", e.message || e);
     throw new Error("AI Vision mengembalikan hasil analisis yang tidak valid. Silakan coba kembali.");
+  }
+
+  // Dual-Vision Integration: Merge Florence-2 OCR text and detected objects into visual facts
+  if (florenceInsights) {
+    if (florenceInsights.ocrText && typeof florenceInsights.ocrText === 'string' && florenceInsights.ocrText.trim().length > 0) {
+      if (!Array.isArray(visualFacts.visible_text)) visualFacts.visible_text = [];
+      const cleanOcr = florenceInsights.ocrText.trim();
+      if (!visualFacts.visible_text.includes(cleanOcr)) {
+        visualFacts.visible_text.push(cleanOcr);
+      }
+    }
+    if (florenceInsights.detectedObjects && Array.isArray(florenceInsights.detectedObjects) && florenceInsights.detectedObjects.length > 0) {
+      if (!Array.isArray(visualFacts.yolo_detected_objects)) visualFacts.yolo_detected_objects = [];
+      for (const obj of florenceInsights.detectedObjects) {
+        if (obj && typeof obj === 'string' && !visualFacts.yolo_detected_objects.some((o: any) => o?.name?.toLowerCase() === obj.toLowerCase())) {
+          visualFacts.yolo_detected_objects.push({
+            name: obj.trim(),
+            confidence: 0.98,
+            category: 'subject'
+          });
+        }
+      }
+    }
   }
 
   const dominantSubjects = [
@@ -4316,11 +4362,27 @@ export const generateBatchStockMetadata = async (
   let parsedVisualFactsList: any[] = [];
   const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
-  console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
+  console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Dual-Vision / Gemini Vision (Visual Facts Detection)...`);
   
   for (let i = 0; i < items.length; i++) {
       const imageParts = items[i].frames.map(frame => processFrameServer(frame));
       
+      let itemFlorenceInsights: FlorenceInsights = { provider: 'none' };
+      try {
+        const florenceKey = store?.florence?.apiKey || process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY;
+        const florenceEndpoint = store?.florence?.endpoint || process.env.FLORENCE_API_ENDPOINT;
+        if ((florenceKey || florenceEndpoint) && items[i].frames && items[i].frames.length > 0) {
+          itemFlorenceInsights = await extractFlorenceVisualInsights(items[i].frames[0], 'image/jpeg', {
+            apiKey: florenceKey,
+            endpoint: florenceEndpoint,
+            timeoutMs: 9000
+          });
+        }
+      } catch (florenceErr: any) {
+        console.warn(`[Florence-2 Batch Item #${i + 1} Warning] Non-blocking fallback:`, florenceErr?.message || florenceErr);
+      }
+
+      const itemFlorenceContextPrompt = formatFlorenceContextForPrompt(itemFlorenceInsights);
       const mediaTypeContext = directives.mediaTypeContext;
 
       const visionSystemInstruction = `ROLE:
@@ -4389,6 +4451,7 @@ Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
 Asset Context: ${mediaTypeContext}
+${itemFlorenceContextPrompt}
 
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
@@ -4459,6 +4522,15 @@ OUTPUT FORMAT:
              parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS;
              if (!parsedFacts || typeof parsedFacts !== "object" || Array.isArray(parsedFacts)) {
                throw new Error("VISUAL_FACTS missing or invalid");
+             }
+             if (itemFlorenceInsights) {
+               if (itemFlorenceInsights.ocrText && typeof itemFlorenceInsights.ocrText === 'string' && itemFlorenceInsights.ocrText.trim().length > 0) {
+                 if (!Array.isArray(parsedFacts.visible_text)) parsedFacts.visible_text = [];
+                 const cleanOcr = itemFlorenceInsights.ocrText.trim();
+                 if (!parsedFacts.visible_text.includes(cleanOcr)) {
+                   parsedFacts.visible_text.push(cleanOcr);
+                 }
+               }
              }
           } catch(e: any) {
              console.error(`[JohMeta Pipeline - Batch] Invalid Vision response for item ${i}:`, e.message || e);
@@ -7646,40 +7718,67 @@ Language: ${targetLanguageName}. Return pure JSON.`;
   }
 }
 
-/* ===== FIXED: generateMotionCode restored as standalone function ===== */
+/* ===== FIXED: generateMotionCode restored as standalone function conforming to Remotion Docs ===== */
 export async function generateMotionCode(userPrompt: string, options?: { currentCode?: string; fps?: number; durationSeconds?: number; width?: number; height?: number; history?: Array<{role: string; content: string}>; model?: string }) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   const model = options?.model;
 
-  const systemInstruction = `You are an expert Remotion developer. Your task is to generate a self-contained React component that composes a stunning, modern motion graphics animation. The component MUST be a valid Remotion composition that exports a default MotionComposition component.
-RULES: Use @remotion packages appropriately. The animation should be smooth, professional, and visually impressive. Use React hooks as needed. Use useCurrentFrame() and useVideoConfig() from remotion. Export as: export default MotionComposition. Keep the code self-contained and production-ready. Return ONLY valid, runnable JSX/TSX code.`;
+  const systemInstruction = `You are a world-class Remotion 4.x and React Motion Graphics developer.
+Your task is to generate a high-end, production-ready Remotion video animation component according to official Remotion documentation (https://www.remotion.dev/docs).
+
+REMOTION RULES & BEST PRACTICES:
+1. EXPORT: The root component MUST be named 'MotionComposition' and exported (e.g. 'export default function MotionComposition()' or 'export const MotionComposition = () => { ... }').
+2. HOOKS & PRIMITIVES:
+   - Import and use from 'remotion':
+     - 'AbsoluteFill': Full-frame layout container.
+     - 'Sequence': Time-shifting container for scene/layer choreography (use 'from' and 'durationInFrames').
+     - 'useCurrentFrame()': Current frame number (starts at 0 inside Sequences).
+     - 'useVideoConfig()': Video config ({ fps, durationInFrames, width, height }).
+     - 'interpolate(frame, inputRange, outputRange, { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ... })': Smooth numerical transformations.
+     - 'interpolateColors(frame, inputRange, colorRange)': Smooth CSS color transitions.
+     - 'spring({ frame, fps, config: { damping: 12, mass: 0.5, stiffness: 100 } })': Physics-based spring animations.
+     - 'random(seed)': Deterministic pseudorandom values.
+   - Import React: 'import React, { useMemo } from "react";'
+3. DETERMINISTIC ANIMATION:
+   - All animations must be pure mathematical functions of 'frame' and 'spring'/'interpolate'.
+   - NEVER use CSS @keyframes, CSS animations, setInterval, setTimeout, Date.now(), or Math.random() inside the render cycle.
+4. STYLING:
+   - Use clean inline styles ('style={{ ... }}') or inline SVG graphics.
+   - Design modern, cinematic visuals: rich linear/radial gradients, glassmorphism ('backdropFilter', translucent backgrounds), glowing drop-shadows, sleek typography, badges, cards, and smooth spring-in / fade-in / slide choreography.
+5. SELF-CONTAINED:
+   - The code must be 100% self-contained, valid, and runnable JSX without external asset dependencies or missing packages.
+
+Return a JSON object with:
+- 'title': Short descriptive title of the motion graphic
+- 'summary': 1-2 sentence description of the visual effects and choreography
+- 'code': Complete, runnable JSX Remotion code containing MotionComposition.`;
 
   const { width = 1920, height = 1080, fps = 30, durationSeconds = 5 } = options || {};
   const durationInFrames = fps * durationSeconds;
 
   const contextParts: string[] = [];
-  contextParts.push(`Canvas: ${width}x${height}, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s).`);
-  if (options?.currentCode?.trim()) contextParts.push(`Existing code:\n\`\`\`jsx\n${options.currentCode}\n\`\`\``);
+  contextParts.push(`Composition Parameters: ${width}x${height}px, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s duration).`);
+  if (options?.currentCode?.trim()) contextParts.push(`Current Code to iterate/fix:\n\`\`\`jsx\n${options.currentCode}\n\`\`\``);
   if (options?.history?.length) {
     const h = options.history.slice(-6);
-    contextParts.push(`History:\n${h.map(m => `${m.role}: ${m.content}`).join('\n')}`);
+    contextParts.push(`Conversation History:\n${h.map(m => `${m.role}: ${m.content}`).join('\n')}`);
   }
-  contextParts.push(`Request: "${userPrompt}"`);
+  contextParts.push(`User Request: "${userPrompt}"`);
   const fullContents = contextParts.join('\n\n');
 
   const responseSchema = { type: Type.OBJECT, properties: { title: { type: Type.STRING }, summary: { type: Type.STRING }, code: { type: Type.STRING } }, required: ["title", "summary", "code"] };
 
   let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.9 }, model });
+    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.85 }, model });
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-2.5-pro', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
+      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-2.5-pro', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.85 }, 2);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
+      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.85 }, 1);
       responseText = res.text || "{}";
     }
   }
@@ -7687,7 +7786,13 @@ RULES: Use @remotion packages appropriately. The animation should be smooth, pro
   const parsed = JSON.parse(extractJSON(responseText));
   if (typeof parsed.code === 'string') {
     parsed.code = parsed.code.replace(/^```(jsx|javascript|js|tsx)?\s*/i, '').replace(/```\s*$/i, '').trim();
-    if (!/MotionComposition/.test(parsed.code)) throw new Error('AI response did not include a MotionComposition export.');
+    if (!/MotionComposition/.test(parsed.code)) {
+      if (/export\s+default\s+function\s+([A-Za-z0-9_]+)/.test(parsed.code)) {
+        parsed.code = parsed.code.replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/, 'export default function MotionComposition');
+      } else {
+        parsed.code += '\nexport default MotionComposition;';
+      }
+    }
   } else throw new Error('AI response missing code field.');
   return { title: parsed.title || 'Untitled Motion', summary: parsed.summary || '', code: parsed.code as string };
 }

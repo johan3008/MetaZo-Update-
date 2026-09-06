@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, ImageIcon, Film, FileCode, ArrowRight } from 'lucide-react';
+import { Trash2, ImageIcon, Film, FileCode, ArrowRight, UploadCloud, Plus, CheckCircle2 } from 'lucide-react';
 import { HelpIcon } from './HelpIcon';
 import { ToolType, FileItem } from '../../types';
 
@@ -38,20 +38,55 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
     }
   };
 
+  const getToolTheme = () => {
+    if (activeTool === ToolType.IMAGE) {
+      return {
+        accent: 'violet',
+        bgGlow: 'bg-violet-500/10',
+        text: 'text-violet-600 dark:text-violet-400',
+        borderActive: 'border-violet-500 bg-violet-500/5 ring-4 ring-violet-500/10',
+        btnBg: 'bg-violet-600 hover:bg-violet-700 text-white',
+        formats: ['JPG', 'JPEG', 'PNG', 'WEBP'],
+      };
+    }
+    if (activeTool === ToolType.VIDEO) {
+      return {
+        accent: 'purple',
+        bgGlow: 'bg-purple-500/10',
+        text: 'text-purple-600 dark:text-purple-400',
+        borderActive: 'border-purple-500 bg-purple-500/5 ring-4 ring-purple-500/10',
+        btnBg: 'bg-purple-600 hover:bg-purple-700 text-white',
+        formats: ['MP4', 'MOV', 'WEBM'],
+      };
+    }
+    return {
+      accent: 'emerald',
+      bgGlow: 'bg-emerald-500/10',
+      text: 'text-emerald-600 dark:text-emerald-400',
+      borderActive: 'border-emerald-500 bg-emerald-500/5 ring-4 ring-emerald-500/10',
+      btnBg: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+      formats: ['SVG', 'EPS', 'AI'],
+    };
+  };
+
+  const theme = getToolTheme();
+
   return (
-    <div className={`bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-2xl shadow-md shadow-black/5 flex flex-col min-h-[460px] relative overflow-hidden ${
+    <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-white/5 rounded-2xl shadow-xl shadow-black/5 flex flex-col min-h-[480px] relative overflow-hidden transition-all duration-300 ${
       mobileTab === 'upload' ? 'flex animate-in fade-in slide-in-from-bottom-5 duration-300' : 'hidden lg:flex'
     }`}>
       {/* CARD HEADER */}
-      <div className="bg-[#f8f9fc] dark:bg-slate-900 py-3.5 px-5 border-b border-[#e3e6f0]/60 dark:border-white/5 rounded-t-lg flex justify-between items-center">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-6.5 h-6.5 rounded-2xl bg-[#7c3aed] text-white flex items-center justify-center font-black text-xs shadow-md shadow-black/5">
-            1
+      <div className="bg-slate-50/70 dark:bg-slate-850/50 py-3.5 px-5 border-b border-slate-200/60 dark:border-white/5 flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-xl bg-violet-600 text-white flex items-center justify-center font-black text-xs shadow-md shadow-violet-500/20">
+            01
           </div>
-          <h3 className="m-0 font-extrabold text-[#7c3aed] dark:text-violet-400 text-xs sm:text-sm uppercase tracking-wider flex items-center space-x-2">
-            <span>{t.upload_title}</span>
+          <div className="flex items-center gap-2">
+            <h3 className="m-0 font-extrabold text-slate-800 dark:text-white text-xs sm:text-sm uppercase tracking-wider">
+              {t.upload_title}
+            </h3>
             <HelpIcon title={t.upload_help} />
-          </h3>
+          </div>
         </div>
         {hasFiles && (
           <button 
@@ -67,10 +102,10 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
               });
               updateFiles(() => []);
             }} 
-            className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/15 text-red-500 rounded-xl transition-all border border-red-500/15 flex items-center space-x-1 text-[10px] font-black uppercase tracking-wider"
+            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl transition-all border border-rose-200 dark:border-rose-500/20 flex items-center gap-1.5 text-[11px] font-bold cursor-pointer"
             title={t.upload_reset_title}
           >
-            <Trash2 size={12} />
+            <Trash2 size={13} />
             <span>{t.upload_reset}</span>
           </button>
         )}
@@ -79,19 +114,31 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
       {/* CARD BODY */}
       <div className="p-6 flex-grow flex flex-col justify-between">
         <div
-          className={`flex-grow border-[2px] border-dashed ${
-            isDragging 
-              ? activeTool === ToolType.IMAGE ? 'border-violet-500 bg-violet-500/10 scale-[1.02] shadow-2xl shadow-violet-500/20' : activeTool === ToolType.VIDEO ? 'border-purple-500 bg-purple-500/10 scale-[1.02] shadow-2xl shadow-purple-500/20' : 'border-emerald-500 bg-emerald-500/10 scale-[1.02] shadow-2xl shadow-emerald-500/20'
-              : activeTool === ToolType.IMAGE ? 'border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-black/20 hover:bg-violet-50/50 dark:hover:bg-violet-900/10 hover:border-violet-400/50 hover:shadow-xl' 
-              : activeTool === ToolType.VIDEO ? 'border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-black/20 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 hover:border-purple-400/50 hover:shadow-xl'
-              : 'border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-black/20 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 hover:border-emerald-400/50 hover:shadow-xl'
-          } rounded-[2rem] p-6 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center min-h-[260px] relative group overflow-hidden`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+              handleFileChange({ target: { files: e.dataTransfer.files } });
+            }
+          }}
           onClick={triggerFileInput}
+          className={`flex-grow border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center min-h-[280px] relative group overflow-hidden ${
+            isDragging 
+              ? theme.borderActive
+              : 'border-slate-300 dark:border-slate-700/80 bg-slate-50/50 dark:bg-black/20 hover:border-violet-400 dark:hover:border-violet-500/50 hover:bg-violet-50/20 dark:hover:bg-violet-950/10'
+          }`}
         >
-          {/* Background Ambient Glow */}
-          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none mix-blend-plus-lighter">
-            <div className={`absolute top-0 right-0 w-48 h-48 blur-[3xl] rounded-full ${activeTool === ToolType.IMAGE ? 'bg-violet-400/20' : activeTool === ToolType.VIDEO ? 'bg-purple-400/20' : 'bg-emerald-400/20'}`} />
-            <div className={`absolute bottom-0 left-0 w-48 h-48 blur-[3xl] rounded-full ${activeTool === ToolType.IMAGE ? 'bg-indigo-400/20' : activeTool === ToolType.VIDEO ? 'bg-fuchsia-400/20' : 'bg-teal-400/20'}`} />
+          {/* Subtle Ambient Radial Glow */}
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
           </div>
 
           <input 
@@ -102,50 +149,85 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
             onChange={handleFileChange} 
             className="hidden" 
           />
-          <div className="flex flex-col items-center group/icon relative z-10 transition-transform duration-500 group-hover:-translate-y-2">
-            <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center mb-6 shadow-xl border border-white/20 transition-all duration-500 relative ${
-                activeTool === ToolType.IMAGE 
-                  ? 'bg-gradient-to-br from-violet-500/10 to-indigo-500/10 text-violet-600 dark:text-violet-400 group-hover:from-violet-500/20 group-hover:to-indigo-500/20 group-hover:scale-110 group-hover:shadow-violet-500/25 group-hover:ring-4 ring-violet-500/10' 
-                  : activeTool === ToolType.VIDEO 
-                    ? 'bg-gradient-to-br from-purple-500/10 to-fuchsia-500/10 text-purple-600 dark:text-purple-400 group-hover:from-purple-500/20 group-hover:to-fuchsia-500/20 group-hover:scale-110 group-hover:shadow-purple-500/25 group-hover:ring-4 ring-purple-500/10' 
-                    : 'bg-gradient-to-br from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:text-emerald-400 group-hover:from-emerald-500/20 group-hover:to-teal-500/20 group-hover:scale-110 group-hover:shadow-emerald-500/25 group-hover:ring-4 ring-emerald-500/10'
-              }`}
-            >
-              {activeTool === ToolType.IMAGE ? <ImageIcon size={32} strokeWidth={1.5} /> : activeTool === ToolType.VIDEO ? <Film size={32} strokeWidth={1.5} /> : <FileCode size={32} strokeWidth={1.5} />}
+
+          <div className="flex flex-col items-center relative z-10 transition-transform duration-300 group-hover:-translate-y-1">
+            <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 shadow-lg shadow-black/5 border border-slate-200 dark:border-white/10 flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 group-hover:shadow-violet-500/20 group-hover:border-violet-500/30">
+              {activeTool === ToolType.IMAGE ? (
+                <ImageIcon size={28} className={theme.text} strokeWidth={2} />
+              ) : activeTool === ToolType.VIDEO ? (
+                <Film size={28} className={theme.text} strokeWidth={2} />
+              ) : (
+                <FileCode size={28} className={theme.text} strokeWidth={2} />
+              )}
             </div>
-            <p className="text-slate-400 dark:text-slate-500 font-extrabold text-[11px] mb-2 uppercase tracking-[0.25em]">{t.drag_drop}</p>
-            <p className={`font-black text-lg tracking-tight ${
-              activeTool === ToolType.IMAGE ? 'text-violet-600 dark:text-violet-400' : activeTool === ToolType.VIDEO ? 'text-purple-600 dark:text-purple-400' : 'text-emerald-600 dark:text-emerald-400'
-            }`}>{t.click_to_choose}</p>
+
+            <p className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
+              {t.drag_drop}
+            </p>
+            <p className="font-black text-base sm:text-lg text-slate-800 dark:text-white tracking-tight mb-3">
+              {t.click_to_choose}
+            </p>
+
+            {/* Quick Browse button */}
+            <div className={`px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 ${theme.btnBg}`}>
+              <UploadCloud size={15} />
+              <span>Browse Files</span>
+            </div>
+
+            {/* Supported Formats Pills */}
+            <div className="flex items-center gap-1.5 mt-5 flex-wrap justify-center">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-1">Formats:</span>
+              {theme.formats.map(fmt => (
+                <span key={fmt} className="px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-extrabold tracking-wider">
+                  .{fmt}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
+        {/* Selected Files Preview & Thumbnails Strip */}
         {hasFiles && (
-          <div className="mt-5 flex items-center justify-between p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-md shadow-black/5 animate-in fade-in duration-300">
-            <span className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-wider">
-              {files.length} {t.files_selected}
-            </span>
-            <div className="flex -space-x-1.5">
-              {files.slice(0, 4).map((f) => (
+          <div className="mt-4 p-3.5 rounded-2xl border border-slate-200/80 dark:border-white/5 bg-slate-50/70 dark:bg-slate-800/40 flex items-center justify-between animate-in fade-in duration-300">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                <CheckCircle2 size={16} />
+              </div>
+              <div>
+                <span className="text-slate-700 dark:text-slate-200 text-xs font-black block">
+                  {files.length} {t.files_selected}
+                </span>
+                <span className="text-slate-400 text-[10px] font-semibold">
+                  Ready for AI processing
+                </span>
+              </div>
+            </div>
+
+            <div className="flex -space-x-2 overflow-hidden py-1">
+              {files.slice(0, 5).map((f) => (
                 <div 
                   key={f.id} 
-                  onClick={() => setPreviewFile(f)} 
-                  className="w-8 h-8 rounded-2xl border-2 border-white dark:border-slate-900 bg-slate-200 overflow-hidden cursor-pointer hover:scale-110 hover:z-20 transition-all shadow-md shadow-black/5"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewFile(f);
+                  }} 
+                  className="w-9 h-9 rounded-xl border-2 border-white dark:border-slate-850 bg-slate-200 dark:bg-slate-800 overflow-hidden cursor-pointer hover:scale-115 hover:z-20 transition-all shadow-sm"
+                  title={f.file.name}
                 >
                   {f.file.type.startsWith('video/') && f.analysisFrames && f.analysisFrames.length >= 3 ? (
-                    <img src={f.analysisFrames[1] || undefined} className="w-full h-full object-cover" loading="lazy" />
+                    <img src={f.analysisFrames[1] || undefined} className="w-full h-full object-cover" loading="lazy" alt="" />
                   ) : f.thumbnail ? (
-                    <img src={f.thumbnail || undefined} className="w-full h-full object-cover" loading="lazy" />
+                    <img src={f.thumbnail || undefined} className="w-full h-full object-cover" loading="lazy" alt="" />
                   ) : (
-                    <div className="w-full h-full bg-slate-400 flex items-center justify-center text-[8px] text-white font-bold">
-                      {t.upload_file_placeholder}
+                    <div className="w-full h-full bg-slate-700 flex items-center justify-center text-[9px] text-white font-extrabold">
+                      {f.file.name.split('.').pop()?.toUpperCase() || 'FILE'}
                     </div>
                   )}
                 </div>
               ))}
-              {files.length > 4 && (
-                <div className="w-8 h-8 rounded-2xl border-2 border-white dark:border-slate-900 bg-slate-800 text-white flex items-center justify-center text-[10px] font-bold shadow-md shadow-black/5">
-                  +{files.length - 4}
+              {files.length > 5 && (
+                <div className="w-9 h-9 rounded-xl border-2 border-white dark:border-slate-850 bg-slate-800 text-white flex items-center justify-center text-[10px] font-black shadow-sm">
+                  +{files.length - 5}
                 </div>
               )}
             </div>
@@ -154,7 +236,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
 
         {/* Mobile Page Switcher Hook */}
         {hasFiles && (
-          <div className="flex lg:hidden mt-4 pt-3 border-t border-[#e3e6f0]/60 dark:border-white/5 w-full">
+          <div className="flex lg:hidden mt-4 pt-3 border-t border-slate-200 dark:border-white/5 w-full">
             <button
               onClick={() => {
                 if ('vibrate' in navigator) {
@@ -162,10 +244,10 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
                 }
                 setMobileTab('ai');
               }}
-              className="w-full py-3 bg-[#7c3aed] hover:bg-violet-600 text-white font-black rounded-[1.5rem] flex items-center justify-center space-x-1.5 text-xs uppercase tracking-wider shadow active:scale-[0.98] transition-all"
+              className="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-xl flex items-center justify-center space-x-1.5 text-xs uppercase tracking-wider shadow-lg shadow-violet-500/20 active:scale-[0.98] transition-all"
             >
               <span>{t.upload_next_ai}</span>
-              <ArrowRight size={13} />
+              <ArrowRight size={14} />
             </button>
           </div>
         )}

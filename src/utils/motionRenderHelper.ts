@@ -174,7 +174,7 @@ const renderDeterministicMaster = async (
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, cleanWidth, cleanHeight);
 
-      const createFileFn = (MP4Box as any).createFile;
+      const createFileFn = (MP4Box as any).createFile || (MP4Box as any).default?.createFile || (window as any).MP4Box?.createFile;
       if (!createFileFn) throw new Error('MP4Box createFile tidak ditemukan');
       const mp4file = createFileFn();
       let trackId: number | null = null;
