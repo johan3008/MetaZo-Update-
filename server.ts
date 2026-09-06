@@ -194,6 +194,8 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
     const customBlackboxKey = req.headers['x-blackbox-key'];
     const customBluesmindsKey = req.headers['x-bluesminds-key'];
     const customAiveneKey = req.headers['x-aivene-key'];
+    const customFlorenceKey = req.headers['x-florence-key'];
+    const customFlorenceEndpoint = req.headers['x-florence-endpoint'];
     const provider = req.headers['x-ai-provider'] || 'gemini';
 
     const getKeys = (headerVal: any) => {
@@ -212,7 +214,11 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
         nvidia: { keys: getKeys(customNvidiaKey), activeIndex: 0 },
         blackbox: { keys: getKeys(customBlackboxKey), activeIndex: 0 },
         bluesminds: { keys: getKeys(customBluesmindsKey), activeIndex: 0 },
-        aivene: { keys: getKeys(customAiveneKey), activeIndex: 0 }
+        aivene: { keys: getKeys(customAiveneKey), activeIndex: 0 },
+        florence: { 
+            apiKey: typeof customFlorenceKey === 'string' ? customFlorenceKey.trim() : undefined,
+            endpoint: typeof customFlorenceEndpoint === 'string' ? customFlorenceEndpoint.trim() : undefined
+        }
     }, () => {
         next();
     });
@@ -1425,6 +1431,54 @@ app.get('/api/debug-uploads', (req, res) => {
             return res.status(status).json({ error: `Terjadi error dari Z.AI (Status: ${status}): ${errorMsg}` });
         } catch (e: any) {
             console.warn('Test Z.AI API Key error exception:', e);
+            res.status(500).json({ error: e.message || 'Internal Server Error' });
+        }
+    });
+
+    app.post('/api/test-florence-key', async (req, res) => {
+        try {
+            const { apiKey, endpoint } = req.body;
+            if (!apiKey && !endpoint) {
+                return res.status(400).json({ error: 'HuggingFace Token atau Florence Endpoint tidak boleh kosong.' });
+            }
+
+            // Test HF token or custom endpoint
+            if (endpoint) {
+                try {
+                    const testResp = await fetch(endpoint.trim(), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ping: true, test: true })
+                    });
+                    if (testResp.ok || testResp.status === 400 || testResp.status === 422) {
+                        return res.json({ success: true, message: 'Florence-2 Custom Endpoint terhubung dengan sukses!' });
+                    }
+                    return res.status(testResp.status).json({ error: `Florence-2 Endpoint merespon status ${testResp.status}` });
+                } catch (err: any) {
+                    return res.status(500).json({ error: `Gagal menghubungi Florence-2 Endpoint: ${err.message || err}` });
+                }
+            }
+
+            if (apiKey) {
+                const hfResp = await fetch('https://api-inference.huggingface.co/models/microsoft/Florence-2-large', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey.trim()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ inputs: 'test' })
+                });
+                if (hfResp.ok || hfResp.status === 503 || hfResp.status === 400 || hfResp.status === 422) {
+                    return res.json({ success: true, message: 'Hugging Face API Token untuk Florence-2 valid!' });
+                }
+                if (hfResp.status === 401 || hfResp.status === 403) {
+                    return res.status(400).json({ error: 'Hugging Face Token tidak valid atau unauthorized.' });
+                }
+                const text = await hfResp.text();
+                return res.status(hfResp.status).json({ error: `Hugging Face API response (${hfResp.status}): ${text.slice(0, 150)}` });
+            }
+        } catch (e: any) {
+            console.warn('Test Florence API Key error exception:', e);
             res.status(500).json({ error: e.message || 'Internal Server Error' });
         }
     });
