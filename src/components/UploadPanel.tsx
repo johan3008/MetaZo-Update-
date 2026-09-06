@@ -72,17 +72,24 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
   const theme = getToolTheme();
 
   return (
-    <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-white/5 rounded-2xl shadow-xl shadow-black/5 flex flex-col min-h-[480px] relative overflow-hidden transition-all duration-300 ${
+    <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-white/10 rounded-3xl shadow-xl shadow-black/5 flex flex-col min-h-[500px] relative overflow-hidden transition-all duration-300 hover:shadow-2xl hover:border-violet-500/20 ${
       mobileTab === 'upload' ? 'flex animate-in fade-in slide-in-from-bottom-5 duration-300' : 'hidden lg:flex'
     }`}>
+      {/* Top Accent Gradient Line */}
+      <div className={`h-1 w-full bg-gradient-to-r ${
+        activeTool === ToolType.IMAGE ? 'from-violet-500 via-indigo-500 to-purple-500' :
+        activeTool === ToolType.VIDEO ? 'from-purple-500 via-fuchsia-500 to-pink-500' :
+        'from-emerald-500 via-teal-500 to-cyan-500'
+      }`} />
+
       {/* CARD HEADER */}
-      <div className="bg-slate-50/70 dark:bg-slate-850/50 py-3.5 px-5 border-b border-slate-200/60 dark:border-white/5 flex justify-between items-center">
+      <div className="bg-slate-50/80 dark:bg-slate-850/60 py-4 px-6 border-b border-slate-200/70 dark:border-white/5 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-xl bg-violet-600 text-white flex items-center justify-center font-black text-xs shadow-md shadow-violet-500/20">
+          <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-md shadow-violet-500/30">
             01
           </div>
           <div className="flex items-center gap-2">
-            <h3 className="m-0 font-extrabold text-slate-800 dark:text-white text-xs sm:text-sm uppercase tracking-wider">
+            <h3 className="m-0 font-black text-slate-800 dark:text-white text-xs sm:text-sm uppercase tracking-wider">
               {t.upload_title}
             </h3>
             <HelpIcon title={t.upload_help} />
@@ -102,7 +109,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
               });
               updateFiles(() => []);
             }} 
-            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl transition-all border border-rose-200 dark:border-rose-500/20 flex items-center gap-1.5 text-[11px] font-bold cursor-pointer"
+            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl transition-all border border-rose-200/80 dark:border-rose-500/30 flex items-center gap-1.5 text-[11px] font-extrabold cursor-pointer active:scale-95"
             title={t.upload_reset_title}
           >
             <Trash2 size={13} />
@@ -112,7 +119,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
       </div>
 
       {/* CARD BODY */}
-      <div className="p-6 flex-grow flex flex-col justify-between">
+      <div className="p-6 flex-grow flex flex-col justify-between space-y-4">
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -130,15 +137,15 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
             }
           }}
           onClick={triggerFileInput}
-          className={`flex-grow border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center min-h-[280px] relative group overflow-hidden ${
+          className={`flex-grow border-2 border-dashed rounded-3xl p-8 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center min-h-[300px] relative group overflow-hidden ${
             isDragging 
               ? theme.borderActive
-              : 'border-slate-300 dark:border-slate-700/80 bg-slate-50/50 dark:bg-black/20 hover:border-violet-400 dark:hover:border-violet-500/50 hover:bg-violet-50/20 dark:hover:bg-violet-950/10'
+              : 'border-slate-300 dark:border-slate-700/80 bg-slate-50/60 dark:bg-black/25 hover:border-violet-500/60 dark:hover:border-violet-400/60 hover:bg-violet-50/30 dark:hover:bg-violet-950/15'
           }`}
         >
           {/* Subtle Ambient Radial Glow */}
           <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-violet-500/15 dark:bg-violet-500/20 rounded-full blur-3xl pointer-events-none" />
           </div>
 
           <input 
@@ -150,35 +157,36 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
             className="hidden" 
           />
 
-          <div className="flex flex-col items-center relative z-10 transition-transform duration-300 group-hover:-translate-y-1">
-            <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 shadow-lg shadow-black/5 border border-slate-200 dark:border-white/10 flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 group-hover:shadow-violet-500/20 group-hover:border-violet-500/30">
+          <div className="flex flex-col items-center relative z-10 transition-transform duration-300 group-hover:-translate-y-1.5">
+            <div className="w-18 h-18 rounded-3xl bg-white dark:bg-slate-800 shadow-xl shadow-black/5 border border-slate-200/80 dark:border-white/10 flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 group-hover:shadow-violet-500/25 group-hover:border-violet-500/40">
               {activeTool === ToolType.IMAGE ? (
-                <ImageIcon size={28} className={theme.text} strokeWidth={2} />
+                <ImageIcon size={32} className={theme.text} strokeWidth={2.2} />
               ) : activeTool === ToolType.VIDEO ? (
-                <Film size={28} className={theme.text} strokeWidth={2} />
+                <Film size={32} className={theme.text} strokeWidth={2.2} />
               ) : (
-                <FileCode size={28} className={theme.text} strokeWidth={2} />
+                <FileCode size={32} className={theme.text} strokeWidth={2.2} />
               )}
             </div>
 
-            <p className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
+            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
               {t.drag_drop}
             </p>
-            <p className="font-black text-base sm:text-lg text-slate-800 dark:text-white tracking-tight mb-3">
+            <p className="font-black text-base sm:text-lg text-slate-900 dark:text-white tracking-tight mb-3">
               {t.click_to_choose}
             </p>
 
             {/* Quick Browse button */}
-            <div className={`px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 ${theme.btnBg}`}>
-              <UploadCloud size={15} />
-              <span>Browse Files</span>
+            <div className={`px-5 py-2.5 rounded-2xl text-xs font-black shadow-md transition-all flex items-center gap-2 cursor-pointer group-hover:scale-105 active:scale-95 ${theme.btnBg}`}>
+              <UploadCloud size={16} />
+              <span>Browse Stock Files</span>
             </div>
 
             {/* Supported Formats Pills */}
-            <div className="flex items-center gap-1.5 mt-5 flex-wrap justify-center">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-1">Formats:</span>
+            <div className="flex items-center gap-1.5 mt-6 flex-wrap justify-center">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-wider mr-1">Formats:</span>
               {theme.formats.map(fmt => (
-                <span key={fmt} className="px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-extrabold tracking-wider">
+                <span key={fmt} className="px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 text-[10px] font-mono font-black tracking-wider border border-slate-300/50 dark:border-white/5">
                   .{fmt}
                 </span>
               ))}
@@ -188,22 +196,23 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
 
         {/* Selected Files Preview & Thumbnails Strip */}
         {hasFiles && (
-          <div className="mt-4 p-3.5 rounded-2xl border border-slate-200/80 dark:border-white/5 bg-slate-50/70 dark:bg-slate-800/40 flex items-center justify-between animate-in fade-in duration-300">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                <CheckCircle2 size={16} />
+          <div className="mt-2 p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-slate-850/50 flex items-center justify-between animate-in fade-in duration-300">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                <CheckCircle2 size={18} />
               </div>
               <div>
-                <span className="text-slate-700 dark:text-slate-200 text-xs font-black block">
+                <span className="text-slate-900 dark:text-white text-xs font-black block">
                   {files.length} {t.files_selected}
                 </span>
-                <span className="text-slate-400 text-[10px] font-semibold">
-                  Ready for AI processing
+                <span className="text-slate-400 text-[10px] font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Ready for AI Dual-Vision analysis
                 </span>
               </div>
             </div>
 
-            <div className="flex -space-x-2 overflow-hidden py-1">
+            <div className="flex -space-x-2.5 overflow-hidden py-1">
               {files.slice(0, 5).map((f) => (
                 <div 
                   key={f.id} 
@@ -211,7 +220,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
                     e.stopPropagation();
                     setPreviewFile(f);
                   }} 
-                  className="w-9 h-9 rounded-xl border-2 border-white dark:border-slate-850 bg-slate-200 dark:bg-slate-800 overflow-hidden cursor-pointer hover:scale-115 hover:z-20 transition-all shadow-sm"
+                  className="w-10 h-10 rounded-xl border-2 border-white dark:border-slate-900 bg-slate-200 dark:bg-slate-800 overflow-hidden cursor-pointer hover:scale-120 hover:z-20 transition-all shadow-md"
                   title={f.file.name}
                 >
                   {f.file.type.startsWith('video/') && f.analysisFrames && f.analysisFrames.length >= 3 ? (
@@ -219,14 +228,14 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
                   ) : f.thumbnail ? (
                     <img src={f.thumbnail || undefined} className="w-full h-full object-cover" loading="lazy" alt="" />
                   ) : (
-                    <div className="w-full h-full bg-slate-700 flex items-center justify-center text-[9px] text-white font-extrabold">
+                    <div className="w-full h-full bg-slate-700 flex items-center justify-center text-[9px] text-white font-black">
                       {f.file.name.split('.').pop()?.toUpperCase() || 'FILE'}
                     </div>
                   )}
                 </div>
               ))}
               {files.length > 5 && (
-                <div className="w-9 h-9 rounded-xl border-2 border-white dark:border-slate-850 bg-slate-800 text-white flex items-center justify-center text-[10px] font-black shadow-sm">
+                <div className="w-10 h-10 rounded-xl border-2 border-white dark:border-slate-900 bg-gradient-to-br from-violet-600 to-indigo-600 text-white flex items-center justify-center text-[10px] font-black shadow-md">
                   +{files.length - 5}
                 </div>
               )}
@@ -236,7 +245,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
 
         {/* Mobile Page Switcher Hook */}
         {hasFiles && (
-          <div className="flex lg:hidden mt-4 pt-3 border-t border-slate-200 dark:border-white/5 w-full">
+          <div className="flex lg:hidden mt-2 pt-3 border-t border-slate-200 dark:border-white/5 w-full">
             <button
               onClick={() => {
                 if ('vibrate' in navigator) {
@@ -244,7 +253,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
                 }
                 setMobileTab('ai');
               }}
-              className="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-xl flex items-center justify-center space-x-1.5 text-xs uppercase tracking-wider shadow-lg shadow-violet-500/20 active:scale-[0.98] transition-all"
+              className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-black rounded-2xl flex items-center justify-center space-x-2 text-xs uppercase tracking-wider shadow-lg shadow-violet-500/25 active:scale-[0.98] transition-all"
             >
               <span>{t.upload_next_ai}</span>
               <ArrowRight size={14} />

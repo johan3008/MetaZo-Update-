@@ -67,24 +67,33 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
   };
 
   return (
-    <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-white/5 rounded-2xl shadow-xl shadow-black/5 flex flex-col justify-between min-h-[480px] relative overflow-hidden transition-all duration-300 ${
+    <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-white/10 rounded-3xl shadow-xl shadow-black/5 flex flex-col justify-between min-h-[500px] relative overflow-hidden transition-all duration-300 hover:shadow-2xl hover:border-violet-500/20 ${
       mobileTab === 'ai' ? 'flex animate-in fade-in slide-in-from-bottom-5 duration-300' : 'hidden lg:flex'
     }`}>
+      {/* Top Accent Gradient Line */}
+      <div className={`h-1 w-full bg-gradient-to-r ${
+        activeTool === ToolType.IMAGE ? 'from-violet-500 via-indigo-500 to-purple-500' :
+        activeTool === ToolType.VIDEO ? 'from-purple-500 via-fuchsia-500 to-pink-500' :
+        'from-emerald-500 via-teal-500 to-cyan-500'
+      }`} />
+
       {/* CARD HEADER */}
-      <div className="bg-slate-50/70 dark:bg-slate-850/50 py-3.5 px-5 border-b border-slate-200/60 dark:border-white/5 flex justify-between items-center">
+      <div className="bg-slate-50/80 dark:bg-slate-850/60 py-4 px-6 border-b border-slate-200/70 dark:border-white/5 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-xl bg-violet-600 text-white flex items-center justify-center font-black text-xs shadow-md shadow-violet-500/20">
+          <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-md shadow-violet-500/30">
             02
           </div>
           <div className="flex items-center gap-2">
-            <h3 className="m-0 font-extrabold text-slate-800 dark:text-white text-xs sm:text-sm uppercase tracking-wider">
+            <h3 className="m-0 font-black text-slate-800 dark:text-white text-xs sm:text-sm uppercase tracking-wider">
               AI Generation Engine
             </h3>
-            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              CLIP Rank V2
-            </span>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-violet-600 dark:text-violet-300 bg-violet-500/10 dark:bg-violet-500/20 px-2.5 py-1 rounded-full border border-violet-500/25 shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
+            Dual-Vision (Florence-2 + AI)
+          </span>
         </div>
       </div>
 
@@ -94,9 +103,9 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
           {/* SECTION 1: LANGUAGE & MODEL SELECTION ROW */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3.5">
             {/* Metadata Language */}
-            <div className="p-3 bg-slate-50/80 dark:bg-black/20 rounded-xl border border-slate-200/70 dark:border-white/5">
+            <div className="p-3 bg-slate-50/80 dark:bg-black/25 rounded-2xl border border-slate-200/70 dark:border-white/5 shadow-sm">
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                   <Globe size={13} className="text-violet-500" />
                   <span>Metadata Language</span>
                 </label>
@@ -104,7 +113,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
               <select
                 value={metadataLanguage}
                 onChange={(e) => setMetadataLanguage(e.target.value)}
-                className="w-full h-8.5 px-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500/40 font-bold transition-all"
+                className="w-full h-9 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500/40 font-black transition-all"
               >
                 <option value="en">🇺🇸 English (Default)</option>
                 <option value="id">🇮🇩 Indonesian / Bahasa</option>
@@ -120,25 +129,25 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
             </div>
 
             {/* Model Performance */}
-            <div className="p-3 bg-slate-50/80 dark:bg-black/20 rounded-xl border border-slate-200/70 dark:border-white/5">
+            <div className="p-3 bg-slate-50/80 dark:bg-black/25 rounded-2xl border border-slate-200/70 dark:border-white/5 shadow-sm">
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                   <Cpu size={13} className="text-violet-500" />
-                  <span>AI Model Profile</span>
+                  <span>AI Profile</span>
                 </label>
               </div>
               <div className="grid grid-cols-2 gap-1.5">
                 {[
-                  { value: 'speed', label: '⚡ Speed' },
-                  { value: 'detail', label: '🎯 Detail' }
+                  { value: 'speed', label: '⚡ Ultra Fast' },
+                  { value: 'detail', label: '🎯 Deep Detail' }
                 ].map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => setAiModelPerformance?.(opt.value as 'speed' | 'detail')}
-                    className={`py-1.5 px-2 text-[11px] font-extrabold rounded-lg border transition-all text-center cursor-pointer ${
+                    className={`py-2 px-2.5 text-[11px] font-black rounded-xl border transition-all text-center cursor-pointer ${
                       aiModelPerformance === opt.value
-                        ? 'bg-violet-600 text-white border-violet-600 shadow-sm shadow-violet-500/20'
+                        ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-violet-600 shadow-md shadow-violet-500/25'
                         : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -152,11 +161,11 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
           {/* SECTION 2: KEYWORD RULES & TITLE LENGTH */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3.5">
             {/* Keyword Count */}
-            <div className="p-3 bg-slate-50/80 dark:bg-black/20 rounded-xl border border-slate-200/70 dark:border-white/5 flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <div className="p-3 bg-slate-50/80 dark:bg-black/25 rounded-2xl border border-slate-200/70 dark:border-white/5 flex flex-col justify-between shadow-sm">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
                   <Hash size={12} className="text-violet-500" />
-                  <span>Count</span>
+                  <span>Tags Target</span>
                 </label>
                 <div className="flex gap-1">
                   {[30, 40, 49].map((c) => (
@@ -164,8 +173,8 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                       key={c}
                       type="button"
                       onClick={() => setKeywordCount(c)}
-                      className={`px-1.5 py-0.5 text-[9px] font-extrabold rounded ${
-                        keywordCount === c ? 'bg-violet-600 text-white' : 'bg-slate-200/70 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                      className={`px-1.5 py-0.5 text-[9px] font-black rounded-md ${
+                        keywordCount === c ? 'bg-violet-600 text-white' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       {c}
@@ -187,13 +196,13 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                     setKeywordCount(num);
                   }
                 }} 
-                className="w-full h-8.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-lg text-center text-xs font-black text-slate-800 dark:text-white transition-all focus:ring-2 focus:ring-violet-500/40 outline-none" 
+                className="w-full h-9 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-center text-xs font-black text-slate-900 dark:text-white transition-all focus:ring-2 focus:ring-violet-500/40 outline-none font-mono" 
               />
             </div>
 
             {/* Keyword Style */}
-            <div className="p-3 bg-slate-50/80 dark:bg-black/20 rounded-xl border border-slate-200/70 dark:border-white/5">
-              <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">
+            <div className="p-3 bg-slate-50/80 dark:bg-black/25 rounded-2xl border border-slate-200/70 dark:border-white/5 shadow-sm">
+              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">
                 Keyword Style
               </label>
               <div className="grid grid-cols-3 gap-1">
@@ -206,9 +215,9 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                     key={opt.value}
                     type="button"
                     onClick={() => setKeywordMode(opt.value as 'mixed' | 'single' | 'multi')}
-                    className={`py-1.5 text-[10px] font-extrabold rounded-lg border transition-all text-center cursor-pointer ${
+                    className={`py-2 text-[10px] font-black rounded-xl border transition-all text-center cursor-pointer ${
                       keywordMode === opt.value
-                        ? 'bg-violet-600 text-white border-violet-600 shadow-sm shadow-violet-500/20'
+                        ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-violet-600 shadow-md shadow-violet-500/25'
                         : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -219,8 +228,8 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
             </div>
 
             {/* Title Length */}
-            <div className="p-3 bg-slate-50/80 dark:bg-black/20 rounded-xl border border-slate-200/70 dark:border-white/5">
-              <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
+            <div className="p-3 bg-slate-50/80 dark:bg-black/25 rounded-2xl border border-slate-200/70 dark:border-white/5 shadow-sm">
+              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
                 <Type size={12} className="text-violet-500" />
                 <span>Title Length</span>
               </label>
@@ -234,9 +243,9 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                     key={opt.value}
                     type="button"
                     onClick={() => setTitleLength(opt.value as 'short' | 'medium' | 'long')}
-                    className={`py-1.5 text-[10px] font-extrabold rounded-lg border transition-all text-center cursor-pointer ${
+                    className={`py-2 text-[10px] font-black rounded-xl border transition-all text-center cursor-pointer ${
                       titleLength === opt.value
-                        ? 'bg-violet-600 text-white border-violet-600 shadow-sm shadow-violet-500/20'
+                        ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-violet-600 shadow-md shadow-violet-500/25'
                         : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -248,18 +257,18 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
           </div>
 
           {/* SECTION 3: CUSTOM PROMPT ANCHOR */}
-          <div className="p-3 bg-slate-50/80 dark:bg-black/20 rounded-xl border border-slate-200/70 dark:border-white/5 mb-3.5">
+          <div className="p-3 bg-slate-50/80 dark:bg-black/25 rounded-2xl border border-slate-200/70 dark:border-white/5 mb-3.5 shadow-sm">
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles size={12} className="text-violet-500" />
                 <span>{t.custom_prompt_optional}</span>
               </label>
-              <span className="text-[9px] font-bold text-violet-600 dark:text-violet-400 bg-violet-500/10 px-1.5 py-0.2 rounded">
-                Prompt Anchor
+              <span className="text-[9px] font-black text-violet-600 dark:text-violet-400 bg-violet-500/15 px-2 py-0.5 rounded-full border border-violet-500/20">
+                SEO Anchor
               </span>
             </div>
             <textarea 
-              className="w-full p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700/80 outline-none text-xs text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all resize-none min-h-[60px] max-h-[90px] font-medium placeholder-slate-400" 
+              className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700/80 outline-none text-xs text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all resize-none min-h-[64px] max-h-[96px] font-medium placeholder-slate-400" 
               value={customPrompt} 
               onChange={(e) => setCustomPrompt(e.target.value)} 
               placeholder={t.custom_prompt_placeholder}
@@ -267,17 +276,17 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
           </div>
 
           {/* SECTION 4: AI CREATIVITY SLIDER */}
-          <div className="p-3 bg-slate-50/80 dark:bg-black/20 rounded-xl border border-slate-200/70 dark:border-white/5">
+          <div className="p-3 bg-slate-50/80 dark:bg-black/25 rounded-2xl border border-slate-200/70 dark:border-white/5 shadow-sm">
             <div className="flex items-center justify-between mb-2">
-              <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Sliders size={12} className="text-amber-500" />
-                <span>AI Creativity</span>
+                <span>AI Creativity Level</span>
               </label>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-slate-400">
                   {getCreativityLabel(aiCreativity)}
                 </span>
-                <span className="px-2 py-0.5 bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 text-xs font-black rounded-md border border-slate-200 dark:border-slate-700 font-mono">
+                <span className="px-2 py-0.5 bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 text-xs font-black rounded-lg border border-slate-200 dark:border-slate-700 font-mono shadow-sm">
                   {aiCreativity.toFixed(1)}
                 </span>
               </div>
@@ -289,7 +298,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
               step="0.1"
               value={aiCreativity}
               onChange={(e) => setAiCreativity(parseFloat(e.target.value))}
-              className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-600 focus:outline-none"
+              className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-600 focus:outline-none"
             />
           </div>
         </div>
@@ -297,43 +306,43 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
         {/* CONTROLS FLOOR */}
         <div className="space-y-3 w-full pt-2">
           {isLoading && progressInfo && (
-            <div className="p-3 bg-violet-500/10 border border-violet-500/20 rounded-xl animate-in zoom-in-95 duration-200">
-              <div className="flex justify-between text-[10px] font-extrabold uppercase tracking-wider mb-1.5">
+            <div className="p-3.5 bg-violet-500/10 border border-violet-500/25 rounded-2xl animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between text-[10px] font-black uppercase tracking-wider mb-2">
                 <span className="text-violet-600 dark:text-violet-400 flex items-center">
-                  <RefreshCcw size={11} className="animate-spin mr-1.5"/> 
-                  {activeTool === ToolType.VIDEO ? "Decoding Frames" : activeTool === ToolType.VECTOR ? "Parsing Vector Data" : "Analyzing Visuals"} {progressInfo.current}/{progressInfo.total}
+                  <RefreshCcw size={12} className="animate-spin mr-1.5"/> 
+                  {activeTool === ToolType.VIDEO ? "Dual-Vision Video Frames" : activeTool === ToolType.VECTOR ? "Parsing Vector Semantics" : "Dual-Vision Visual Analysis"} {progressInfo.current}/{progressInfo.total}
                 </span>
                 <span className="text-slate-500 font-mono font-bold">{progressInfo.duration}s elapsed</span>
               </div>
               <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-to-r from-violet-600 to-indigo-500 transition-all duration-300 shadow-sm" 
+                  className="h-full bg-gradient-to-r from-violet-600 via-indigo-500 to-purple-500 transition-all duration-300 shadow-sm" 
                   style={{ width: `${(progressInfo.current / progressInfo.total) * 100}%` }}
                 />
               </div>
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex gap-2.5">
             <button 
               onClick={() => handleGenerateAll(false)} 
               disabled={isLoading || !filesToGenerateCount} 
-              className={`flex-1 py-3.5 px-4 text-white font-black rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer duration-200 active:scale-[0.98] ${
+              className={`flex-1 py-4 px-5 text-white font-black rounded-2xl transition-all shadow-xl flex items-center justify-center gap-2.5 cursor-pointer duration-200 active:scale-[0.98] ${
                 isLoading && !isPaused 
                   ? 'bg-violet-500 cursor-not-allowed' 
                   : isPaused 
                     ? 'bg-amber-500 hover:bg-amber-600' 
                     : !filesToGenerateCount 
                       ? 'bg-slate-300 dark:bg-slate-800 text-slate-400 cursor-not-allowed shadow-none'
-                      : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-500/25 hover:shadow-xl hover:shadow-violet-500/30'
+                      : 'bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-500/30 hover:shadow-2xl hover:shadow-violet-500/40 hover:-translate-y-0.5'
               }`}
             >
               {isLoading ? (
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2 size={18} className="animate-spin" />
               ) : (
-                <Zap size={16} className="fill-current" />
+                <Zap size={18} className="fill-current" />
               )}
-              <span className="text-xs sm:text-sm uppercase tracking-wider font-extrabold">
+              <span className="text-xs sm:text-sm uppercase tracking-wider font-black">
                 {isPaused ? "Rate-limited (Auto Retrying...)" : isLoading ? t.generating : `${t.generate_all} (${filesToGenerateCount})`}
               </span>
             </button>
@@ -341,7 +350,7 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
             {isLoading && (
               <button 
                 onClick={handleStopGeneration}
-                className="px-4 py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center active:scale-[0.98] text-xs uppercase tracking-wider cursor-pointer"
+                className="px-5 py-4 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-2xl transition-all shadow-lg shadow-rose-500/25 flex items-center justify-center active:scale-[0.98] text-xs uppercase tracking-wider cursor-pointer"
                 title="Stop Processing"
               >
                 <span>STOP</span>

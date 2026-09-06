@@ -438,15 +438,25 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
       )}
 
       {/* Chips Container */}
-      <div className="p-2.5 bg-slate-50/70 dark:bg-black/20 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto custom-scrollbar">
+      <div className="p-3 bg-slate-50/70 dark:bg-black/20 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap gap-1.5 max-h-[170px] overflow-y-auto custom-scrollbar">
         <AnimatePresence mode="popLayout">
           {keywords.map((kw, index) => {
             const isFirst = index === 0;
-            const isTop5 = index > 0 && index < 5;
+            const isSecond = index === 1;
+            const isThird = index === 2;
+            const isTop5 = index >= 3 && index < 5;
 
-            let badgeClass = "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-white/5 hover:border-slate-300";
+            let badgeClass = "bg-white/90 dark:bg-slate-850 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-white/10 hover:border-violet-500/40 hover:bg-violet-50/50 dark:hover:bg-violet-950/30 shadow-2xs";
+            let rankSymbol = `#${index + 1}`;
             if (isFirst) {
-              badgeClass = "bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/10 font-black";
+              badgeClass = "bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-900 dark:text-amber-200 border border-amber-500/50 shadow-sm shadow-amber-500/10 font-black";
+              rankSymbol = '👑 #1';
+            } else if (isSecond) {
+              badgeClass = "bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 font-black";
+              rankSymbol = '🥈 #2';
+            } else if (isThird) {
+              badgeClass = "bg-amber-700/15 text-amber-900 dark:text-amber-300 border border-amber-700/30 font-black";
+              rankSymbol = '🥉 #3';
             } else if (isTop5) {
               badgeClass = "bg-violet-500/15 text-violet-800 dark:text-violet-300 border border-violet-500/30 font-bold";
             }
@@ -463,16 +473,16 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
                 exit={{ scale: 0.7, opacity: 0, transition: { duration: 0.12 } }}
                 transition={{ type: "spring", stiffness: 500, damping: 28 }}
                 layout
-                className={`inline-flex cursor-grab active:cursor-grabbing items-center px-2 py-1 rounded-lg text-[10px] select-none transition-shadow ${badgeClass} ${draggedIndex === index ? 'opacity-40 ring-2 ring-violet-500' : ''}`}
+                className={`inline-flex cursor-grab active:cursor-grabbing items-center px-2.5 py-1 rounded-lg text-[10px] select-none transition-all ${badgeClass} ${draggedIndex === index ? 'opacity-40 ring-2 ring-violet-500' : ''}`}
                 title={isFirst ? "Keyword #1 - Prime Search Importance (👑 Top 1)" : isTop5 ? `Keyword #${index + 1} - High Search Priority (Top 5)` : `Keyword #${index + 1}`}
               >
-                <span className="opacity-70 mr-1 text-[9px] font-black font-mono shrink-0">
-                  {isFirst ? '👑' : `#${index + 1}`}
+                <span className="opacity-75 mr-1 text-[9px] font-black font-mono shrink-0">
+                  {rankSymbol}
                 </span>
                 <span className="truncate max-w-[140px]">{kw}</span>
                 <button 
                   onClick={() => handleRemove(kw)} 
-                  className="ml-1 text-slate-400 hover:text-rose-600 font-bold text-xs leading-none p-0.5 rounded cursor-pointer"
+                  className="ml-1.5 text-slate-400 hover:text-rose-600 font-bold text-xs leading-none p-0.5 rounded cursor-pointer transition-colors"
                 >
                   ×
                 </button>
@@ -698,6 +708,9 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
         mobileTab === 'review' ? 'block animate-in fade-in slide-in-from-bottom-5 duration-300' : 'hidden lg:block'
       }`}
     >
+      {/* Top Accent Gradient Line */}
+      <div className="h-1 w-full bg-gradient-to-r from-violet-500 via-indigo-500 to-purple-500" />
+
       {/* HEADER */}
       <div className="bg-slate-50/70 dark:bg-slate-850/50 py-3.5 px-5 border-b border-slate-200/60 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -716,8 +729,12 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
 
         {/* Right Header Status Pill */}
         <div className="flex items-center gap-2">
+          <span className="hidden sm:inline-flex px-2.5 py-1 bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-300 text-[10px] font-black rounded-lg uppercase tracking-wider items-center gap-1.5 shadow-2xs">
+            <Sparkles size={11} className="text-violet-500" />
+            <span>Dual-Vision Grounded</span>
+          </span>
           {canDownload && (
-            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-black rounded-lg uppercase tracking-wider flex items-center gap-1.5">
+            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-black rounded-lg uppercase tracking-wider flex items-center gap-1.5 shadow-2xs">
               <CheckCircle2 size={13} />
               <span>Ready to Export</span>
             </span>
@@ -959,10 +976,15 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                               Error: {file.error}
                             </span>
                           ) : file.title ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider rounded-md border border-emerald-500/20">
-                              <CheckCircle2 size={11} />
-                              Analysis Complete
-                            </span>
+                            <>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider rounded-md border border-emerald-500/20 shadow-2xs">
+                                <CheckCircle2 size={11} />
+                                Analysis Complete
+                              </span>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-500/10 text-violet-700 dark:text-violet-300 text-[9px] font-black uppercase tracking-wider rounded-md border border-violet-500/20 shadow-2xs">
+                                ✨ Florence-2 + AI Vision
+                              </span>
+                            </>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase tracking-wider rounded-md">
                               Waiting in Queue
@@ -1001,26 +1023,31 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                     {/* METADATA EDITORS (When Generated) */}
                     {file.title && (
                       <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-white/5 animate-in fade-in duration-200">
-                        {/* YOLO Grounded Objects Badges */}
+                        {/* Florence-2 & YOLO Grounded Objects Badges */}
                         {Array.isArray(file.yolo_detected_objects) && file.yolo_detected_objects.length > 0 && (
-                          <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-500/20">
+                          <div className="p-3.5 rounded-xl bg-gradient-to-r from-violet-500/5 via-indigo-500/5 to-purple-500/5 dark:from-violet-950/20 dark:via-indigo-950/20 dark:to-purple-950/20 border border-violet-500/20 shadow-xs">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
-                                <span className="text-[10px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
-                                  YOLO Grounded Objects ({file.yolo_detected_objects.length})
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
+                                </span>
+                                <span className="text-[10px] font-black text-violet-700 dark:text-violet-300 uppercase tracking-wider">
+                                  Florence-2 & Visual Grounding ({file.yolo_detected_objects.length} Entities)
                                 </span>
                               </div>
-                              <span className="text-[9px] font-mono text-slate-400 font-bold">100% FACTUAL</span>
+                              <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                100% FACTUAL
+                              </span>
                             </div>
                             <div className="flex flex-wrap gap-1.5">
                               {file.yolo_detected_objects.map((obj, idx) => (
                                 <span 
                                   key={idx} 
-                                  className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-indigo-100 dark:border-indigo-900/50 shadow-xs"
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-white/10 shadow-2xs"
                                 >
                                   <span>🎯 {obj.label}</span>
-                                  <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400">
+                                  <span className="text-[9px] font-black text-violet-600 dark:text-violet-400 font-mono">
                                     {Math.round(obj.confidence > 1 ? obj.confidence : obj.confidence * 100)}%
                                   </span>
                                 </span>
