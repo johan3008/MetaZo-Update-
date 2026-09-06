@@ -70,7 +70,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       desc: 'Categories & CLIP keywords',
       checked: exportAdobe,
       setChecked: setExportAdobe,
-      color: 'border-slate-800 dark:border-violet-500 bg-slate-900/5 dark:bg-violet-500/10 text-slate-900 dark:text-violet-300'
+      color: 'border-[#7c3aed] bg-[#7c3aed]/10 text-[#7c3aed]'
     },
     {
       id: 'shutterstock',
@@ -149,41 +149,35 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   const selectedCount = platforms.filter(p => p.checked).length;
 
   return (
-    <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-white/5 rounded-2xl shadow-xl shadow-black/5 flex flex-col relative overflow-hidden transition-all duration-300">
-      {/* HEADER */}
-      <div className="bg-slate-50/70 dark:bg-slate-850/50 py-3.5 px-5 border-b border-slate-200/60 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-xl bg-violet-600 text-white flex items-center justify-center font-black text-xs shadow-md shadow-violet-500/20">
-            04
+    <div className="bg-white dark:bg-[#111827] border border-[#e3e6f0]/80 dark:border-white/5 rounded-2xl shadow-md shadow-black/5 flex flex-col relative overflow-hidden transition-all duration-300">
+      {/* CARD HEADER */}
+      <div className="bg-[#f8f9fc] dark:bg-slate-900 py-3.5 px-5 border-b border-[#e3e6f0]/60 dark:border-white/5 rounded-t-lg flex justify-between items-center">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-6.5 h-6.5 rounded-2xl bg-[#7c3aed] text-white flex items-center justify-center font-black text-xs shadow-md shadow-black/5">
+            4
           </div>
-          <div>
-            <h3 className="m-0 font-extrabold text-slate-800 dark:text-white text-xs sm:text-sm uppercase tracking-wider">
-              Bulk Multi-Platform Export Controls
-            </h3>
-            <p className="text-[11px] text-slate-400 font-semibold hidden sm:block">
-              Select stock platforms to export CSV metadata or embed tags directly into files
-            </p>
-          </div>
+          <h3 className="m-0 font-extrabold text-[#7c3aed] dark:text-violet-400 text-xs sm:text-sm uppercase tracking-wider">
+            Bulk Multi-Platform Export Controls
+          </h3>
         </div>
-
-        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg self-start sm:self-auto">
+        <span className="text-[10px] font-black uppercase text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-xl shadow-md shadow-black/5">
           {selectedCount} platform{selectedCount !== 1 ? 's' : ''} selected
         </span>
       </div>
 
-      {/* BODY */}
-      <div className="p-5 sm:p-6 space-y-5">
+      {/* CARD BODY */}
+      <div className="p-6 space-y-5">
         <div>
-          <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-2.5">
+          <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-3">
             Select Target Marketplaces
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
             {platforms.map((plat) => (
               <label 
                 key={plat.id}
-                className={`flex flex-col justify-between p-3 rounded-xl border-2 cursor-pointer transition-all duration-200 select-none ${
+                className={`flex flex-col justify-between p-3 rounded-[1.5rem] border-2 cursor-pointer transition-all duration-200 select-none ${
                   plat.checked 
-                    ? `${plat.color} shadow-xs` 
+                    ? `${plat.color} shadow-sm` 
                     : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-black/20 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
               >
@@ -201,7 +195,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
                   </span>
                   <div className={`w-4 h-4 rounded-md flex items-center justify-center border transition-colors ${
                     plat.checked 
-                      ? 'bg-violet-600 border-violet-600 text-white' 
+                      ? 'bg-[#7c3aed] border-[#7c3aed] text-white' 
                       : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900'
                   }`}>
                     {plat.checked && <Check size={11} strokeWidth={3} />}
@@ -209,7 +203,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
                 </div>
                 <div>
                   <span className="text-xs font-black block truncate">{plat.name}</span>
-                  <span className="text-[9px] opacity-70 mt-0.5 block truncate leading-tight font-medium">
+                  <span className="text-[9px] opacity-70 mt-0.5 block truncate leading-tight font-semibold">
                     {plat.desc}
                   </span>
                 </div>
@@ -222,27 +216,27 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
           {/* Shutterstock format toggle */}
           {exportShutterstock && (
-            <div className="p-3.5 bg-slate-50/70 dark:bg-black/20 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2 animate-in fade-in duration-200">
-              <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+            <div className="p-3.5 bg-slate-50/80 dark:bg-black/20 border border-slate-200/50 dark:border-white/5 rounded-2xl space-y-2 animate-in fade-in duration-200">
+              <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
                 Shutterstock Description Mode
               </label>
               <div className="grid grid-cols-2 gap-1.5">
                 <button 
                   onClick={() => setShutterstockDescMode('desc')}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`py-2 px-2 text-[10px] uppercase font-extrabold rounded-[1.5rem] border transition-all text-center cursor-pointer ${
                     shutterstockDescMode === 'desc' 
-                      ? 'bg-rose-600 text-white shadow-sm' 
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-600/20' 
+                      : 'bg-white dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                 >
                   Description Only
                 </button>
                 <button 
                   onClick={() => setShutterstockDescMode('title_desc')}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`py-2 px-2 text-[10px] uppercase font-extrabold rounded-[1.5rem] border transition-all text-center cursor-pointer ${
                     shutterstockDescMode === 'title_desc' 
-                      ? 'bg-rose-600 text-white shadow-sm' 
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-600/20' 
+                      : 'bg-white dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                 >
                   Title + Description
@@ -252,17 +246,17 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           )}
 
           {/* Master Auto-Download Toggle */}
-          <div className="flex items-center justify-between p-3.5 bg-slate-50/70 dark:bg-black/20 border border-slate-200 dark:border-slate-800 rounded-xl">
+          <div className="flex items-center justify-between p-3.5 bg-slate-50/80 dark:bg-black/20 border border-slate-200/50 dark:border-white/5 rounded-2xl">
             <div>
-              <label className="text-xs font-extrabold text-slate-800 dark:text-slate-200 uppercase tracking-wider block">
+              <label className="text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider block">
                 Auto-Download CSV
               </label>
-              <span className="text-[10px] text-slate-400 font-medium">Trigger CSV package download automatically</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">Trigger CSV package download automatically</span>
             </div>
             <button 
               onClick={() => setAutoDownloadCSV(!autoDownloadCSV)}
               className={`w-11 h-6 rounded-full p-0.5 transition-colors relative flex items-center cursor-pointer ${
-                autoDownloadCSV ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
+                autoDownloadCSV ? 'bg-[#7c3aed]' : 'bg-slate-300 dark:bg-slate-700'
               }`}
             >
               <div 
@@ -275,14 +269,14 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
         </div>
 
         {/* BUTTON ACTION FLOOR */}
-        <div className="pt-3 border-t border-slate-200/60 dark:border-white/5 flex flex-col sm:flex-row justify-end gap-2.5">
+        <div className="pt-3 border-t border-[#e3e6f0]/60 dark:border-white/5 flex flex-col sm:flex-row justify-end gap-2.5">
           {handleBackupJSON && (
             <button
               onClick={handleBackupJSON}
               disabled={!canDownload}
-              className={`px-5 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] ${
+              className={`px-5 py-3 text-xs font-black uppercase tracking-wider rounded-[1.5rem] transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] ${
                 canDownload 
-                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-750' 
+                  ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200' 
                   : 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-slate-800'
               }`}
             >
@@ -295,7 +289,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             <button
               onClick={handleDownloadEmbedded}
               disabled={!canDownload || embedDownloading}
-              className={`px-5 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] ${
+              className={`px-5 py-3 text-xs font-black uppercase tracking-wider rounded-[1.5rem] transition-all flex items-center justify-center gap-2 cursor-pointer shadow active:scale-[0.98] ${
                 canDownload && !embedDownloading 
                   ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-500/20' 
                   : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
@@ -313,9 +307,9 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           <button
             onClick={handleExport}
             disabled={!canDownload}
-            className={`px-6 py-3 text-xs font-black uppercase tracking-wider rounded-xl text-white transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] ${
+            className={`px-6 py-3 text-xs font-black uppercase tracking-wider rounded-[1.5rem] text-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow active:scale-[0.98] ${
               canDownload 
-                ? 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-violet-500/25' 
+                ? 'bg-[#7c3aed] hover:bg-violet-600 shadow-md shadow-violet-500/20' 
                 : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
             }`}
           >

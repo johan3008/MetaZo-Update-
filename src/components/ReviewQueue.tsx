@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Info, CheckCircle2, Trash2, FileCode, ArrowRight, Check, Loader2, Sparkles, Film } from 'lucide-react';
+import { Search, Info, CheckCircle2, Trash2, FileCode, ArrowRight, Check, Loader2, Sparkles, Film, Copy, Download, Wand2 } from 'lucide-react';
 import { ToolType, FileItem, ProgressInfo } from '../../types';
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO, DREAMSTIME_CATEGORIES, MIRICANVAS_CATEGORIES } from '../../constants';
 import { copyToClipboard } from '../utils';
@@ -52,8 +52,13 @@ const ProjectCopyBox: React.FC<CopyBoxProps> = ({
 
   const safeValue = localValue || '';
   const len = safeValue.length;
-  const minLen = label.toLowerCase().includes('title') ? 15 : 50; const ratingText = len < minLen ? 'Too short' : len <= 200 ? 'Optimal' : 'Too long';
-  const ratingColor = len < minLen ? 'text-rose-500' : len <= 200 ? 'text-emerald-500' : 'text-amber-500';
+  const isTitle = label.toLowerCase().includes('title') || label.toLowerCase().includes('judul');
+  const ratingText = isTitle
+    ? len < 40 ? 'Kurang panjang' : len <= 140 ? 'Optimal (SEO)' : len <= 200 ? 'Panjang' : 'Terlalu panjang'
+    : len < 50 ? 'Too short' : len <= 200 ? 'Optimal' : 'Too long';
+  const ratingColor = isTitle
+    ? len < 40 ? 'text-amber-500' : len <= 140 ? 'text-emerald-500' : len <= 200 ? 'text-blue-500' : 'text-rose-500'
+    : len < 50 ? 'text-rose-500' : len <= 200 ? 'text-emerald-500' : 'text-amber-500';
 
   return (
     <div className="space-y-1">
@@ -291,22 +296,37 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
     // Semantic title & description anchors
     const titleWords = (title || '').toLowerCase().split(/\W+/).filter(w => w.length > 2);
     const descWords = (description || '').toLowerCase().split(/\W+/).filter(w => w.length > 2);
+    const primaryTitleWords = titleWords.slice(0, 4); // First 3-4 words = core commercial subject
+
+    const genericFillers = new Set([
+      'photo', 'image', 'picture', 'design', 'nice', 'beautiful', 'amazing', 'stunning',
+      'best', 'detail', 'quality', 'object', 'thing', 'background', 'element', 'visual', 'high quality'
+    ]);
 
     const scored = keywords.map((kw, originalIndex) => {
       const cleanKw = kw.toLowerCase().trim();
       let score = 0.5;
 
-      // Exact match in title (Top visual priority)
-      if (titleWords.some(tw => cleanKw === tw || cleanKw.includes(tw) || tw.includes(cleanKw))) {
+      // Primary Title Anchor (Core Subject #1 priority)
+      if (primaryTitleWords.some(tw => cleanKw === tw || cleanKw.includes(tw) || tw.includes(cleanKw))) {
+        score += 0.85;
+      } else if (titleWords.some(tw => cleanKw === tw || cleanKw.includes(tw) || tw.includes(cleanKw))) {
         score += 0.45;
       }
+
       // Match in description
       if (descWords.some(dw => cleanKw === dw || cleanKw.includes(dw))) {
         score += 0.25;
       }
-      // Compound commercial term bonus (2-3 words are highly valued by buyers)
+
+      // Compound commercial term bonus (2-3 words are highly valued by stock buyers)
       if (cleanKw.includes(' ') && cleanKw.split(' ').length <= 3) {
-        score += 0.15;
+        score += 0.20;
+      }
+
+      // Heavily penalize generic filler words so they don't block prime slots
+      if (genericFillers.has(cleanKw)) {
+        score -= 0.60;
       }
 
       score -= (originalIndex * 0.001);
@@ -317,11 +337,34 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
     onChange(scored.map(item => item.kw));
   };
 
+  const handleToggleCase = () => {
+    if (!keywords || keywords.length === 0) return;
+    const isAllLower = keywords.every(k => k === k.toLowerCase());
+    if (isAllLower) {
+      // Title Case each word
+      onChange(keywords.map(k => k.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')));
+    } else {
+      // Lowercase
+      onChange(keywords.map(k => k.toLowerCase()));
+    }
+  };
+
   return (
     <div className="space-y-1.5 font-sans">
       <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
-        <label>{label} ({keywords.length}/49)</label>
-        <div className="flex items-center space-x-3">
+        <label className="flex items-center gap-1.5">
+          <span>{label}</span>
+          <span className={`px-1.5 py-0.2 rounded-full font-mono text-[8px] font-black ${
+            keywords.length >= 40 && keywords.length <= 49
+              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+              : keywords.length < 25
+              ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+              : 'bg-violet-500/15 text-[#7c3aed] dark:text-violet-400 border border-violet-500/20'
+          }`}>
+            {keywords.length}/49 {keywords.length >= 40 && keywords.length <= 49 ? '• Optimal' : keywords.length < 25 ? '• Kurang' : ''}
+          </span>
+        </label>
+        <div className="flex items-center space-x-2.5">
           {suggestError && (
             <span className="text-rose-500 font-extrabold normal-case leading-none animate-pulse">
               {suggestError}
@@ -334,13 +377,32 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
           >
             <span className="text-amber-500 text-[10px]">⚡</span> clip rank
           </button>
-          <button onClick={handleClean} className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}>
+          <button 
+            onClick={handleClean} 
+            title="Bersihkan duplikat & spasi berlebih"
+            className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}
+          >
             clean
           </button>
-          <button onClick={handleShuffle} className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}>
+          <button 
+            onClick={handleToggleCase} 
+            title="Ubah huruf kecil / Huruf Besar Setiap Kata (Title Case)"
+            className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}
+          >
+            Aa case
+          </button>
+          <button 
+            onClick={handleShuffle} 
+            title="Acak urutan kata kunci"
+            className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}
+          >
             shuffle
           </button>
-          <button onClick={handleCopy} className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}>
+          <button 
+            onClick={handleCopy} 
+            title="Salin semua kata kunci (dipisahkan koma)"
+            className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}
+          >
             {copied ? 'copied!' : 'copy'}
           </button>
           <button
@@ -693,11 +755,45 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
             Review & Refine Queue
           </h3>
         </div>
-        {canDownload && (
-          <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/15 text-[9px] font-black rounded-2xl uppercase tracking-wider">
-            Ready to Export
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {canDownload && (
+            <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/15 text-[9px] font-black rounded-2xl uppercase tracking-wider">
+              Ready to Export
+            </div>
+          )}
+          {successfulFilesCount > 0 && (
+            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200 dark:border-slate-800">
+              <button
+                onClick={async () => {
+                  const titles = files.filter(f => f.title).map(f => f.title).join('\n');
+                  if (titles) {
+                    await copyToClipboard(titles);
+                  }
+                }}
+                title="Salin semua judul aset yang berhasil diekstrak (1 baris per judul)"
+                className="px-2 py-1 bg-white dark:bg-slate-800 hover:bg-violet-50 dark:hover:bg-violet-950/20 text-slate-600 dark:text-slate-300 hover:text-[#7c3aed] border border-slate-200 dark:border-slate-700 rounded-xl text-[9px] font-bold transition-all cursor-pointer flex items-center gap-1"
+              >
+                <Copy size={10} />
+                <span>Salin Judul</span>
+              </button>
+              <button
+                onClick={async () => {
+                  const allKw = files.filter(f => f.keywords && f.keywords.length > 0)
+                    .map(f => `${f.customFileName || f.file.name}: ${f.keywords.join(', ')}`)
+                    .join('\n\n');
+                  if (allKw) {
+                    await copyToClipboard(allKw);
+                  }
+                }}
+                title="Salin semua kata kunci per file"
+                className="px-2 py-1 bg-white dark:bg-slate-800 hover:bg-violet-50 dark:hover:bg-violet-950/20 text-slate-600 dark:text-slate-300 hover:text-[#7c3aed] border border-slate-200 dark:border-slate-700 rounded-xl text-[9px] font-bold transition-all cursor-pointer flex items-center gap-1"
+              >
+                <Copy size={10} />
+                <span>Salin Keywords</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="p-6">
@@ -850,6 +946,18 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                   )}
                 
                 <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
+                  {file.title && (
+                    <button
+                      onClick={async () => {
+                        const cardText = `Title: ${file.title || ''}\nDescription: ${file.description || ''}\nKeywords: ${(file.keywords || []).join(', ')}`;
+                        await copyToClipboard(cardText);
+                      }}
+                      className="p-1.5 bg-slate-100 hover:bg-violet-50 dark:bg-slate-800 dark:hover:bg-violet-950/20 text-slate-400 hover:text-[#7c3aed] rounded-2xl transition-all border border-slate-200 dark:border-slate-700 hover:border-violet-500/20 focus:outline-none cursor-pointer"
+                      title="Salin semua metadata file ini (Judul + Deskripsi + Keywords)"
+                    >
+                      <Copy size={12} />
+                    </button>
+                  )}
                   {handleRegenerateFile && (
                     <button
                       onClick={() => handleRegenerateFile(file)}
@@ -907,9 +1015,22 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                             Error: {file.error}
                           </span>
                         ) : file.title ? (
-                          <span className="inline-flex items-center px-2 py-0.5 bg-[#1cc88a]/10 dark:bg-[#1cc88a]/5 text-[#1bd18f] text-[9px] font-black uppercase tracking-wider rounded-xl border border-[#1cc88a]/20 shadow-md shadow-black/5">
-                            Analysis Complete
-                          </span>
+                          <>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#1cc88a]/10 dark:bg-[#1cc88a]/5 text-[#1bd18f] text-[9px] font-black uppercase tracking-wider rounded-xl border border-[#1cc88a]/20 shadow-md shadow-black/5">
+                              <CheckCircle2 size={10} />
+                              <span>Analisis Lengkap</span>
+                            </span>
+                            {file.keywords && (
+                              <span className="inline-flex items-center px-2 py-0.5 bg-violet-500/10 text-[#7c3aed] dark:text-violet-400 text-[9px] font-bold rounded-xl border border-violet-500/15">
+                                🏷️ {file.keywords.length} kata kunci
+                              </span>
+                            )}
+                            {file.title && (
+                              <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-bold rounded-xl">
+                                📝 {file.title.length} chars
+                              </span>
+                            )}
+                          </>
                         ) : (
                           <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-wider rounded-xl border border-slate-200 dark:border-white/5 shadow-md shadow-black/5">
                             Waiting Pending
