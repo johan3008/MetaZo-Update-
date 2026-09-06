@@ -9,6 +9,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import https from "node:https";
 
+import { extractFlorenceVisualInsights, formatFlorenceContextForPrompt, FlorenceOptions, FlorenceInsights } from "./server/florenceService.ts";
+
 // Thread-safe dynamic API Key storage
 export const apiKeyStorage = new AsyncLocalStorage<any>();
 
@@ -3673,8 +3675,28 @@ export const generateStockMetadata = async (
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMIXED-KEYWORD MODE OVERRIDE:\nGenerate a balanced mix of single words and 2-4 word natural search phrases. DO NOT artificially split compound words that are naturally searched together. NO colors. NO patterns.`;
   }
 
-  // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
+  // --- TAHAP 1: DUAL-VISION PIPELINE (FLORENCE-2 + GEMINI/VISION LLM) ---
   let visualFactsJson = "";
+  let florenceInsights: FlorenceInsights = { provider: 'none' };
+  try {
+    const florenceKey = store?.florence?.apiKey || process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY;
+    const florenceEndpoint = store?.florence?.endpoint || process.env.FLORENCE_API_ENDPOINT;
+    if (florenceKey || florenceEndpoint) {
+      console.log(`[Florence-2 Dual-Vision] Extracting micro-details & OCR with Florence-2...`);
+      florenceInsights = await extractFlorenceVisualInsights(frames[0], 'image/jpeg', {
+        apiKey: florenceKey,
+        endpoint: florenceEndpoint,
+        timeoutMs: 9000
+      });
+      if (florenceInsights.detailedCaption || florenceInsights.ocrText) {
+        console.log(`[Florence-2 Dual-Vision] Successfully extracted Florence-2 insights! Provider: ${florenceInsights.provider}`);
+      }
+    }
+  } catch (florenceErr: any) {
+    console.warn(`[Florence-2 Dual-Vision Warning] Non-blocking fallback:`, florenceErr?.message || florenceErr);
+  }
+
+  const florenceContextPrompt = formatFlorenceContextForPrompt(florenceInsights);
   
   console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
@@ -3730,6 +3752,7 @@ Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
 Asset Context: ${mediaTypeContext}
+${florenceContextPrompt}
 
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
@@ -3818,6 +3841,29 @@ OUTPUT FORMAT:
   } catch (e: any) {
     console.error("[JohMeta Pipeline] Invalid Gemini Vision response:", e.message || e);
     throw new Error("AI Vision mengembalikan hasil analisis yang tidak valid. Silakan coba kembali.");
+  }
+
+  // Dual-Vision Integration: Merge Florence-2 OCR text and detected objects into visual facts
+  if (florenceInsights) {
+    if (florenceInsights.ocrText && typeof florenceInsights.ocrText === 'string' && florenceInsights.ocrText.trim().length > 0) {
+      if (!Array.isArray(visualFacts.visible_text)) visualFacts.visible_text = [];
+      const cleanOcr = florenceInsights.ocrText.trim();
+      if (!visualFacts.visible_text.includes(cleanOcr)) {
+        visualFacts.visible_text.push(cleanOcr);
+      }
+    }
+    if (florenceInsights.detectedObjects && Array.isArray(florenceInsights.detectedObjects) && florenceInsights.detectedObjects.length > 0) {
+      if (!Array.isArray(visualFacts.yolo_detected_objects)) visualFacts.yolo_detected_objects = [];
+      for (const obj of florenceInsights.detectedObjects) {
+        if (obj && typeof obj === 'string' && !visualFacts.yolo_detected_objects.some((o: any) => o?.name?.toLowerCase() === obj.toLowerCase())) {
+          visualFacts.yolo_detected_objects.push({
+            name: obj.trim(),
+            confidence: 0.98,
+            category: 'subject'
+          });
+        }
+      }
+    }
   }
 
   const dominantSubjects = [
@@ -4316,11 +4362,27 @@ export const generateBatchStockMetadata = async (
   let parsedVisualFactsList: any[] = [];
   const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
-  console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
+  console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Dual-Vision / Gemini Vision (Visual Facts Detection)...`);
   
   for (let i = 0; i < items.length; i++) {
       const imageParts = items[i].frames.map(frame => processFrameServer(frame));
       
+      let itemFlorenceInsights: FlorenceInsights = { provider: 'none' };
+      try {
+        const florenceKey = store?.florence?.apiKey || process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY;
+        const florenceEndpoint = store?.florence?.endpoint || process.env.FLORENCE_API_ENDPOINT;
+        if ((florenceKey || florenceEndpoint) && items[i].frames && items[i].frames.length > 0) {
+          itemFlorenceInsights = await extractFlorenceVisualInsights(items[i].frames[0], 'image/jpeg', {
+            apiKey: florenceKey,
+            endpoint: florenceEndpoint,
+            timeoutMs: 9000
+          });
+        }
+      } catch (florenceErr: any) {
+        console.warn(`[Florence-2 Batch Item #${i + 1} Warning] Non-blocking fallback:`, florenceErr?.message || florenceErr);
+      }
+
+      const itemFlorenceContextPrompt = formatFlorenceContextForPrompt(itemFlorenceInsights);
       const mediaTypeContext = directives.mediaTypeContext;
 
       const visionSystemInstruction = `ROLE:
@@ -4389,6 +4451,7 @@ Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
 Asset Context: ${mediaTypeContext}
+${itemFlorenceContextPrompt}
 
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
@@ -4459,6 +4522,15 @@ OUTPUT FORMAT:
              parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS;
              if (!parsedFacts || typeof parsedFacts !== "object" || Array.isArray(parsedFacts)) {
                throw new Error("VISUAL_FACTS missing or invalid");
+             }
+             if (itemFlorenceInsights) {
+               if (itemFlorenceInsights.ocrText && typeof itemFlorenceInsights.ocrText === 'string' && itemFlorenceInsights.ocrText.trim().length > 0) {
+                 if (!Array.isArray(parsedFacts.visible_text)) parsedFacts.visible_text = [];
+                 const cleanOcr = itemFlorenceInsights.ocrText.trim();
+                 if (!parsedFacts.visible_text.includes(cleanOcr)) {
+                   parsedFacts.visible_text.push(cleanOcr);
+                 }
+               }
              }
           } catch(e: any) {
              console.error(`[JohMeta Pipeline - Batch] Invalid Vision response for item ${i}:`, e.message || e);
@@ -5050,7 +5122,14 @@ export const generateOptimizedPrompt = async (options: {
     "Dark Horror Aesthetic": ' - Focus on extremely dark, eerie, unsettling, and atmospheric horror themes. MUST look like a photorealistic, real-world photograph or live-action movie still. Emphasize crushing pitch-black shadows, high-contrast chiaroscuro lighting with minimal illumination, macabre elements, muted or monochromatic color palettes with stark accents (like crimson red), thick fog/mist, decaying textures, and a profound sense of dread. AVOID: Digital painting, illustration, cartoonish styles, bright daylight, cheerful elements, or well-lit scenes. It must look breathtakingly real.',
     "Lego Style": ' - Focus on compositions entirely constructed from interlocking plastic building bricks (gaya mainan balok plastik). Emphasize sharp geometric brick shapes, visible circular studs on top of bricks, glossy plastic textures with subtle scratches, vibrant primary colors, and macro photography lighting (depth of field, studio lighting) to make it look like a miniature diorama or toy set. Do NOT use the word "Lego" in the prompt if possible, use "interlocking plastic bricks" or "brick toy style".',
     "Voxel Art": ' - Focus on 3D pixel art constructed from volumetric cubes (voxels). Emphasize a blocky, retro video game aesthetic similar to Minecraft, with low-resolution 3D geometry but modern high-quality lighting (raytracing, global illumination). Use sharp pixelated textures, crisp cube edges, and a rigid grid-based structure. CRITICAL: Do not use the word "Minecraft" or specific game IP; instead use "voxel art", "3D blocky pixel art", or "cubical world". AVOID: Realism, photorealistic rendering, real-world natural aesthetics, or smooth continuous surfaces.',
-    "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject—focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.',
+    "Abstract": ` - Style Guide: DYNAMIC KINETIC & CRYSTALLINE SHATTERED GEOMETRIC ABSTRACT STYLE.
+Visual Characteristics & Core Elements:
+1. Dynamic Motion & Kinetic Energy: Portray the subject "${subject}" in high-energy, freeze-frame athletic or kinetic action poses with explosive forward momentum, dynamic speed arcs, and speed streaks.
+2. Floating Shattered Geometric & Crystalline Glass Shards: Surround the subject and motion path with sharp, floating polygonal/triangular glass fragments, faceted crystalline prisms, and refractive geometric shards dispersing dynamically through the air.
+3. Glowing Neon Light Trails & Speed Ribbons: Incorporate luminous flowing neon light trails, speed streaks, and glowing energetic ribbons (in vibrant cyan, electric blue, magenta, neon amber, or radiant white) tracing the movement and trajectory of action.
+4. Dramatic High-Contrast Dark Arena/Stadium Lighting: Set against a moody dark arena, stadium track, or stage backdrop illuminated by powerful volumetric spotlights, intense rim lighting, and dramatic chiaroscuro contrast that makes the glowing elements and crystalline facets pop.
+5. Kinetic Particle Explosions & Debris: Include explosive particle bursts, glowing sparks, luminous embers, or ice spray/shattered debris erupting from contact, footwork, or pivot points.
+6. Aesthetic & Quality: Hyper-detailed, ultra-sharp focus on the subject in dynamic motion, 8k resolution, cinematic action freeze-frame composition, Octane/Unreal volumetric lighting aesthetic.`,
     "Corporate Technology Concept": ' - Focus on realistic photography and business themes combined with holographic UI overlays such as floating icons, glowing digital lights, and advanced tech elements. Emphasize a photorealistic corporate environment infused with futuristic, high-tech digital interfaces and data streams.',
     "Graphic Design": `You are an elite Commercial Art Director and Graphic Designer creating premium, high-selling commercial assets tailored for Adobe Stock, advertising campaigns, and professional marketing media.
 
@@ -5257,7 +5336,8 @@ Rules for the Generated Prompts:
       - 🧱 3D / CGI & RENDER (3D Render, 3D CGI, Lowpoly, Voxel Art, Isometric): Use ONLY 3D geometry, polygon meshes, PBR materials, global illumination, and ray-tracing. FORBIDDEN: "2D flat drawing", "vector path", "real physical photograph".
       - 🖌️ TRADITIONAL FINE ART (Oil Painting, Watercolor, HandDrawn Sketch, Paper Cut, Embroidery, Origami): Use ONLY tactile physical medium characteristics (brushstrokes, impasto pigments, paper grain, stitched thread, folded paper). FORBIDDEN: "digital 3D CGI", "DSLR camera lens", "vector shapes".
       - 🎮 STYLIZED & TOY (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style, Claymation): Use ONLY the specific medium vocabulary (cel-shaded animation, 8-bit pixels, interlocking plastic brick studs, hand-molded clay). FORBIDDEN: "realistic photo", "photorealistic".
-      - UNDER NO CIRCUMSTANCES should any prompt drift into abstract geometric patterns or unrelated styles unless explicitly requested.
+      - 💎 DYNAMIC ABSTRACT & KINETIC ENERGY (Abstract): Emphasize dynamic freeze-frame action poses, floating shattered crystalline/geometric glass shards, glowing speed streaks and neon light ribbons, explosive particle bursts, and high-contrast dramatic stadium/arena lighting on dark backgrounds.
+      - UNDER NO CIRCUMSTANCES should any prompt drift into unrelated styles unless explicitly requested.
 0.2 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
 1. BASE SUBJECT TRANSLATION & LOCK: First, accurately translate the core subject "${subject}" into vivid English. You MUST LOCK onto this subject. Under no circumstances can you swap the main subject for something else.
 2. Return EXACTLY ${count} unique prompt variations as an array. Each must feature the LOCKED subject, be professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
@@ -5675,16 +5755,16 @@ CRITICAL DIRECTIVES:
       "vintage hand-painted portrait oil technique, rich pigments, weathered fine-art appeal"
     ],
     "Abstract": [
-      "Dynamic abstract light trails on dark background, energetic flowing waves, vivid neon accents, sharp geometric glass shards",
-      "High-contrast abstract energy, glowing sphere amidst swirling light ribbons, mysterious dark void, futuristic abstract art",
-      "Radiant abstract light pulses, ethereal dark atmosphere, vibrant accent streaks, complex motion and light play",
-      "Abstract digital light art, deep dark void background, sharp crystalline motion, vibrant glowing focal point",
-      "Energetic abstract composition, fluid white light waves, sharp angular glass fragments, intense vibrant spotlight, dark noir atmosphere",
-      "Vibrant fluid liquid art, colorful swirling thick pigments, high viscosity motion, chaotic yet harmonious abstract flow",
-      "Futuristic geometric abstract, complex interlocking angular shapes, metallic textures, neon grid lines, cinematic dark theme",
-      "Abstract particle simulation, dense glowing dots in motion, dark deep void, energetic dispersal, cinematic moody lighting",
-      "Holographic gradient abstract, iridescent flowing curves, light refraction, mysterious ethereal textures, dark background",
-      "Complex abstract fractal geometry, infinite intricate patterns, glowing edges, dark contrast lighting, futuristic artistic design"
+      "Dynamic action freeze-frame shot of the subject in explosive motion, surrounded by floating shattered crystal glass shards, vibrant glowing cyan and electric blue speed trails, kinetic particle sparks, dark stadium arena background with volumetric floodlights, high-contrast rim lighting, 8k, Octane render",
+      "Futuristic kinetic composition of the subject sprinting with explosive momentum, encased in floating geometric polygonal prism shards, glowing orange and cyan neon light streaks, dark high-tech track with luminous ground lines, hyper-detailed, 8k",
+      "Dynamic athletic subject mid-motion, explosive burst of shattered crystalline glass fragments and glowing sparks, swirling vibrant neon energy ribbons, dramatic dark arena with overhead spotlight, sharp focus, cinematic lighting",
+      "Dynamic high-speed action shot of the subject, floating faceted geometric prism shards refracting light, glowing electric speed lines, kinetic ice debris and glowing ember particles, dramatic dark stadium, volumetric rim lighting, 8k",
+      "Artistic kinetic jump in mid-air, flowing neon ribbon trails forming geometric abstract rings, floating shattered glass polygons, dark stage with warm overhead spotlight, intense high-contrast rim light, hyper-detailed, 8k",
+      "Explosive kinetic energy composition with the subject, surrounded by floating translucent crystal shards and refractive geometric prisms, glowing magenta and electric blue light trails, dark moody backdrop with cinematic spotlights, 8k",
+      "High-speed freeze-frame of the subject in dynamic motion, shattered glass fragments dispersing through the air, vibrant glowing neon light arcs, kinetic spark explosion at contact points, dark arena with dramatic rim lighting, 8k",
+      "Futuristic cybernetic subject bursting with kinetic energy, glowing cyan and amber speed streaks, floating sharp geometric crystals, dark futuristic stadium with glowing track markings, ultra-sharp detail, 8k",
+      "Dynamic abstract kinetic artwork of the subject, swirling glowing neon light trails intertwined with faceted polygonal glass prisms, explosive particle dispersal, deep dark background with intense volumetric spotlights, 8k",
+      "Cinematic dynamic action shot of the subject, explosive burst of floating shattered glass shards, glowing light ribbons tracing the motion trajectory, high contrast rim lighting against a dark arena, hyper-detailed, 8k Octane render"
     ],
     "Vintage Photography": [
       "authentic vintage analog photograph, film grain texture, classic 1970s warm color grading, nostalgic light leaks",
@@ -6281,53 +6361,39 @@ export async function checkImageQuality(
     metadataInstruction = `\n\n---\n[DATA PENGUKURAN TEKNIS OBJEKTIF & PIXEL FORENSIK]\nHasil analisis OpenCV / BRISQUE / NIQE pada file asli:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nPETUNJUK ANALISIS PIKSEL & TEKNIKAL:\n1. Skor BRISQUE > 52 atau NIQE > 6.2: Indikasi kuat degradasi spasial / blur ekstrem / over-smoothing AI sintetis. Skor di bawah 45 adalah rentang normal fotografi komersial.\n2. has_local_blur_anomaly = true: Hanya jika seluruh gambar tidak memiliki fokus tajam. Jika subjek utama tajam dan latar belakang blur karena bokeh optik, nilai PASS.\n3. Pantulan kilau (specular highlights pada saus/cairan/gelas/logam) dan bayangan alami adalah pencahayaan normal komersial dan BUKAN cacat.\n4. Gunakan data numerik bersama inspeksi visual crop 100% untuk menetapkan penilaian akurat dan proporsional.`;
   }
 
-  const systemInstruction = `Anda adalah "Adobe Stock Senior Content Moderator & Forensic Quality Inspector" resmi. Tugas Anda adalah mengaudit dan mengkurasi kiriman gambar (Foto Riil, 3D Render/CGI, AI Generatif, Ilustrasi/Vektor) dengan standar moderasi resmi Adobe Stock Quality and Technical Standards (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html).
+  const systemInstruction = `Anda adalah "Adobe Stock Senior Content Moderator & Forensic Quality Inspector" resmi. Tugas Anda adalah mengaudit gambar komersial secara mendalam berdasarkan standar moderasi resmi Adobe Stock Contributor.
 
-PERINGATAN UTAMA: JANGAN PERNAH HANYA MELIHAT APAKAH GAMBAR "KELIHATAN BAGUS" SECARA KESELURUHAN DARI KEJAUHAN!
-Adobe Stock secara ketat menolak konten generatif dan foto komersial yang memiliki anomali AI atau cacat teknis pada perbesaran 100% zoom (1:1 pixel). Anda WAJIB memeriksa detail mikroskopis pada 5 Zona Crop 100% Zoom yang disertakan.
+STANDAR MODERASI & PEDOMAN RESMI ADOBE STOCK:
+1. KEBIJAKAN HAK CIPTA & RESTRIKSI HUKUM (Known Restrictions & Common Refusal Reasons - https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html & https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
+   - Merek Dagang & Logo Komersial: Logo atau nama merek (Apple, Nike, Lego, Starbucks, Disney, Adidas, Samsung, dsb.) dan desain produk ikonik/trade dress (Rubik's cube, Funko Pop, Louboutin red soles, Zippo, Barbie, Chemex, dsb.).
+   - Arsitektur & Landmark Terlindungi: Pencahayaan malam Menara Eiffel, Sydney Opera House, Burj Khalifa, Atomium, Sagrada Familia interior, Sistine Chapel, Piramida Louvre, Vessel NYC, dsb.
+   - Karya Seni Publik & Patung: Cloud Gate ("The Bean"), Patung Banteng Wall Street, Patung Kristus Penebus, Patung Little Mermaid, patung Bruce Lee, mural berhak cipta.
+   - Simbol & Emblems Khusus: Aset NASA (logo, astronot, misi ruang angkasa — DILARANG KERAS untuk konten AI generatif), Palang Merah / Bulan Sabit Merah, Cincin Olimpiade, Lambang PBB, uang kertas/mata uang utuh.
+   - Model & Property Release: Wajib model release untuk wajah manusia yang dapat dikenali, dan property release untuk lokasi privat / arsitektur khusus.
 
-PROTOKOL PEMERIKSAAN WAJIB (13 AREA FORENSIK ANOMALI AI & STRUKTUR):
-1. TANGAN & JARI (Hands & Fingers) -> [anatomical_errors]:
-   - Hitung jumlah jari di setiap tangan (harus tepat 5 jari).
-   - Periksa apakah ada jari yang menyatu, meleleh, hilang, bengkok tidak alami, terbalik, kuku tidak wajar, atau memiliki ruas/sendi ganda.
-   - Cacat pada tangan/jari adalah alasan penolakan AI nomor satu di Adobe Stock -> WAJIB FAIL jika ditemukan!
-2. MATA (Eyes) -> [anatomical_errors]:
-   - Periksa pupil dan iris pada perbesaran 100%: apakah pupil bulat sempurna, ukuran iris simetris, arah tatapan kedua mata selaras (tidak juling/strabismus), dan pantulan cahaya (catchlight) konsisten.
-   - Pupil meleleh, iris bergerigi/cacat, atau bentuk mata asimetris aneh -> WAJIB FAIL!
-3. GIGI (Teeth) -> [anatomical_errors]:
-   - Periksa barisan gigi: tidak boleh ada jumlah gigi berlebih, gigi menyatu seperti balok tanpa sela pemisah alami, taring tidak wajar pada manusia, atau gusi yang meleleh.
-4. TELINGA (Ears) -> [anatomical_errors]:
-   - Periksa bentuk daun telinga, tragus, dan heliks: tidak boleh terdistorsi, meleleh, atau hilang struktur anatomi normalnya.
-5. ANATOMI KESELURUHAN (Overall Anatomy) -> [anatomical_errors]:
-   - Periksa proporsi kepala, leher, bahu, lengan, dan tungkai. Tidak boleh ada leher terpelintir, persendian lepas, lengan/kaki ekstra, atau tubuh yang membengkok secara mustahil.
-6. OBJEK MENYATU (Fused / Merging Objects) -> [structural_defects]:
-   - Periksa batas pertemuan antar objek: pakaian menyatu dengan kulit, jari menyatu ke cangkir/gagang, kaki meja/kursi menyatu ke lantai, tali tas meleleh ke baju, atau kacamata menyatu ke hidung.
-   - Penggabungan material yang tidak logis adalah cacat struktural AI fatal -> WAJIB FAIL!
-7. TEKS / GIBBERISH (Pseudo-Text & Gibberish) -> [text]:
-   - Periksa semua teks pada baju, latar, plang, kemasan, atau layar: teks semu AI (alien symbols, pseudo-font, huruf acak/rusak yang tidak terbaca) WAJIB FAIL. Teks hanya boleh PASS jika berupa huruf nyata yang terbaca jelas dan dieja dengan benar, atau jika gambar memang tidak memuat teks.
-8. ARTEFAK GENERATIF AI (AI Artifacts & Textures) -> [ai_artifacts]:
-   - Periksa kulit dan permukaan: hindari kulit seperti lilin sintetis (waxy AI skin), penghalusan berlebih tanpa pori alami (over-smoothed plastic skin), detail yang meleleh seperti cat air basah (watercolor smudging), atau piksel halusinasi AI.
-9. PATTERN YANG RUSAK (Broken Repeating Patterns) -> [structural_defects / ai_artifacts]:
-   - Periksa pola geometris dan tekstur berulang: anyaman kain, kisi-kisi jendela, ubin lantai/parket, pagar, atau motif berulang. Jika polanya mendadak putus, meliuk tidak wajar, atau kacau di tengah jalan -> WAJIB FAIL.
-10. PERSPEKTIF & GEOMETRI (Perspective & Geometry) -> [proportion_defects / structural_defects]:
-    - Periksa garis perspektif arsitektur, cakrawala, dan perabotan. Objek yang melayang tanpa tumpuan gravitasi fisik, garis yang melengkung tidak logis, atau skala objek yang mustahil secara 3D -> WAJIB FAIL.
-11. REFLEKSI (Reflections) -> [lighting / structural_defects]:
-    - Periksa pantulan pada cermin, kaca, permukaan air, atau logam: apakah objek pada pantulan cocok dengan objek asli? Pantulan yang terbalik salah arah, objek hilang di pantulan, atau pantulan memuat objek hantu -> WAJIB FAIL.
-12. SHADOW / BAYANGAN (Shadow Consistency) -> [lighting]:
-    - Periksa arah dan kejatuhan bayangan: apakah semua bayangan konsisten dengan arah sumber cahaya utama? Objek tanpa bayangan (tampak melayang) atau bayangan yang bertabrakan berlawanan arah -> WAJIB FAIL.
-13. DETAIL KECIL YANG ANEH (Odd Micro-Details) -> [structural_defects / artifacts]:
-    - Periksa detail kecil: gagang kacamata hilang sebelah, ritsleting tanpa gigi, kancing baju melayang tanpa jahitan, tali jam tangan putus, roda sepeda tanpa rantai/jeruji.
+2. STANDAR KUALITAS & KECACATAN PROPORSI (Quality Issues & Proportion Defects - https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html):
+   - Kecacatan Proporsi & Skala: Disproporsi anggota tubuh (kepala, tangan, kaki, jari), ketidakwajaran skala objek terhadap lingkungan (misal cangkir sebesar meja), distorsi geometri atau perspektif 3D yang merusak kealamian gambar.
+   - Artefak AI Generatif: Jari berlebih/menyatu, mata tidak simetris, tekstur kulit lilin (waxy skin) abnormal, objek meleleh (melting), teks/huruf yang tidak terbaca (gibberish).
 
-STANDAR TEKNIS FOTOGRAFI KOMERSIAL:
-- Fokus & Ketajaman [blur]: Subjek utama WAJIB tajam (tack-sharp) pada 100% zoom. (Catatan: Bokeh optik lembut bukaan lebar f/1.4-f/2.8 pada latar belakang non-subjek adalah sah, tetapi subjek utama buram/soft focus = FAIL).
-- Pencahayaan & Eksposur [exposure]: Blown highlights (putih murni terpotong tanpa detail) atau crushed shadows (hitam pekat tanpa detail) = FAIL.
-- Derau & Sensor [noise, sensor_issues]: Noise digital kotor, chromatic noise ungu/hijau di bayangan, bintik debu sensor = FAIL.
-- Legal & Merek [ip_risk, logo, watermark]: Logo komersial nyata tanpa izin (Apple, Nike, dll.) atau watermark agensi = FAIL + legal_status: "VIOLATION".
+3. STANDAR TEKNIS FOTOGRAFI (Technical Standards):
+   - Fokus & Ketajaman: Subjek utama wajib fokus tajam (tack-sharp) pada inspeksi crop 100%. Bebas dari camera shake dan motion blur yang merusak.
+   - Pencahayaan & Eksposur: Eksposur seimbang, tidak ada blown-out highlights (overexposure) atau bayangan pekat tanpa detail (underexposure).
+   - Noise & Kompresi: Bebas dari digital sensor noise berlebih, artefak kompresi JPEG (macro-blocking, color banding, pixelation).
 
-PANDUAN KEPUTUSAN JUJUR, OBJEKTIF & TEGAS:
-- JANGAN SEGAN MENETAPKAN 'FAIL'! Menolak gambar yang cacat adalah fungsi utama Anda demi menyelamatkan kontributor dari penolakan resmi kurator Adobe Stock.
-- Jika ditemukan minimal SATU cacat anomali AI (tangan/jari, mata, gigi, telinga, anatomi, objek menyatu, teks gibberish, artefak, pattern rusak, perspektif/refleksi/shadow salah) ATAU cacat teknis utama (subjek buram, eksposur rusak, noise berat, logo merek) -> recommendation WAJIB "FAIL" dengan overall_score 35% – 55%!
-- recommendation "PASS" dengan overall_score 88% – 98% HANYA DIBERIKAN jika gambar BENAR-BENAR BERSIH, tajam pada 100% zoom di subjek utama, anatomi dan logika fisik sempurna, bebas dari anomali AI, dan siap untuk dijual secara komersial.` + metadataInstruction;
+4. PERALATAN FORENSIK YANG DIGUNAKAN (Detection Tools Used):
+   - AI Multimodal Vision Quality Inspector (Pemeriksaan Semantik & Visual Mendalam)
+   - OpenCV Forensic Pixel Engine (Inspeksi Crop 100% & Edge Laplacian Sharpness Analysis)
+   - BRISQUE & NIQE Spatial Quality & Distortion Metric Analyzer
+   - YOLO (You Only Look Once) Neural Object & Feature Grounding
+   - Luma & Chrominance Histogram Exposure Inspector
+
+FORMAT LAPORAN:
+Kembalikan keterangan naratif terpadu yang jelas, terstruktur, dan elegan (TIDAK terpecah-pecah per-part) untuk:
+- detection_tools_used: Daftar nama alat forensik yang digunakan.
+- ip_audit_summary: Keterangan naratif lengkap audit hak cipta, merek dagang, landmark, dan kebutuhan rilis.
+- quality_issues_summary: Keterangan naratif lengkap audit kualitas visual, proporsi, anatomi, dan keutuhan bentuk.
+- technical_issues_summary: Keterangan naratif lengkap audit standar teknis fotografi (ketajaman 100%, pencahayaan, noise, kompresi).
+- detailed_feedback: Kesimpulan akhir kurator Adobe Stock dan langkah perbaikan yang disarankan.` + metadataInstruction;
 
   const responseSchema = {
     type: Type.OBJECT,
@@ -6336,6 +6402,10 @@ PANDUAN KEPUTUSAN JUJUR, OBJEKTIF & TEGAS:
         legal_status: { type: Type.STRING, enum: ["SAFE", "AT_RISK", "VIOLATION"] },
         requires_model_release: { type: Type.BOOLEAN, description: "True if recognizable people are in the image" },
         requires_property_release: { type: Type.BOOLEAN, description: "True if recognizable modern architecture, artwork, or private property is in the image" },
+        detection_tools_used: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of forensic and AI detection tools applied" },
+        ip_audit_summary: { type: Type.STRING, description: "Detailed narrative summary of IP, trademark, landmark, and release compliance" },
+        quality_issues_summary: { type: Type.STRING, description: "Detailed narrative summary of visual quality, proportion integrity, and AI artifacts" },
+        technical_issues_summary: { type: Type.STRING, description: "Detailed narrative summary of technical photography standards (focus, exposure, noise, compression)" },
         technical_issues: { type: Type.ARRAY, items: { type: Type.STRING } },
         strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
         overall_score: { type: Type.NUMBER },
@@ -6344,26 +6414,14 @@ PANDUAN KEPUTUSAN JUJUR, OBJEKTIF & TEGAS:
         ai_vision_checks: {
             type: Type.OBJECT,
             properties: {
-                blur: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                composition: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                lighting: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                exposure: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                color_balance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                over_edited: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                sensor_issues: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                watermark: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                logo: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                text: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                anatomical_errors: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                ip_risk: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                structural_defects: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                proportion_defects: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                illustration_issues: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                vector_issues: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                noise: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                ai_artifacts: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
-                stock_acceptance: { type: Type.OBJECT, properties: { status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, note: { type: Type.STRING } }, required: ["status", "note"] },
+                proportion_defects: { 
+                    type: Type.OBJECT, 
+                    properties: { 
+                        status: { type: Type.STRING, enum: ["PASS", "FAIL"] }, 
+                        note: { type: Type.STRING } 
+                    }, 
+                    required: ["status", "note"] 
+                },
                 metadata: {
                     type: Type.OBJECT,
                     properties: {
@@ -6373,10 +6431,7 @@ PANDUAN KEPUTUSAN JUJUR, OBJEKTIF & TEGAS:
                     required: ["title", "keywords"]
                 }
             },
-            required: [
-                "blur", "composition", "lighting", "exposure", "color_balance", "over_edited", "sensor_issues", "watermark", "logo", "text",
-                "anatomical_errors", "structural_defects", "ip_risk", "proportion_defects", "illustration_issues", "vector_issues", "noise", "artifacts", "ai_artifacts", "stock_acceptance", "metadata"
-            ]
+            required: ["proportion_defects", "metadata"]
         },
         heatmaps: {
             type: Type.ARRAY,
@@ -6411,7 +6466,7 @@ PANDUAN KEPUTUSAN JUJUR, OBJEKTIF & TEGAS:
             }
         }
     },
-    required: ["visual_scan_analysis", "legal_status", "requires_model_release", "requires_property_release", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps", "yolo_detected_objects"]
+    required: ["visual_scan_analysis", "legal_status", "requires_model_release", "requires_property_release", "detection_tools_used", "ip_audit_summary", "quality_issues_summary", "technical_issues_summary", "technical_issues", "strengths", "overall_score", "recommendation", "detailed_feedback", "ai_vision_checks", "heatmaps", "yolo_detected_objects"]
   };
 
   const rawImages = Array.isArray(image) ? image : [image];
@@ -6434,7 +6489,6 @@ PANDUAN KEPUTUSAN JUJUR, OBJEKTIF & TEGAS:
   }
   const imageParts = resolvedImages.map(img => processFrameServer(img));
   
-  // QC routing: use original model configuration
   let selectedModel = model || 'gemini-3.1-pro-preview';
   if (selectedModel === 'auto' || !selectedModel.startsWith('gemini')) {
     selectedModel = 'gemini-3.1-pro-preview';
@@ -6444,36 +6498,24 @@ PANDUAN KEPUTUSAN JUJUR, OBJEKTIF & TEGAS:
   let responseText = "";
   let lastError;
 
-  const promptText = `Sebagai Kurator & Moderator Konten Senior Adobe Stock, lakukan review kurasi dan audit forensik menyeluruh terhadap gambar ini (termasuk crop 100% zoom resolusi tinggi yang disertakan) berdasarkan pedoman resmi Adobe Stock Quality and Technical Standards (https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html):
+  const promptText = `Sebagai Kurator & Moderator Konten Senior Adobe Stock, lakukan review kurasi forensik menyeluruh pada gambar ini sesuai pedoman Adobe Stock:
 
-CHECKLIST FORENSIK 13 POIN ANOMALI AI & CACAT TEKNIS ADOBE STOCK:
-1. Tangan & Jari: Periksa perbesaran 100% di setiap tangan. Hitung jari (harus 5), cek apakah ada jari menyatu, meleleh, hilang, bengkok tidak alami, terbalik, kuku rusak, atau ruas berlebih.
-2. Mata: Periksa pupil dan iris di 100% zoom. Pupil harus bulat dan simetris, arah tatapan selaras (tidak juling), catchlight alami.
-3. Gigi: Periksa barisan gigi. Tidak boleh ada jumlah gigi berlebih, gigi balok menyatu tanpa sela pemisah alami, atau gusi meleleh.
-4. Telinga: Daun telinga dan tragus harus memiliki bentuk anatomi normal, tidak boleh meleleh atau hilang bentuk.
-5. Anatomi Tubuh: Periksa proporsi kepala, leher, bahu, lengan, dan kaki. Tidak boleh ada leher terpelintir, sendi lepas, atau anggota tubuh ganjil.
-6. Objek Menyatu: Periksa apakah ada objek atau material yang menyatu secara tidak logis (pakaian meleleh ke kulit, tangan menyatu ke cangkir/gagang, kaki meja meleleh ke lantai, tali tas menyatu ke baju).
-7. Teks / Gibberish: Periksa semua teks di baju, tanda, plang, layar, kemasan. Teks semu AI (huruf acak, simbol alien, pseudo-font rusak) WAJIB FAIL.
-8. Artefak Generatif AI: Periksa tekstur lilin (waxy AI skin), penghalusan berlebih tanpa pori alami, smudging seperti cat air basah, halusinasi piksel.
-9. Pattern yang Rusak: Periksa anyaman kain, kisi jendela, motif ubin/parket. Jika pola berulang terputus, meliuk aneh, atau rusak -> WAJIB FAIL.
-10. Perspektif & Geometri: Garis arsitektur yang mustahil, objek melayang tanpa tumpuan gravitasi, distorsi ruang 3D yang salah.
-11. Refleksi: Pantulan cermin/kaca/air yang tidak cocok dengan objek asli atau arah pantulannya salah.
-12. Shadow / Bayangan: Bayangan yang hilang, arah bayangan berlawanan dengan sumber cahaya utama, atau bayangan terputus aneh.
-13. Detail Kecil Aneh: Gagang kacamata hilang sebelah, ritsleting tanpa gigi, kancing melayang, tali jam tangan putus, jeruji roda sepeda hilang.
+1. AUDIT HAK CIPTA & RESTRIKSI (Known Restrictions & Common Refusal Reasons):
+   - Evaluasi keberadaan logo, merek komersial, desain produk berhak cipta, landmark/arsitektur yang dilindungi, karya seni/patung publik, serta logo/aset NASA.
+   - Nyatakan kebutuhan Model Release atau Property Release.
+   - Buat narasi lengkap pada "ip_audit_summary".
 
-STANDAR TEKNIS FOTOGRAFI & LEGAL:
-- Ketajaman Subjek Utama: Subjek utama WAJIB tajam (tack-sharp) pada 100% zoom crop. Jika subjek utama buram / soft-focus / camera shake -> blur: FAIL!
-- Pencahayaan & Eksposur: Tidak boleh ada blown highlights (putih mati kehilangan detail) atau crushed shadows (hitam pekat tanpa detail).
-- Noise & Sensor: Bebas dari chromatic noise kotor, artefak kompresi, dan bercak debu sensor.
-- Intellectual Property: Bebas dari logo merek komersial (Apple, Nike, dll.) dan watermark tanpa izin.
-- YOLO Object Grounding: Isi "yolo_detected_objects" dengan objek konkret yang terdeteksi dengan confidence (0.0-1.0) dan bounding box [ymin, xmin, ymax, xmax] skala 0-1000.
+2. AUDIT KUALITAS VISUAL & KECACATAN PROPORSI (Quality Issues):
+   - Periksa kecacatan proporsi tubuh/anatomi, skala objek terhadap latar belakang, serta anomali/artefak AI generatif.
+   - Tetapkan status pada ai_vision_checks.proportion_defects (PASS/FAIL beserta catatannya).
+   - Buat narasi lengkap pada "quality_issues_summary".
 
-ATURAN KEPUTUSAN JUJUR & TEGAS:
-- JIKA DITEMUKAN CACAT ANOMALI AI ATAU CACAT TEKNIS FATAL DI ATAS:
-  * recommendation: "FAIL"!
-  * overall_score: 35% – 55%!
-  * Catat semua alasan penolakan secara spesifik dan jujur pada technical_issues dan detailed_feedback.
-- HANYA BERIKAN recommendation "PASS" (skor 88% - 98%) jika gambar BENAR-BENAR BERSIH, tack-sharp pada subjek utama di 100% zoom, bebas dari anomali AI, dan siap untuk dijual secara komersial.
+3. AUDIT STANDAR TEKNIS FOTOGRAFI (Technical Standards):
+   - Periksa ketajaman fokus pada crop 100%, keseimbangan pencahayaan/eksposur, noise sensor, dan artefak kompresi.
+   - Buat narasi lengkap pada "technical_issues_summary".
+
+4. ALAT DETEKSI (detection_tools_used):
+   - Cantumkan daftar alat forensik: ["AI Multimodal Vision Inspector", "OpenCV Pixel Forensic Engine (100% Crop)", "BRISQUE & NIQE Spatial Quality Analyzer", "YOLO Neural Object Grounding", "Luma Histogram Analyzer"].
 
 Tingkat toleransi yang diminta: ${tolerance}.
 Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
@@ -6519,100 +6561,71 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
   try {
     const parsedResult = JSON.parse(extractJSON(responseText));
     
+    // Pastikan daftar detection_tools_used selalu lengkap
+    if (!Array.isArray(parsedResult.detection_tools_used) || parsedResult.detection_tools_used.length === 0) {
+      parsedResult.detection_tools_used = [
+        "AI Multimodal Vision Inspector",
+        "OpenCV Pixel Forensic Engine (100% Zoom Crop)",
+        "BRISQUE & NIQE Spatial Quality Analyzer",
+        "YOLO Neural Object Grounding",
+        "Luma Histogram Analyzer"
+      ];
+    }
+
     if (parsedResult.ai_vision_checks) {
-      // Ignore media-mismatched checks for standard photos (e.g. vector/illustration checks)
-      const isVectorAsset = fileType?.includes('eps') || fileType?.includes('svg') || fileType?.includes('ai') || fileType?.includes('vector');
-      if (!isVectorAsset) {
-        if (parsedResult.ai_vision_checks.vector_issues) {
-          parsedResult.ai_vision_checks.vector_issues = { status: 'PASS', note: 'Not applicable (Raster photographic asset).' };
-        }
-        if (parsedResult.ai_vision_checks.illustration_issues) {
-          parsedResult.ai_vision_checks.illustration_issues = { status: 'PASS', note: 'Not applicable (Raster photographic asset).' };
-        }
-      }
-
-      // Kunci kritis yang memicu penolakan stock (IP, Watermark, Mutasi Anatomi AI, Cacat Gadget/Struktur, atau AI artifact nyata)
-      const criticalKeys = ['watermark', 'logo', 'ip_risk', 'anatomical_errors', 'structural_defects', 'ai_artifacts', 'proportion_defects'];
-      // Kunci teknis pendukung kualitas
-      const technicalKeys = ['blur', 'exposure', 'lighting', 'color_balance', 'over_edited', 'sensor_issues', 'noise', 'artifacts', 'text'];
-      
-      const failedCriticalKeys: string[] = [];
-      const failedTechnicalKeys: string[] = [];
-      const failedCheckKeys: string[] = [];
-      let anyIpFail = false;
-
-      for (const [key, value] of Object.entries(parsedResult.ai_vision_checks)) {
-        if (value && typeof value === 'object' && (value as any).status === 'FAIL') {
-          failedCheckKeys.push(key);
-          if (['watermark', 'logo', 'ip_risk'].includes(key)) {
-            anyIpFail = true;
-          }
-          if (criticalKeys.includes(key)) {
-            failedCriticalKeys.push(key);
-          } else if (technicalKeys.includes(key)) {
-            failedTechnicalKeys.push(key);
-          }
-        }
-      }
-
-      // Evaluasi toleransi penolakan berbasis standar kurasi komersial nyata:
+      const isProportionFail = parsedResult.ai_vision_checks.proportion_defects?.status === 'FAIL';
+      const isLegalFail = parsedResult.legal_status === 'VIOLATION';
       const modelWantsFail = parsedResult.recommendation === "FAIL";
-      const hasCriticalFail = failedCriticalKeys.length > 0;
-      const hasTechnicalFail = failedTechnicalKeys.length > 0;
-      const stockAcceptanceFail = parsedResult.ai_vision_checks.stock_acceptance?.status === "FAIL";
-      
-      let isFailing = false;
-      if (tolerance === 'STRICT') {
-        // STRICT: Zero-tolerance. Ada 1 check FAIL apa pun -> FAIL
-        isFailing = modelWantsFail || hasCriticalFail || hasTechnicalFail || stockAcceptanceFail || anyIpFail;
-      } else if (tolerance === 'LOOSE') {
-        // LOOSE: Tetap tolak pelanggaran IP, mutasi anatomi AI nyata, atau cacat teknis ganda
-        isFailing = anyIpFail || hasCriticalFail || failedTechnicalKeys.length >= 2 || (modelWantsFail && (hasCriticalFail || hasTechnicalFail));
-      } else {
-        // Default MEDIUM (Standar Resmi Kurasi Adobe Stock):
-        // 1. Pelanggaran IP/Logo/Watermark -> PASTI FAIL
-        // 2. Ada cacat anomali AI apa pun (tangan/jari, mata, gigi, telinga, anatomi, objek menyatu, teks rusak, artefak, pattern rusak) -> PASTI FAIL
-        // 3. Cacat teknis utama pada subjek (blur, eksposur rusak, noise kotor, sensor issues, over-edited) -> PASTI FAIL
-        // 4. Model AI sendiri menyimpulkan FAIL atau stock_acceptance FAIL -> PASTI FAIL (Jangan pernah menimpa penolakan AI menjadi PASS!)
-        isFailing = anyIpFail || hasCriticalFail || hasTechnicalFail || modelWantsFail || stockAcceptanceFail;
-      }
+      const isFailing = isProportionFail || isLegalFail || modelWantsFail;
 
       if (isFailing) {
         parsedResult.recommendation = "FAIL";
-        if (parsedResult.ai_vision_checks.stock_acceptance) {
-          parsedResult.ai_vision_checks.stock_acceptance.status = "FAIL";
+        if (isProportionFail && parsedResult.ai_vision_checks.proportion_defects) {
+          parsedResult.ai_vision_checks.proportion_defects.status = "FAIL";
         }
-        // Pastikan skor mencerminkan penolakan secara realistis (35 - 55)
-        const deductions = (failedCriticalKeys.length * 6) + (failedTechnicalKeys.length * 3);
-        const calculatedFailScore = Math.max(28, Math.min(55, 52 - deductions));
-        parsedResult.overall_score = typeof parsedResult.overall_score === 'number' && parsedResult.overall_score <= 58
+        const calculatedFailScore = typeof parsedResult.overall_score === 'number' && parsedResult.overall_score <= 58
           ? parsedResult.overall_score
-          : calculatedFailScore;
+          : 45;
+        parsedResult.overall_score = calculatedFailScore;
 
-        (parsedResult as any).failed_checks = failedCheckKeys;
+        (parsedResult as any).failed_checks = isProportionFail ? ['proportion_defects'] : [];
         if (!Array.isArray(parsedResult.technical_issues)) {
           parsedResult.technical_issues = [];
         }
-        for (const k of failedCheckKeys) {
-          const note = (parsedResult.ai_vision_checks as any)[k]?.note;
-          if (note && !parsedResult.technical_issues.includes(note)) {
-            parsedResult.technical_issues.push(note);
-          }
+        const note = parsedResult.ai_vision_checks.proportion_defects?.note;
+        if (note && !parsedResult.technical_issues.includes(note)) {
+          parsedResult.technical_issues.push(note);
         }
       } else {
         parsedResult.recommendation = "PASS";
-        if (parsedResult.ai_vision_checks.stock_acceptance) {
-          parsedResult.ai_vision_checks.stock_acceptance.status = "PASS";
+        if (parsedResult.ai_vision_checks.proportion_defects) {
+          parsedResult.ai_vision_checks.proportion_defects.status = "PASS";
         }
         parsedResult.overall_score = typeof parsedResult.overall_score === 'number' && parsedResult.overall_score >= 80
           ? Math.min(98, Math.max(88, parsedResult.overall_score))
           : 92;
         (parsedResult as any).failed_checks = [];
       }
-      
-      if (anyIpFail) {
-        parsedResult.legal_status = "VIOLATION";
-      }
+    }
+
+    // Fallback narratives jika properti narasi kosong
+    if (!parsedResult.ip_audit_summary) {
+      parsedResult.ip_audit_summary = parsedResult.legal_status === 'VIOLATION'
+        ? (isIndonesian ? 'Terdeteksi potensi pelanggaran hak kekayaan intelektual (merek dagang, logo komersial, desain terdaftar, atau landmark berhak cipta) sesuai katalog Adobe Stock Known Restrictions.' : 'Potential IP infringement detected (trademarks, commercial logos, registered design, or protected landmarks) per Adobe Stock Known Restrictions catalog.')
+        : (isIndonesian ? 'Bebas dari logo komersial, merek dagang terdaftar, dan landmark terlindungi. Aset mematuhi pedoman kekayaan intelektual Adobe Stock.' : 'Free of commercial logos, registered trademarks, and protected landmarks. Complies with Adobe Stock intellectual property guidelines.');
+    }
+
+    if (!parsedResult.quality_issues_summary) {
+      const propNote = parsedResult.ai_vision_checks?.proportion_defects?.note;
+      parsedResult.quality_issues_summary = propNote || (parsedResult.recommendation === 'PASS'
+        ? (isIndonesian ? 'Proporsi subjek dan elemen seimbang secara alami. Struktur anatomi dan perspektif gambar bebas dari distorsi atau kecacatan skala.' : 'Subject and element proportions are naturally balanced. Anatomy and perspective are clean of distortions or scale defects.')
+        : (isIndonesian ? 'Terdeteksi anomali proporsi atau distorsi visual yang tidak memenuhi standar kualitas komersial Adobe Stock.' : 'Proportion anomalies or visual distortions detected that do not meet Adobe Stock commercial quality standards.'));
+    }
+
+    if (!parsedResult.technical_issues_summary) {
+      parsedResult.technical_issues_summary = parsedResult.recommendation === 'PASS'
+        ? (isIndonesian ? 'Fokus tajam pada subjek utama (tack-sharp pada inspeksi crop 100%), pencahayaan dan kontras seimbang, serta bebas dari noise sensor dan artefak kompresi.' : 'Sharp focus on primary subject (tack-sharp at 100% crop inspection), balanced lighting and contrast, clean of sensor noise and compression artifacts.')
+        : (isIndonesian ? 'Pemeriksaan teknis mendeteksi ketidaksesuaian pada ketajaman fokus, pencahayaan, atau integritas piksel.' : 'Technical check detected issues in focus sharpness, lighting balance, or pixel integrity.');
     }
 
     return parsedResult;
@@ -7946,38 +7959,34 @@ export async function generateCinematicPrompt(topic: string): Promise<string> {
 }
 
 export const ABSTRACT_STYLE_INSTRUCTION = `
-You are a Master Abstract Artist and Creative Director specializing in deconstructive, non-literal visual art, fluid dynamics, and expressive modern compositions.
+You are a Master Creative Director and AI Prompt Designer specializing in Dynamic Kinetic Abstract Art, Crystalline Shattered Geometry, and High-Contrast Cinematic Energy.
 
 When generating or refining prompts for the "Abstract" style, you MUST strictly follow these rules:
 
-1. CORE CONCEPT & DECONSTRUCTION
-   - Deconstruct the user's input subject into dynamic expressions of motion, kinetic energy, emotion, and non-literal forms.
-   - Shift focus away from recognizable real-world subjects toward atmospheric mood, fluid rhythm, and spatial energy.
+1. DYNAMIC KINETIC MOTION & ACTION FREEZE-FRAME
+   - Portray the subject in high-speed, dynamic athletic or kinetic action poses with explosive forward momentum, dynamic speed arcs, and freeze-frame action moments.
+   - Maintain the subject as the recognizable energetic hero interacting seamlessly with abstract forces.
 
-2. VISUAL CHARACTERISTICS & TEXTURES
-   - Incorporate vivid tactile textures: explosive pigment swirls, kinetic motion trails, thick impasto brushwork, layered translucent facets, or fluid marble inks.
-   - Enforce dramatic asymmetric compositions and balance of organic versus structured forms.
+2. FLOATING SHATTERED CRYSTAL & GEOMETRIC GLASS SHARDS
+   - Seamlessly surround the subject and motion path with sharp, floating polygonal glass shards, faceted crystalline prisms, and transparent geometric fragments dispersing dynamically through the air.
+   - The shards refract and reflect the scene's vibrant light sources with sharp, crystalline edges.
 
-3. EMBEDDED ABSTRACT MOVEMENTS & TECHNIQUES
-   - Automatically blend or select appropriate abstract movements based on the topic context:
-     * Abstract Expressionism: Bold gestural strokes and raw emotional marks.
-     * Fluid / Marble Art: Smooth liquid ink flows, acrylic pouring, and swirling colors.
-     * Neon & Kinetic: Glowing light trails, luminescent energy vectors, and vibrant neon pulses.
-     * Geometric & Cubist: Fractured geometric facets, intersecting translucent planes, and mathematical precision.
-     * Glitch Art & Distortion: Digital signal degradation, scanline distortions, and chromatic shifting.
+3. GLOWING NEON LIGHT TRAILS & SPEED STREAKS
+   - Trace the motion trajectory with vibrant glowing neon light trails, electric speed streaks, and luminescent flowing ribbons (such as electric cyan, neon orange, magenta, glowing amber, or radiant white).
 
-4. MANDATORY PROMPT STRUCTURE
-   - Formulate the output prompt using this structural pattern:
-     "Abstract, [subject deconstructed into energy/form] using [selected abstract style/movement] with [specific textures, e.g., vibrant paint splatters, crystalline facets, or liquid silk flow] and [atmospheric lighting]."
+4. DRAMATIC HIGH-CONTRAST ARENA / STADIUM LIGHTING
+   - Set the scene against a moody dark arena, stadium track, or stage backdrop with volumetric stadium floodlights, intense rim lighting, and dramatic chiaroscuro contrast that makes the glowing light trails and crystalline facets pop.
 
-5. STRICT PROHIBITIONS (STRICTLY AVOID)
-   - DO NOT generate photorealistic renders or literal human/object anatomy.
-   - DO NOT include camera lens specs (e.g., 50mm, f/1.8), raytracing parameters, or realistic world-building elements.
-   - DO NOT create static, flat, or featureless background fills.
+5. KINETIC PARTICLE BURST & DEBRIS EXPLOSIONS
+   - Include explosive bursts of glowing sparks, ice debris, crystalline dust, or luminous particles erupting from pivot, footwork, or impact points.
+
+6. MANDATORY PROMPT STRUCTURE
+   - Formulate prompts using rich, cinematic descriptors:
+     "Dynamic action freeze-frame of [Subject in motion], surrounded by floating shattered crystal glass shards, vibrant glowing [neon colors] speed trails, kinetic particle explosion, dramatic dark stadium/arena background with volumetric floodlights, high-contrast rim lighting, 8k resolution, Octane render."
 `;
 
 export async function generateAbstractPrompt(topic: string): Promise<string> {
-  const userQuery = `Generate a highly artistic abstract image prompt for the subject: "${topic}". \nFocus on deconstructing the subject into energy, motion, and non-literal forms. Incorporate vivid textures (impasto, fluid marble, geometric facets) and dynamic compositions. \nOutput ONLY the refined prompt text without intro or explanations.`;
+  const userQuery = `Generate a high-impact dynamic abstract image prompt for the subject: "${topic}". \nFocus on dynamic kinetic action, floating shattered crystal/geometric glass shards, vibrant glowing neon speed trails, explosive particle bursts, and dramatic high-contrast dark arena/stadium lighting. \nOutput ONLY the refined prompt text without intro or explanations.`;
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });

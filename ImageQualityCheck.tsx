@@ -59,16 +59,7 @@ export interface QualityReport {
     strengths: string[];
     detailed_feedback: string;
     ai_vision_checks?: {
-      blur?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      composition?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      lighting?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      watermark?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      logo?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      text?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      anatomical_errors?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      ip_risk?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
       proportion_defects?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
-      stock_acceptance?: { status: "PASS" | "FAIL" | "UNKNOWN"; note: string };
       metadata?: { title: string; keywords: string[] };
     };
   };
@@ -1550,16 +1541,7 @@ export const ImageQualityCheck: React.FC<{
                                       ? { status: "FAIL", note: t.language === 'Bahasa' ? "Terdeteksi pelanggaran legal/IP pada laporan akhir." : "Legal/IP violation detected in the final report." }
                                       : fallbackCheck(key);
                                   const aiVisionChecks = {
-                                    blur: rawChecks.blur || fallbackCheck('blur', ['focus', 'blur', 'tajam', 'sharp']),
-                                    composition: rawChecks.composition || fallbackCheck('composition', ['komposisi', 'composition']),
-                                    lighting: rawChecks.lighting || fallbackCheck('lighting', ['lighting', 'exposure', 'pencahayaan', 'eksposur']),
-                                    watermark: rawChecks.watermark || fallbackCheck('watermark', ['watermark']),
-                                    logo: rawChecks.logo || legalFallback('logo'),
-                                    text: rawChecks.text || fallbackCheck('text', ['teks', 'text', 'gibberish']),
-                                    anatomical_errors: rawChecks.anatomical_errors || fallbackCheck('anatomical_errors', ['anatomi', 'anatomy', 'jari', 'finger', 'tangan', 'hand']),
-                                    ip_risk: rawChecks.ip_risk || legalFallback('ip_risk'),
-                                    proportion_defects: rawChecks.proportion_defects || fallbackCheck('proportion_defects', ['proporsi', 'proportion', 'mekanis', 'mechanical', 'struktur']),
-                                    stock_acceptance: rawChecks.stock_acceptance || { status: r.recommendation === "PASS" ? "PASS" : "FAIL", note: r.detailed_feedback || "" },
+                                    proportion_defects: rawChecks.proportion_defects || fallbackCheck('proportion_defects', ['proporsi', 'proportion', 'mekanis', 'mechanical', 'struktur', 'skala', 'scale', 'perspektif', 'distorsi']),
                                     metadata: rawChecks.metadata || { title: (r as any).metadata?.title || "Stock photography showing details", keywords: (r as any).metadata?.keywords || r.strengths || [] }
                                   };
 
@@ -1776,45 +1758,6 @@ export const ImageQualityCheck: React.FC<{
                                                 </div>
                                               </div>
                                             </div>
-
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                                              {[
-                                                { label: t.language === 'Bahasa' ? 'Ketajaman & Sharpness' : 'Blur / Sharpness', val: aiVisionChecks.blur },
-                                                { label: t.language === 'Bahasa' ? 'Pencahayaan & Kontras' : 'Lighting & Contrast', val: aiVisionChecks.lighting },
-                                                { label: t.language === 'Bahasa' ? 'Komposisi & Framing' : 'Composition & Crop', val: aiVisionChecks.composition }
-                                              ].map((c, i) => {
-                                                const isCheckpointPass = c.val?.status === 'PASS';
-                                                const isCheckpointUnknown = c.val?.status === 'UNKNOWN';
-                                                return (
-                                                  <div 
-                                                    key={i}
-                                                    className={`p-3 rounded-2xl border flex flex-col gap-1.5 ${
-                                                      isCheckpointPass 
-                                                        ? 'bg-emerald-500/5 border-emerald-500/10' 
-                                                        : isCheckpointUnknown
-                                                          ? 'bg-amber-500/5 border-amber-500/10'
-                                                          : 'bg-rose-500/5 border-rose-500/10'
-                                                    }`}
-                                                  >
-                                                    <div className="flex items-center justify-between">
-                                                      <span className="text-[9px] font-black uppercase text-slate-700 dark:text-slate-200">{c.label}</span>
-                                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
-                                                        isCheckpointPass 
-                                                          ? 'bg-emerald-500/15 text-emerald-600' 
-                                                          : isCheckpointUnknown
-                                                            ? 'bg-amber-500/15 text-amber-600'
-                                                            : 'bg-rose-500/15 text-rose-600'
-                                                      }`}>
-                                                        {c.val?.status || 'FAIL'}
-                                                      </span>
-                                                    </div>
-                                                    <p className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-normal">
-                                                      {c.val?.note || "Normal, tidak mendeteksi masalah."}
-                                                    </p>
-                                                  </div>
-                                                );
-                                              })}
-                                            </div>
                                           </div>
                                         )}
 
@@ -1826,45 +1769,6 @@ export const ImageQualityCheck: React.FC<{
                                                 <p className="text-[9px] font-black uppercase tracking-widest opacity-60">{t.qc_legal_status}</p>
                                                 <p className="text-xs font-black">{r.legal_status}</p>
                                               </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                                              {[
-                                                { label: t.language === 'Bahasa' ? 'Watermark Komersial' : 'Watermark Check', val: aiVisionChecks.watermark },
-                                                { label: t.language === 'Bahasa' ? 'Deteksi Merek & Logo' : 'Logo Detection', val: aiVisionChecks.logo },
-                                                { label: t.language === 'Bahasa' ? 'Risiko Hak Cipta & IP' : 'IP & Trademark Risk', val: aiVisionChecks.ip_risk }
-                                              ].map((c, i) => {
-                                                const isCheckpointPass = c.val?.status === 'PASS';
-                                                const isCheckpointUnknown = c.val?.status === 'UNKNOWN';
-                                                return (
-                                                  <div 
-                                                    key={i}
-                                                    className={`p-3 rounded-2xl border flex flex-col gap-1.5 ${
-                                                      isCheckpointPass 
-                                                        ? 'bg-emerald-500/5 border-emerald-500/10' 
-                                                        : isCheckpointUnknown
-                                                          ? 'bg-amber-500/5 border-amber-500/10'
-                                                          : 'bg-rose-500/5 border-rose-500/10'
-                                                    }`}
-                                                  >
-                                                    <div className="flex items-center justify-between">
-                                                      <span className="text-[9px] font-black uppercase text-slate-700 dark:text-slate-200">{c.label}</span>
-                                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
-                                                        isCheckpointPass 
-                                                          ? 'bg-emerald-500/15 text-emerald-600' 
-                                                          : isCheckpointUnknown
-                                                            ? 'bg-amber-500/15 text-amber-600'
-                                                            : 'bg-rose-500/15 text-rose-600'
-                                                      }`}>
-                                                        {c.val?.status || 'FAIL'}
-                                                      </span>
-                                                    </div>
-                                                    <p className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-normal">
-                                                      {c.val?.note || "Normal, tidak mendeteksi pelanggaran kekayaan intelektual."}
-                                                    </p>
-                                                  </div>
-                                                );
-                                              })}
                                             </div>
 
                                             <div className="bg-slate-100/30 dark:bg-white/[0.01] border border-slate-200/50 dark:border-white/5 p-4 rounded-2xl space-y-2">
@@ -1892,19 +1796,16 @@ export const ImageQualityCheck: React.FC<{
                                               </div>
                                             )}
 
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                                            <div className="grid grid-cols-1 gap-2.5">
                                               {[
-                                                { label: t.language === 'Bahasa' ? 'Integritas Anatomi' : 'Anatomical Integrity', val: aiVisionChecks.anatomical_errors },
-                                                { label: t.language === 'Bahasa' ? 'Proporsi & Mekanis' : 'Proportion & Mechanical', val: aiVisionChecks.proportion_defects },
-                                                { label: t.language === 'Bahasa' ? 'Teks Overlay / Typo' : 'Text Overlay Check', val: aiVisionChecks.text },
-                                                { label: t.language === 'Bahasa' ? 'Standar Penerimaan' : 'Stock Acceptance', val: aiVisionChecks.stock_acceptance }
+                                                { label: t.language === 'Bahasa' ? 'Kecacatan Proporsi (Quality Issue)' : 'Proportion Defects (Quality Issue)', val: aiVisionChecks.proportion_defects }
                                               ].map((c, i) => {
                                                 const isCheckpointPass = c.val?.status === 'PASS';
                                                 const isCheckpointUnknown = c.val?.status === 'UNKNOWN';
                                                 return (
                                                   <div 
                                                     key={i}
-                                                    className={`p-3 rounded-2xl border flex flex-col gap-1.5 ${
+                                                    className={`p-4 rounded-2xl border flex flex-col gap-2 ${
                                                       isCheckpointPass 
                                                         ? 'bg-emerald-500/5 border-emerald-500/10' 
                                                         : isCheckpointUnknown
@@ -1913,7 +1814,7 @@ export const ImageQualityCheck: React.FC<{
                                                     }`}
                                                   >
                                                     <div className="flex items-center justify-between">
-                                                      <span className="text-[9px] font-black uppercase text-slate-700 dark:text-slate-200">{c.label}</span>
+                                                      <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-200">{c.label}</span>
                                                       <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
                                                         isCheckpointPass 
                                                           ? 'bg-emerald-500/15 text-emerald-600' 
@@ -1924,8 +1825,8 @@ export const ImageQualityCheck: React.FC<{
                                                         {c.val?.status || 'FAIL'}
                                                       </span>
                                                     </div>
-                                                    <p className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-normal line-clamp-3" title={c.val?.note}>
-                                                      {c.val?.note || "Aman, tidak mendeteksi anomali rekonstruksi kecerdasan buatan."}
+                                                    <p className="text-[9.5px] font-semibold text-slate-500 dark:text-slate-400 leading-normal" title={c.val?.note}>
+                                                      {c.val?.note || (t.language === 'Bahasa' ? "Proporsi normal, tidak ditemukan kecacatan proporsi atau distorsi skala." : "Normal proportion, no proportion defects detected.")}
                                                     </p>
                                                   </div>
                                                 );
