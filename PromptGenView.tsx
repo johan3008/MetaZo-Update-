@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { copyToClipboard as robustCopy } from '../utils';
 import { getHeaders } from '../../services/geminiService';
 import { 
-  Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X, Loader2
+  Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X, Loader2,
+  FileSpreadsheet, CheckCheck, FileText, SlidersHorizontal, Layers, ShieldCheck, Filter
 } from 'lucide-react';
 
 import { FeatureGuideButton } from './FeatureGuideModal';
@@ -34,7 +35,7 @@ interface PromptHistoryItem {
   promptMode?: 'background' | 'png';
   pngBgColor?: 'white' | 'black' | 'transparent';
   flatIconType?: 'sheet' | 'single';
-  vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat';
+  vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat' | 'flat_pastel';
 }
 
 const BACKGROUND_STYLE_OPTIONS = [
@@ -114,6 +115,10 @@ const VECTOR_SUB_TYPES = {
     label: 'Minimal Flat Design',
     desc: 'Desain ultra-sederhana dengan warna solid minimalis tanpa detail rumit.'
   },
+  'flat_pastel': {
+    label: 'Flat Pastel Illustration',
+    desc: 'Ilustrasi flat modern berpalet warna pastel lembut, karakter minimalis/faceless, dan bentuk lineless yang harmonis.'
+  },
   'flat_vector': {
     label: 'Flat Vector Illustration',
     desc: 'Ilustrasi vektor 2D detail dengan garis bersih dan blok warna solid yang estetis.'
@@ -167,7 +172,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   const [customCameraAngle, setCustomCameraAngle] = useState('');
   const [flatIconType, setFlatIconType] = useState<'sheet' | 'single'>('single');
   const [showFlatIconModal, setShowFlatIconModal] = useState(false);
-  const [vectorSubType, setVectorSubType] = useState<'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat'>('minimal_flat');
+  const [vectorSubType, setVectorSubType] = useState<'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat' | 'flat_pastel'>('minimal_flat');
   const [showVectorModal, setShowVectorModal] = useState(false);
   
   

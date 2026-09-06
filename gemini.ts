@@ -391,16 +391,80 @@ export function ensureTitleLength(title: string, keywords: string[], description
     cleanedTitle = cleanedTitle.slice(0, -1).trim();
   }
 
-  // Remove disallowed start phrases strictly
+  // Comprehensive list of disallowed stock title filler prefixes / clickbait / AI markers
   const disallowedStarts = [
-    "vector of", "illustration of", "drawing of", "continuous line drawing of",
-    "vector", "illustration", "drawing", "continuous line drawing"
+    // Media type descriptors
+    "a high quality photo of", "high quality photo of", "a photo of", "photo of",
+    "a photograph of", "photograph of", "a picture of", "picture of",
+    "an image of", "image of", "a shot of", "shot of",
+    "a close up of", "close up of", "a close-up of", "close-up of",
+    "a close up shot of", "close up shot of", "a close-up shot of", "close-up shot of",
+    // Perspective / Isolated prefixes
+    "top view of", "a top view of", "aerial view of", "an aerial view of",
+    "side view of", "a side view of", "view of", "a view of",
+    "isolated shot of", "an isolated shot of", "isolated image of",
+    "isolated on white background", "isolated on white", "isolated of",
+    // Vectors / Renders / Illustrations
+    "a vector illustration of", "vector illustration of", "an illustration of", "illustration of",
+    "a vector of", "vector of", "a graphic of", "graphic of",
+    "drawing of", "a drawing of", "continuous line drawing of",
+    "flat illustration of", "a flat illustration of",
+    "3d render of", "a 3d render of", "render of", "a render of",
+    "3d illustration of", "a 3d illustration of",
+    "vector", "illustration", "drawing", "continuous line drawing",
+    // AI / Stock filler
+    "generative ai image of", "ai generated image of", "generative ai photo of",
+    "ai generated photo of", "generative ai of", "ai generated of",
+    "generative ai", "ai generated",
+    "stock photo of", "stock image of", "stock photo", "stock image",
+    // Subjective clickbait / quality claims rejected by reviewers
+    "high quality image of", "high quality", "high-quality",
+    "beautiful photo of", "beautiful image of", "beautiful",
+    "stunning photo of", "stunning image of", "stunning",
+    "amazing photo of", "amazing image of", "amazing",
+    "gorgeous photo of", "gorgeous image of", "gorgeous",
+    "incredible photo of", "incredible image of", "incredible",
+    "perfect photo of", "perfect image of", "perfect",
+    "best photo of", "best image of", "best",
+    "superb photo of", "superb image of", "superb",
+    "nice photo of", "nice image of", "nice"
   ];
-  let titleLower = cleanedTitle.toLowerCase();
-  for (const start of disallowedStarts) {
-    if (titleLower.startsWith(start + " ")) {
-      cleanedTitle = cleanedTitle.substring(start.length + 1).trim();
-      titleLower = cleanedTitle.toLowerCase();
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    let titleLower = cleanedTitle.toLowerCase();
+    for (const start of disallowedStarts) {
+      if (titleLower === start) {
+        cleanedTitle = "";
+        changed = true;
+        break;
+      }
+      if (titleLower.startsWith(start + " ")) {
+        cleanedTitle = cleanedTitle.substring(start.length + 1).trim();
+        changed = true;
+        break;
+      }
+      if (titleLower.startsWith(start + ":") || titleLower.startsWith(start + "-") || titleLower.startsWith(start + ",")) {
+        cleanedTitle = cleanedTitle.substring(start.length + 1).trim();
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  // Strip lingering leading articles if immediately preceding main subject
+  if (/^(a|an|the)\s+/i.test(cleanedTitle)) {
+    cleanedTitle = cleanedTitle.replace(/^(a|an|the)\s+/i, '').trim();
+  }
+
+  if (!cleanedTitle || cleanedTitle.length < 5) {
+    if (targetKeywords.length > 0) {
+      cleanedTitle = targetKeywords.slice(0, 3).join(' ');
+    } else if (keywords && keywords.length >= 3) {
+      cleanedTitle = keywords.slice(0, 5).join(' ');
+    } else {
+      cleanedTitle = "Commercial digital asset";
     }
   }
 
@@ -408,6 +472,7 @@ export function ensureTitleLength(title: string, keywords: string[], description
   if (targetKeywords.length > 0) {
     const primaryTarget = targetKeywords[0];
     const primaryLower = primaryTarget.toLowerCase();
+    const titleLower = cleanedTitle.toLowerCase();
     if (!titleLower.startsWith(primaryLower)) {
       if (titleLower.includes(primaryLower)) {
         const escaped = primaryTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -421,7 +486,7 @@ export function ensureTitleLength(title: string, keywords: string[], description
   }
 
   // Limit bounds based on titleLength
-  let upperLimit = 200;
+  let upperLimit = 140; // Default optimal microstock title length sweet spot
   if (titleLength === 'short') upperLimit = 65;
   if (titleLength === 'long') upperLimit = 200;
 
@@ -1351,21 +1416,32 @@ function scoreKeywordForRanking(
   }
 
   const canonical = adobeKeywordCanonical(normalized);
-  const titleMatch = [...titleTerms].some(term =>
+  const titleTermsArray = [...titleTerms];
+  const titleMatch = titleTermsArray.some(term =>
     canonical === term || canonical.includes(term) || term.includes(canonical)
   );
-  if (titleMatch) score += 160;
+  if (titleMatch) score += 200;
+
+  // Title-Keyword Synergy Bonus (Adobe Stock / Shutterstock top 5 ranking priority):
+  // The first 3 terms of the title contain the core commercial subject. Any keyword matching these terms
+  // receives a massive crown boost (+300) so it ranks at positions #1 to #5.
+  const primaryTitleTerms = titleTermsArray.slice(0, 3);
+  const primaryTitleMatch = primaryTitleTerms.some(term =>
+    canonical === term || canonical.includes(term) || term.includes(canonical)
+  );
+  if (primaryTitleMatch) score += 300;
 
   const wordCount = normalized.split(/\s+/).filter(Boolean).length;
-  if (wordCount === 1) score += 8;
-  else if (wordCount === 2) score += 16;
-  else if (wordCount === 3) score += 7;
-  else score -= 50;
+  if (wordCount === 1) score += 10;
+  else if (wordCount === 2) score += 25; // 2-word commercial phrases have higher conversion
+  else if (wordCount === 3) score += 15;
+  else score -= 60;
 
-  if (containsKeywordConnector(normalized)) score -= 40;
-  if (role === 'generic') score -= 120;
-  if (role === 'color') score -= 18;
-  if (role === 'commercial_use' && !keywordMatchesEvidence(normalized, ctx.commercial)) score -= 60;
+  if (containsKeywordConnector(normalized)) score -= 60;
+  if (role === 'generic') score -= 150;
+  if (isWeakGenericKeyword(normalized)) score -= 400; // Heavily penalize filler / clickbait keywords
+  if (role === 'color') score -= 40;
+  if (role === 'commercial_use' && !keywordMatchesEvidence(normalized, ctx.commercial)) score -= 80;
 
   return score * 1000 - originalIndex;
 }
@@ -4051,7 +4127,8 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 Rules for Titles:
 - Use clear natural language.
 - Describe only visible elements in the image.
-- Put the main subject at the beginning of the title.
+- Put the main subject at the beginning of the title (front-load primary commercial subject).
+- Target optimal stock title length: 70 to 130 characters (10 to 18 words). Never exceed 200 characters.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
@@ -4157,13 +4234,20 @@ OUTPUT FORMAT:
     // Ensure description is valid
     data.description = ensureDescription(data.description || "", data.title || "", data.keywords || []);
     
-    // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
+    // 1. Enforce professional SEO title length strictly FIRST so keyword engine knows finalized title
+    data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "", titleLength, customPrompt);
+
+    // 1.2. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
     if (!data.keywords || !Array.isArray(data.keywords)) {
       data.keywords = [];
     }
+      const factContext = {
+        ...(visualFacts || {}),
+        title: data.title
+      };
       const finalKeywordList = await applyMetadataGenKeywordLogic({
         rawKeywords: data.keywords,
-        visualFacts,
+        visualFacts: factContext,
         targetCount,
         provider,
         model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-2.5-flash',
@@ -4172,10 +4256,8 @@ OUTPUT FORMAT:
         customPrompt
       });
 
-      data.keywords = finalKeywordList;
-
-    // 1.5. Enforce professional title length strictly
-    data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "", titleLength, customPrompt);
+      // Re-rank final keywords based on the finalized SEO title to ensure 100% synergy
+      data.keywords = rankMetadataGenKeywords(finalKeywordList, factContext);
 
     const keywordQuality = scoreMetadataGenKeywords(data.keywords || [], {
       ...(visualFacts || {}),
@@ -4735,7 +4817,8 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 Rules for Titles:
 - Use clear natural language.
 - Describe only visible elements in the image.
-- Put the main subject at the beginning of the title.
+- Put the main subject at the beginning of the title (front-load primary commercial subject).
+- Target optimal stock title length: 70 to 130 characters (10 to 18 words). Never exceed 200 characters.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
@@ -4879,11 +4962,17 @@ OUTPUT FORMAT:
         // Ensure description is valid
         metadata.description = ensureDescription(metadata.description || "", metadata.title || "", metadata.keywords || []);
 
-        // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi
+        // 1. Enforce professional SEO title length strictly FIRST so keyword engine knows finalized title
+        metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "", titleLength, customPrompt);
+
+        // 1.2. Pembersihan & Penguncian Jumlah Keywords secara Presisi
         if (!metadata.keywords || !Array.isArray(metadata.keywords)) {
             metadata.keywords = [];
         }
-            const assetVisualFacts = parsedVisualFactsList[index] || {};
+            const assetVisualFacts = {
+              ...(parsedVisualFactsList[index] || {}),
+              title: metadata.title
+            };
             const finalKeywordList = await applyMetadataGenKeywordLogic({
               rawKeywords: metadata.keywords,
               visualFacts: assetVisualFacts,
@@ -4895,10 +4984,8 @@ OUTPUT FORMAT:
               customPrompt
             });
 
-            metadata.keywords = finalKeywordList;
-
-        // 1.5. Enforce professional title length strictly
-        metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "", titleLength, customPrompt);
+            // Re-rank final keywords based on the finalized SEO title
+            metadata.keywords = rankMetadataGenKeywords(finalKeywordList, assetVisualFacts);
 
         // 1.8. Validate Adobe category_id to be between 1 and 21 (inclusive). If not, calculate heuristically
         const parsedCategoryId = parseInt(String(metadata.category_id), 10);
@@ -5008,7 +5095,7 @@ export const generateOptimizedPrompt = async (options: {
   seed?: number;
   flatIconType?: 'sheet' | 'single';
   iconSheetColumns?: number;
-  vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat';
+  vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat' | 'flat_pastel';
   darkHorrorSubStyle?: string;
   referenceImages?: string[];
   cameraAngles?: string[];
@@ -5088,6 +5175,8 @@ export const generateOptimizedPrompt = async (options: {
   const styleSpecificDirectives: Record<string, string> = {
     "Vector Art": vectorSubType === 'gradient_flat'
       ? ' - Style Guide: STRICTLY 2D GRADIENT FLAT DESIGN. Focus on modern flat vector illustration utilizing smooth linear and radial color gradients. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes.'
+      : vectorSubType === 'flat_pastel'
+      ? ' - Style Guide: STRICTLY FLAT PASTEL ILLUSTRATION (Modern Minimalist Editorial Vector Art). Characterized by soft, harmonious pastel and muted warm color palettes (warm pastel coral, soft blush pink, muted navy/slate, pastel teal, warm butter yellow, soft sage green), stylized minimalist figures/characters with featureless/faceless heads (no facial details like eyes, nose, or mouth—clean smooth silhouettes with elegant hair shapes), ultra-clean lineless shapes or crisp hairline vector contours, zero heavy outlines, zero complex gradients or textures, balanced negative space, and a refined modern lifestyle editorial aesthetic.'
       : vectorSubType === 'flat_vector'
       ? ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus purely on clean figurative 2D flat vector artwork, clean hand-crafted paths, smooth curves, organic line art, and harmonious solid color blocks typical of professional editorial illustrations. STRICTLY FORBIDDEN: Do NOT generate abstract geometric blocks, faceted low-poly shapes, 3D polygons, or chaotic geometric fragments. It must be a cohesive, beautiful, figurative flat illustration.'
       : vectorSubType === 'minimal_flat'
@@ -5217,6 +5306,8 @@ When generating prompts for "Dark Horror Aesthetic", follow these core directive
   if (styleCategory === 'Vector Art' && vectorSubType) {
     if (vectorSubType === 'minimal_flat') {
       vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Minimal Flat Design" aesthetic. Focus on extreme simplicity, clean sweeping curves, elegant organic minimalist layouts, very minimal details, flat color palette with maximum 3-4 cohesive solid colors, high negative space, and absolutely no complex patterns, shading, or gradients. Keep the shapes organic, simple, and beautifully elegant.';
+    } else if (vectorSubType === 'flat_pastel') {
+      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate strictly under the "Flat Pastel Illustration" aesthetic (Modern Minimalist Editorial Vector Art). Features: 1) Color Palette: Harmonious soft pastel and muted tones (warm coral, blush pink, soft teal, muted navy, pale sage, butter yellow). 2) Character & Subject Style: Stylized modern 2D figures that are faceless/featureless (smooth blank facial silhouettes with simple elegant hair, no detailed eyes/nose/mouth) in expressive, graceful everyday poses. 3) Shapes & Rendering: 100% clean flat 2D vector shapes, lineless color blocking or ultra-fine hairline vector outlines, zero heavy strokes, zero glossy 3D rendering, and zero noisy textures. 4) Composition: Elegant negative space, balanced minimal composition, modern editorial vector illustration suitable for premium microstock assets.';
     } else if (vectorSubType === 'flat_vector') {
       vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate strictly under the "Flat Vector Illustration" aesthetic. Clean hand-crafted vector paths, professional 2D illustration style, detailed but flat, using crisp outlines, beautiful sweeping curves, organic lines, and harmonious solid color blocks. STRICTLY FORBIDDEN: Do NOT generate abstract geometric blocks, faceted low-poly, 3D polygons, or chaotic geometric fragments. It must be a cohesive, beautiful, figurative 2D flat vector illustration.';
     } else if (vectorSubType === 'corporate_flat') {
@@ -5270,6 +5361,7 @@ Make sure your generated prompts do not contain these elements or depict them in
   let effectiveStyleCategory = styleCategory;
   if (styleCategory === 'Vector Art' && vectorSubType) {
     if (vectorSubType === 'minimal_flat') effectiveStyleCategory = 'Vector Art - Minimal Flat Design';
+    else if (vectorSubType === 'flat_pastel') effectiveStyleCategory = 'Vector Art - Flat Pastel Illustration';
     else if (vectorSubType === 'flat_vector') effectiveStyleCategory = 'Vector Art - Flat Vector Illustration';
     else if (vectorSubType === 'corporate_flat') effectiveStyleCategory = 'Vector Art - Corporate Flat Illustration';
     else if (vectorSubType === 'gradient_flat') effectiveStyleCategory = 'Vector Art - Gradient Flat Design';
@@ -5400,8 +5492,11 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
 12. CRITICAL NEGATIVE PROMPT FORMAT: If you provide a negativePrompt, it MUST start with the prefix "Avoid: " followed by the list of forbidden elements.
 13. LANGUAGE CONSISTENCY: While all prompts must be in English, the styleExplanation must be in Indonesian.
 14. OPTIONALITY: Jika tidak ada elemen yang benar-benar relevan atau dibutuhkan (khususnya untuk negativePrompt), jangan memaksakan untuk membuatnya (biarkan kosong). Hindari teks placeholder.
-`+
-`15. STICKER PREVENTION: Khusus untuk gaya gaya yang BUKAN Sticker, jangan buat detail border atau die-cut.`;
+15. STICKER PREVENTION: Khusus untuk gaya gaya yang BUKAN Sticker, jangan buat detail border atau die-cut.
+16. PROMPT ARCHITECTURE & VISUAL FIDELITY EXCELLENCE:
+    Structure every single generated prompt with high descriptive fidelity and natural prose:
+    [Clear Style / Medium Anchor] -> [Core Subject with hyper-specific distinct action or stylized pose] -> [Tactile Physical Materials, Surface Textures & Micro-details] -> [Lighting Architecture & Color Harmony] -> [Framing, Camera Perspective & Balanced Commercial Negative Space].
+    Make the language sophisticated, immersive, and vivid without robotic keyword repetition. Every variation must read like an art-directed prompt masterpiece ready for production.`;
 
   const responseSchema = {
     type: Type.OBJECT,
