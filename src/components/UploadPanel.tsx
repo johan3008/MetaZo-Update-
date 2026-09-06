@@ -72,24 +72,17 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
   const theme = getToolTheme();
 
   return (
-    <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-white/10 rounded-3xl shadow-xl shadow-black/5 flex flex-col min-h-[500px] relative overflow-hidden transition-all duration-300 hover:shadow-2xl hover:border-violet-500/20 ${
+    <div className={`bg-white dark:bg-[#111827] border-[2px] border-[#e3e6f0]/80 dark:border-white/5 rounded-[2rem] shadow-xl shadow-black/5 flex flex-col justify-between min-h-[460px] relative overflow-hidden transition-all duration-300 hover:shadow-2xl ${
       mobileTab === 'upload' ? 'flex animate-in fade-in slide-in-from-bottom-5 duration-300' : 'hidden lg:flex'
     }`}>
-      {/* Top Accent Gradient Line */}
-      <div className={`h-1 w-full bg-gradient-to-r ${
-        activeTool === ToolType.IMAGE ? 'from-violet-500 via-indigo-500 to-purple-500' :
-        activeTool === ToolType.VIDEO ? 'from-purple-500 via-fuchsia-500 to-pink-500' :
-        'from-emerald-500 via-teal-500 to-cyan-500'
-      }`} />
-
       {/* CARD HEADER */}
-      <div className="bg-slate-50/80 dark:bg-slate-850/60 py-4 px-6 border-b border-slate-200/70 dark:border-white/5 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-md shadow-violet-500/30">
-            01
+      <div className="bg-[#f8f9fc] dark:bg-slate-900 py-3.5 px-5 border-b border-[#e3e6f0]/60 dark:border-white/5 rounded-t-lg flex justify-between items-center">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-6.5 h-6.5 rounded-2xl bg-[#7c3aed] text-white flex items-center justify-center font-black text-xs shadow-md shadow-black/5">
+            1
           </div>
           <div className="flex items-center gap-2">
-            <h3 className="m-0 font-black text-slate-800 dark:text-white text-xs sm:text-sm uppercase tracking-wider">
+            <h3 className="m-0 font-extrabold text-[#7c3aed] dark:text-violet-400 text-xs sm:text-sm uppercase tracking-wider">
               {t.upload_title}
             </h3>
             <HelpIcon title={t.upload_help} />
