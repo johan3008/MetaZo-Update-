@@ -23,21 +23,30 @@ const initFFmpeg = async () => {
                 }
             });
             
-            if (cachedCoreURL && cachedWasmURL) {
-                await ffmpeg.load({
-                    coreURL: cachedCoreURL,
-                    wasmURL: cachedWasmURL,
-                });
-            } else {
-                const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-                await ffmpeg.load({
-                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-                });
-            }
+            const loadTask = (async () => {
+                if (cachedCoreURL && cachedWasmURL) {
+                    await ffmpeg!.load({
+                        coreURL: cachedCoreURL,
+                        wasmURL: cachedWasmURL,
+                    });
+                } else {
+                    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+                    await ffmpeg!.load({
+                        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                    });
+                }
+            })();
+
+            const timeoutTask = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error("FFmpeg WASM loading timed out (25s network limit)")), 25000)
+            );
+
+            await Promise.race([loadTask, timeoutTask]);
         } catch (err) {
             console.error("Failed to init FFmpeg:", err);
             ffmpeg = null;
+            initPromise = null;
             throw err;
         }
     })();
@@ -62,7 +71,6 @@ self.onmessage = async (e: MessageEvent) => {
     
     try {
         self.postMessage({ type: 'progress', message: 'Loading FFmpeg...', id });
-        // Pastikan FFmpeg benar-benar selesai di-load sebelum lanjut
         await initFFmpeg();
         
         if (!ffmpeg || !ffmpeg.loaded) throw new Error("FFmpeg failed to initialize");
@@ -75,13 +83,15 @@ self.onmessage = async (e: MessageEvent) => {
         // Get duration
         let duration = 0;
         const logHandler = ({ message }: { message: string }) => {
-            const match = message.match(/Duration: (\d+):(\d+):(\d+\.\d+)/);
+            const match = message.match(/Duration:\s*(\d+):(\d+):(\d+\.\d+)/);
             if (match) {
                 duration = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseFloat(match[3]);
             }
         };
         ffmpeg.on('log', logHandler);
-        await ffmpeg.exec(['-i', inputName]);
+        try {
+            await ffmpeg.exec(['-i', inputName]);
+        } catch (_) {}
         ffmpeg.off('log', logHandler);
         
         if (duration === 0) {
@@ -90,22 +100,21 @@ self.onmessage = async (e: MessageEvent) => {
         
         const seekTimes = [
             duration * 0.1,
-            duration * 0.25,
             duration * 0.5,
-            duration * 0.75,
             Math.max(0, duration - 0.5)
         ];
-        const frameWidth = 1280;
+        const frameWidth = 640;
         const framesBlobs: Blob[] = [];
         
         for (let i = 0; i < seekTimes.length; i++) {
             const time = seekTimes[i];
             const outName = `out_${id}_${i}.jpg`;
+            self.postMessage({ type: 'progress', message: `Rendering frame ${i+1}/${seekTimes.length}...`, id });
             await ffmpeg.exec([
                 '-ss', time.toString(),
                 '-i', inputName,
                 '-vframes', '1',
-                '-q:v', '2',
+                '-q:v', '3',
                 '-vf', `scale=${frameWidth}:-1`,
                 outName
             ]);
