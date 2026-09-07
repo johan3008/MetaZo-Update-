@@ -3579,6 +3579,14 @@ function getAIClient() {
   return {
     models: {
       generateContent: async (params) => {
+        if (params && params.model) {
+          let clean = params.model.replace(/^models\//, '');
+          if (clean === 'gemini-2.5-pro' || clean === 'gemini-2.0-pro' || clean === 'gemini-1.5-pro' || clean === 'gemini-pro') {
+            params.model = 'gemini-3.1-pro-preview';
+          } else if (clean === 'gemini-1.5-flash') {
+            params.model = 'gemini-2.5-flash';
+          }
+        }
         const store = apiKeyStorage.getStore();
         const provider = store && store.provider || "gemini";
         if (NON_GEMINI_PROVIDERS.has(provider) && (!params.model?.startsWith("gemini-") && !params.model?.startsWith("gemma-"))) {
@@ -3610,7 +3618,15 @@ function getAIClient() {
             key = keysList[activeIndex] || keysList[0];
           }
         }
+        const normalizeGeminiModel = (m) => {
+          if (!m) return 'gemini-2.5-flash';
+          let clean = m.replace(/^models\//, '');
+          if (clean === 'gemini-2.5-pro' || clean === 'gemini-1.5-pro' || clean === 'gemini-pro') return 'gemini-3.1-pro-preview';
+          if (clean === 'gemini-1.5-flash') return 'gemini-2.5-flash';
+          return clean;
+        };
         const runGeminiDirectFetch = async (keyToUse, params2) => {
+          if (params2 && params2.model) params2.model = normalizeGeminiModel(params2.model);
           const model = params2.model || "gemini-2.5-flash";
           const cleanModel = model.startsWith("models/") ? model : `models/${model}`;
           const url = `https://generativelanguage.googleapis.com/v1beta/${cleanModel}:generateContent?key=${keyToUse}`;
@@ -3677,6 +3693,11 @@ function getAIClient() {
           });
           if (!response.ok) {
             const errText = await response.text();
+            if ((response.status === 404 || errText.includes('NOT_FOUND') || errText.includes('no longer available')) && cleanModel !== 'models/gemini-3.1-pro-preview' && cleanModel !== 'models/gemini-2.5-flash') {
+              console.warn(`[Gemini Direct Fetch] Model ${cleanModel} returned ${response.status}. Auto-retrying with gemini-3.1-pro-preview...`);
+              const retryParams = { ...params2, model: 'gemini-3.1-pro-preview' };
+              return await runGeminiDirectFetch(keyToUse, retryParams);
+            }
             throw new Error(`Gemini Direct Fetch Failed (${response.status}): ${errText}`);
           }
           const resJson = await response.json();
@@ -4525,8 +4546,8 @@ var generateStockMetadata = async (frames, keywordCount, customPrompt = "", tool
   const provider = store && store.provider || "gemini";
   let activeModel = model;
   if (provider === "gemini" || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === "gemini-2.5-pro" || activeModel === "gemini-2.5-flash") {
-      activeModel = aiModelPerformance === "speed" ? "gemini-2.5-flash" : "gemini-2.5-pro";
+    if (!activeModel || activeModel === "gemini-3.1-pro-preview" || activeModel === "gemini-2.5-flash") {
+      activeModel = aiModelPerformance === "speed" ? "gemini-2.5-flash" : "gemini-3.1-pro-preview";
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -4571,7 +4592,7 @@ Generate a balanced mix of single words and 2-4 word natural search phrases. DO 
   let visualFactsJson = "";
   console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 \u2014 Gemini Vision (Visual Facts Detection)...`);
   const mediaTypeContext = directives.mediaTypeContext;
-  const fallbackGeminiModel = aiModelPerformance === "speed" ? "gemini-2.5-flash" : "gemini-2.5-pro";
+  const fallbackGeminiModel = aiModelPerformance === "speed" ? "gemini-2.5-flash" : "gemini-3.1-pro-preview";
   const visionModelToUse = activeModel && activeModel.startsWith("gemini-") ? activeModel : fallbackGeminiModel;
   const visionSystemInstruction = `ROLE:
 You are a Visual Metadata Analyzer.
@@ -5104,8 +5125,8 @@ var generateBatchStockMetadata = async (items, keywordCount, customPrompt = "", 
   const seasonalEventKeywordContext = getSeasonalEventKeywordContext(metadataLanguage);
   let activeModel = model;
   if (provider === "gemini" || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === "gemini-2.5-pro" || activeModel === "gemini-2.5-flash") {
-      activeModel = aiModelPerformance === "speed" ? "gemini-2.5-flash" : "gemini-2.5-pro";
+    if (!activeModel || activeModel === "gemini-3.1-pro-preview" || activeModel === "gemini-2.5-flash") {
+      activeModel = aiModelPerformance === "speed" ? "gemini-2.5-flash" : "gemini-3.1-pro-preview";
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -5135,7 +5156,7 @@ Generate a balanced mix of single words and 2-4 word natural search phrases. DO 
   }
   let visualDescriptions = [];
   let parsedVisualFactsList = [];
-  const fallbackGeminiModel = aiModelPerformance === "speed" ? "gemini-2.5-flash" : "gemini-2.5-pro";
+  const fallbackGeminiModel = aiModelPerformance === "speed" ? "gemini-2.5-flash" : "gemini-3.1-pro-preview";
   const visionModelToUse = activeModel && activeModel.startsWith("gemini-") ? activeModel : fallbackGeminiModel;
   console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 \u2014 Gemini Vision (Visual Facts Detection)...`);
   for (let i = 0; i < items.length; i++) {
@@ -6059,7 +6080,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     },
     required: ["prompts", "negativePrompt", "styleExplanation"]
   };
-  const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-flash-latest"];
+  const modelsToTry = ["gemini-2.5-flash", "gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-flash-latest"];
   let lastError = null;
   const safetySettings = [
     { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
@@ -6665,7 +6686,7 @@ CRITICAL OUTPUT FORMAT:
     required: ["prompts", "description"]
   };
   const imagePart = processFrameServer(image);
-  const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash"];
+  const modelsToTry = ["gemini-2.5-flash", "gemini-3.1-pro-preview", "gemini-2.5-flash"];
   let lastError;
   let responseText = "";
   const modelsToTryList = model && model.startsWith("gemini") ? [model, ...modelsToTry] : modelsToTry;
@@ -7616,7 +7637,7 @@ Output strictly in JSON format.`;
     }
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-2.5-pro", `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination. Use Google Search if necessary to find current and real-time trending events.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination. Use Google Search if necessary to find current and real-time trending events.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -7626,7 +7647,7 @@ Output strictly in JSON format.`;
       responseText = res.text || "{}";
     } catch (err) {
       try {
-        const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-2.5-pro", `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination.`, {
+        const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination.`, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
@@ -7752,7 +7773,7 @@ Rules:
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-2.5-pro", `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST use Google Search to find the absolute latest, real-time trending tags and aesthetics for this event happening right now. Ensure every keyword is extremely short (max 1-3 words).`, {
+      const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST use Google Search to find the absolute latest, real-time trending tags and aesthetics for this event happening right now. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -7761,7 +7782,7 @@ Rules:
       }, 1);
       responseText = res.text || "{}";
     } catch (err) {
-      const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-2.5-pro", `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST provide the absolute latest and most current trending keywords in the market right now. Ensure every keyword is extremely short (max 1-3 words).`, {
+      const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST provide the absolute latest and most current trending keywords in the market right now. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -7830,7 +7851,7 @@ Existing Keywords: ${existingKeywords.join(", ")}`;
       model
     });
   } else {
-    const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-2.5-pro", promptContents, {
+    const res = await callGeminiWithRetry(model && model.startsWith("gemini") ? model : "gemini-3.1-pro-preview", promptContents, {
       systemInstruction,
       responseMimeType: "application/json",
       responseSchema,
@@ -8279,7 +8300,7 @@ ${h.map((m) => `${m.role}: ${m.content}`).join("\n")}`);
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model?.startsWith("gemini") ? model : "gemini-2.5-pro", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
+      const res = await callGeminiWithRetry(model?.startsWith("gemini") ? model : "gemini-3.1-pro-preview", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
       responseText = res.text || "{}";
     } catch (err) {
       const res = await callGeminiWithRetry("gemini-2.5-flash", fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
@@ -9867,6 +9888,74 @@ app.post("/api/extract-exif", upload.single("file"), async (req, res) => {
   } catch (e) {
     console.warn("[ExifTool API] Error extracting EXIF:", e);
     res.status(500).json({ error: e.message || "Error extracting EXIF" });
+  } finally {
+    cleanupFn();
+  }
+});
+
+app.post("/api/extract-video-frames", upload.single("file"), async (req, res) => {
+  let tempFilePath = "";
+  let cleanupFn = () => {};
+  try {
+    let filePath = "";
+    if (req.file) {
+      filePath = req.file.path;
+      tempFilePath = filePath;
+      cleanupFn = () => {
+        try { if (import_fs2.default.existsSync(filePath)) import_fs2.default.unlinkSync(filePath); } catch (e) {}
+      };
+    } else if (req.body.fileUrl) {
+      const { fileUrl, pathKey } = req.body;
+      const downloadResult = await downloadFileFromStorage(fileUrl, pathKey, ".mp4");
+      filePath = downloadResult.localPath;
+      tempFilePath = filePath;
+      cleanupFn = downloadResult.cleanup;
+    } else {
+      return res.status(400).json({ error: "No video file provided" });
+    }
+
+    console.log(`[Video Frame Extraction] Processing video: ${filePath}`);
+    const outDir = import_path.default.join(uploadDir, `frames_${Date.now()}_${Math.random().toString(36).substring(7)}`);
+    import_fs2.default.mkdirSync(outDir, { recursive: true });
+
+    let frames = [];
+    try {
+      if (ffmpeg) {
+        frames = await new Promise((resolve, reject) => {
+          ffmpeg(filePath).screenshots({
+            count: 3,
+            folder: outDir,
+            size: "640x?",
+            filename: "frame-%i.jpg"
+          }).on("end", () => {
+            try {
+              const files = import_fs2.default.readdirSync(outDir).filter(f => f.endsWith(".jpg")).sort();
+              const b64List = files.map(f => `data:image/jpeg;base64,${import_fs2.default.readFileSync(import_path.default.join(outDir, f), "base64")}`);
+              resolve(b64List);
+            } catch (e) {
+              reject(e);
+            }
+          }).on("error", (err) => {
+            reject(err);
+          });
+        });
+      }
+    } catch (ffmpegErr) {
+      console.warn("[Video Frame Extraction] fluent-ffmpeg screenshots note:", ffmpegErr);
+    }
+
+    try {
+      import_fs2.default.rmSync(outDir, { recursive: true, force: true });
+    } catch (_) {}
+
+    if (!frames || frames.length === 0) {
+      return res.status(500).json({ error: "FFmpeg failed to extract frames from video" });
+    }
+
+    res.json({ success: true, frames });
+  } catch (err) {
+    console.error("[Video Frame Extraction] Error:", err);
+    res.status(500).json({ error: err.message || "Video frame extraction failed" });
   } finally {
     cleanupFn();
   }
