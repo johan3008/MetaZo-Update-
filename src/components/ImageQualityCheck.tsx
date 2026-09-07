@@ -1554,16 +1554,36 @@ export const ImageQualityCheck: React.FC<{
                     <div className="mt-6 flex-1 space-y-6">
                       {/* Detailed Feedback (Prominent if Fail) */}
                       {!isPassed && (
-                        <div className="bg-rose-500/5 border border-rose-500/10 p-4 rounded-2xl">
-                           <div className="flex items-center gap-2 mb-2">
-                             <Info size={12} className="text-rose-500" />
-                             <p className="text-[10px] font-black text-rose-500 uppercase tracking-tight">{t.qc_rejection_reason}</p>
+                        <div className="bg-rose-500/5 border border-rose-500/15 p-4 rounded-2xl space-y-3">
+                           <div>
+                             <div className="flex items-center gap-2 mb-1.5">
+                               <Info size={12} className="text-rose-500" />
+                               <p className="text-[10px] font-black text-rose-500 uppercase tracking-tight">{t.qc_rejection_reason}</p>
+                             </div>
+                             <p className="text-[11px] font-bold text-rose-700 dark:text-rose-300 leading-relaxed italic">
+                               {r.detailed_feedback}
+                             </p>
                            </div>
-                           <p className="text-[11px] font-bold text-rose-700 dark:text-rose-300 leading-relaxed italic">
-                             {r.detailed_feedback}
-                           </p>
+
+                           {/* Rekomendasi Solusi & Tindakan Kurasi (Actionable Fix Advice) */}
+                           <div className="p-3 bg-white/70 dark:bg-slate-900/70 rounded-xl border border-rose-200/50 dark:border-rose-900/30">
+                             <div className="flex items-center gap-1.5 mb-1 text-amber-600 dark:text-amber-400">
+                               <Sparkles size={12} />
+                               <p className="text-[9.5px] font-black uppercase tracking-wider">
+                                 {t.language === 'Bahasa' ? 'Panduan Perbaikan Sebelum Re-upload' : 'Actionable Fix Before Re-upload'}
+                               </p>
+                             </div>
+                             <p className="text-[10px] text-slate-700 dark:text-slate-300 leading-relaxed">
+                               {r.detailed_feedback?.toLowerCase().includes('inpaint') || r.detailed_feedback?.toLowerCase().includes('fill') || r.detailed_feedback?.toLowerCase().includes('hapus')
+                                 ? r.detailed_feedback
+                                 : (t.language === 'Bahasa' 
+                                     ? 'Gunakan Generative Fill / Inpainting di Photoshop untuk merapikan area anomali, hilangkan teks semu / logo tersembunyi, lalu lakukan sedikit unsharp mask atau denoise jika perlu sebelum submit kembali.'
+                                     : 'Use Generative Fill / Inpainting in Photoshop to repair anomalous structures, eliminate gibberish text or residual logos, and apply moderate unsharp mask / denoise before resubmitting.')}
+                             </p>
+                           </div>
+
                            {Array.isArray(r.technical_issues) && r.technical_issues.length > 0 && (
-                             <div className="mt-3 pt-3 border-t border-rose-500/10 flex flex-wrap gap-1.5">
+                             <div className="pt-2 border-t border-rose-500/10 flex flex-wrap gap-1.5">
                                {r.technical_issues.map((issue: string, idx: number) => (
                                  <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[9px] font-bold">
                                    ⚠️ {issue}
