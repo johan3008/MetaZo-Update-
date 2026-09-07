@@ -765,23 +765,20 @@ const extractVideoWithWorker = async (file: File): Promise<string[]> => {
         
         const currentId = ++videoWorkerJobId;
         
-        // Timeout to kill worker if it hangs (5 minutes for video)
+        // Timeout to kill worker if it hangs (45 seconds limit per video job)
         let timeoutId = setTimeout(() => {
             if (sharedVideoWorker) {
                 sharedVideoWorker.terminate();
-                sharedVideoWorker = null; // Force recreate next time
+                sharedVideoWorker = null;
             }
             releaseWorker();
-            reject(new Error("Video Worker timed out (Initial)"));
-        }, 300000);
+            reject(new Error("Video Worker timed out (No progress after 45s)"));
+        }, 45000);
 
         const messageHandler = (e: MessageEvent) => {
             if (e.data.id !== currentId) return; // Ignore messages from other jobs
             
             if (e.data.type === 'progress') {
-                // Reset timeout on progress.
-                // Saat background tab, proses FFmpeg bisa lebih lambat,
-                // tapi selama masih ada progress, kita beri waktu tambahan 5 menit per progress.
                 clearTimeout(timeoutId);
                 timeoutId = setTimeout(() => {
                     if (sharedVideoWorker) {
@@ -789,8 +786,8 @@ const extractVideoWithWorker = async (file: File): Promise<string[]> => {
                         sharedVideoWorker = null;
                     }
                     releaseWorker();
-                    reject(new Error("Video Worker timed out (No progress)"));
-                }, 300000);
+                    reject(new Error("Video Worker timed out (No progress after 45s)"));
+                }, 45000);
                 return;
             }
             
@@ -811,7 +808,6 @@ const extractVideoWithWorker = async (file: File): Promise<string[]> => {
                 releaseWorker();
                 resolve(frameUrls);
             } else {
-                // KILL WORKER ON ERROR TO PREVENT POISONING NEXT JOBS
                 if (sharedVideoWorker) {
                     sharedVideoWorker.terminate();
                     sharedVideoWorker = null;
@@ -841,102 +837,57 @@ const extractVideoWithWorker = async (file: File): Promise<string[]> => {
 
 const extractVideoNative = async (file: File): Promise<string[]> => {
     return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
         const video = document.createElement('video');
         video.muted = true;
         video.playsInline = true;
-        video.autoplay = true;
-        video.preload = 'auto'; // Help it load faster
+        video.preload = 'auto';
         
-        // --- TRIK LICIK 2: ATTACH KE DOM (TERSEMBUNYI) ---
-        // Browser sering men-throttle video yang tidak ada di DOM.
-        // Kita tempelkan ke body tapi sembunyikan sepenuhnya.
+        // Sembunyikan elemen di DOM agar browser tidak membekukan decoding
         video.style.position = 'fixed';
         video.style.top = '-9999px';
+        video.style.left = '-9999px';
+        video.style.width = '1px';
+        video.style.height = '1px';
         video.style.opacity = '0';
+        video.style.pointerEvents = 'none';
         document.body.appendChild(video);
-        
-        // --- TRIK LICIK: ANTI-THROTTLING BACKGROUND TAB ---
-        // Hubungkan video ke Web Audio API dengan volume 0.
-        // Tambahkan juga Oscillator (suara buatan) agar browser mengira tab ini
-        // sedang memutar musik secara aktif, sehingga proses decoding video
-        // tidak akan pernah dibekukan meskipun video aslinya tidak bersuara (bisu).
-        let audioCtx: AudioContext | null = null;
-        let audioSource: MediaElementAudioSourceNode | null = null;
-        let gainNode: GainNode | null = null;
-        let oscillator: OscillatorNode | null = null;
-        
-        try {
-            audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            
-            // 1. Hubungkan video ke audio context
-            audioSource = audioCtx.createMediaElementSource(video);
-            
-            // 2. Buat suara buatan (nada beep)
-            oscillator = audioCtx.createOscillator();
-            oscillator.type = 'sine';
-            oscillator.frequency.value = 440;
-            
-            // 3. Mute total keduanya
-            gainNode = audioCtx.createGain();
-            gainNode.gain.value = 0; 
-            
-            audioSource.connect(gainNode);
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            
-            oscillator.start();
-            
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume().catch(() => {});
-            }
-        } catch (e) {
-            console.warn("AudioContext trick failed", e);
-        }
-        // --------------------------------------------------
         
         let isResolved = false;
         const cleanup = () => {
-            video.pause();
-            video.removeAttribute('src');
-            video.load();
-            
-            // Hapus dari DOM
             if (video.parentNode) {
                 video.parentNode.removeChild(video);
             }
-            
-            // Bersihkan AudioContext
-            if (oscillator) {
-                try { oscillator.stop(); } catch(e){}
-                oscillator.disconnect();
-            }
-            if (audioSource) audioSource.disconnect();
-            if (gainNode) gainNode.disconnect();
-            if (audioCtx && audioCtx.state !== 'closed') {
-                audioCtx.close().catch(() => {});
-            }
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            URL.revokeObjectURL(url);
         };
 
-        const timeoutId = setTimeout(() => {
+        const overallTimeout = setTimeout(() => {
             if (!isResolved) {
                 isResolved = true;
                 cleanup();
-                reject(new Error("Native video extraction timed out"));
+                reject(new Error("Native video extraction timed out (30s overall limit)"));
             }
-        }, document.hidden ? 120000 : 15000); // ADAPTIVE TIME BOMB
+        }, 30000);
 
         video.onloadedmetadata = async () => {
             try {
                 const duration = video.duration;
-                if (!duration || duration === Infinity) throw new Error("Invalid duration");
+                if (!duration || isNaN(duration) || duration === Infinity) {
+                    throw new Error("Invalid video duration");
+                }
                 
-                const frameWidth = 320;
-                const frameHeight = Math.floor(frameWidth * (video.videoHeight / video.videoWidth));
+                const frameWidth = 480;
+                const vWidth = video.videoWidth || 640;
+                const vHeight = video.videoHeight || 360;
+                const frameHeight = Math.max(1, Math.floor(frameWidth * (vHeight / vWidth)));
 
                 const seekTimes = [
-                    duration * 0.1, // Start (10%)
-                    duration * 0.5, // Middle (50%)
-                    duration * 0.9  // End (90%)
+                    Math.max(0.1, duration * 0.1),
+                    Math.max(0.5, duration * 0.5),
+                    Math.max(0.9, Math.min(duration - 0.2, duration * 0.85))
                 ];
                 const extractedFrames: string[] = [];
 
@@ -945,15 +896,26 @@ const extractVideoNative = async (file: File): Promise<string[]> => {
                     video.currentTime = time;
                     
                     await new Promise<void>((res, rej) => {
+                        let seekTimer: any;
                         const onSeeked = () => {
+                            clearTimeout(seekTimer);
                             video.removeEventListener('seeked', onSeeked);
+                            video.removeEventListener('error', onErr);
                             res();
                         };
-                        video.addEventListener('seeked', onSeeked);
-                        setTimeout(() => {
+                        const onErr = () => {
+                            clearTimeout(seekTimer);
                             video.removeEventListener('seeked', onSeeked);
-                            rej(new Error("Seek timeout"));
-                        }, document.hidden ? 60000 : 10000); // ADAPTIVE TIME BOMB FOR SEEK
+                            video.removeEventListener('error', onErr);
+                            rej(new Error("Video seek error"));
+                        };
+                        video.addEventListener('seeked', onSeeked);
+                        video.addEventListener('error', onErr);
+                        seekTimer = setTimeout(() => {
+                            video.removeEventListener('seeked', onSeeked);
+                            video.removeEventListener('error', onErr);
+                            rej(new Error("Seek timeout (12s per frame)"));
+                        }, 12000);
                     });
 
                     const canvas = document.createElement('canvas');
@@ -962,19 +924,23 @@ const extractVideoNative = async (file: File): Promise<string[]> => {
                     const ctx = canvas.getContext('2d');
                     if (ctx) {
                         ctx.drawImage(video, 0, 0, frameWidth, frameHeight);
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
                         extractedFrames.push(dataUrl);
                     }
                 }
                 
+                if (extractedFrames.length === 0) {
+                    throw new Error("No frames extracted natively");
+                }
+                
                 isResolved = true;
-                clearTimeout(timeoutId);
+                clearTimeout(overallTimeout);
                 cleanup();
                 resolve(extractedFrames);
             } catch (err) {
                 if (!isResolved) {
                     isResolved = true;
-                    clearTimeout(timeoutId);
+                    clearTimeout(overallTimeout);
                     cleanup();
                     reject(err);
                 }
@@ -984,25 +950,69 @@ const extractVideoNative = async (file: File): Promise<string[]> => {
         video.onerror = () => {
             if (!isResolved) {
                 isResolved = true;
-                clearTimeout(timeoutId);
+                clearTimeout(overallTimeout);
                 cleanup();
-                reject(new Error("Video load error"));
+                reject(new Error("Browser cannot decode this video natively"));
             }
         };
 
-        video.src = URL.createObjectURL(file);
+        video.src = url;
     });
 };
 
+const extractVideoServer = async (file: File): Promise<string[]> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`/api/extract-video-frames?t=${Date.now()}`, {
+        method: 'POST',
+        body: formData
+    });
+    
+    if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || `Server extraction failed with status ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (data.success && Array.isArray(data.frames) && data.frames.length > 0) {
+        return data.frames;
+    }
+    
+    throw new Error("Server returned no video frames");
+};
+
 const extractVideoHybrid = async (file: File): Promise<string[]> => {
+    // 1. Coba ekstraksi cepat via Hardware Acceleration browser (langsung, tanpa upload untuk MP4/WebM standar)
     try {
         console.log(`[${file.name}] Trying native hardware-accelerated extraction...`);
         const frames = await extractVideoNative(file);
-        console.log(`[${file.name}] Native extraction successful.`);
-        return frames;
-    } catch (err) {
-        console.warn(`[${file.name}] Native extraction failed or timed out. Falling back to FFmpeg Worker as secondary solution...`, err);
+        if (frames && frames.length > 0) {
+            console.log(`[${file.name}] Native extraction successful (${frames.length} frames).`);
+            return frames;
+        }
+    } catch (err: any) {
+        console.warn(`[${file.name}] Native extraction failed or timed out (${err?.message || err}). Falling back to Server FFmpeg...`);
+    }
+
+    // 2. Coba Server-side FFmpeg (andal 100% untuk semua format video: ProRes MOV, HEVC, dll.)
+    try {
+        console.log(`[${file.name}] Trying server-side FFmpeg extraction...`);
+        const serverFrames = await extractVideoServer(file);
+        if (serverFrames && serverFrames.length > 0) {
+            console.log(`[${file.name}] Server FFmpeg extraction successful (${serverFrames.length} frames).`);
+            return serverFrames;
+        }
+    } catch (serverErr: any) {
+        console.warn(`[${file.name}] Server FFmpeg extraction failed (${serverErr?.message || serverErr}). Falling back to Worker...`);
+    }
+
+    // 3. Fallback terakhir ke FFmpeg Worker client-side
+    try {
         return await extractVideoWithWorker(file);
+    } catch (workerErr: any) {
+        console.warn(`[${file.name}] Worker extraction failed:`, workerErr);
+        throw new Error(`Gagal memproses video (${file.name}): Format video tidak didukung atau pemrosesan gagal.`);
     }
 };
 

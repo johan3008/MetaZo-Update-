@@ -1578,6 +1578,104 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+    app.post('/api/extract-video-frames', upload.single('file'), async (req, res) => {
+        let tempFilePath = "";
+        let cleanupFn = () => {};
+        try {
+            let filePath = "";
+            if (req.file) {
+                filePath = req.file.path;
+                tempFilePath = filePath;
+                cleanupFn = () => {
+                    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) {}
+                };
+            } else if (req.body.fileUrl) {
+                const { fileUrl, pathKey } = req.body;
+                const downloadResult = await downloadFileFromStorage(fileUrl, pathKey, '.mp4');
+                filePath = downloadResult.localPath;
+                tempFilePath = filePath;
+                cleanupFn = downloadResult.cleanup;
+            } else {
+                return res.status(400).json({ error: 'No video file provided' });
+            }
+
+            console.log(`[Video Frame Extraction] Processing video: ${filePath}`);
+            
+            // Get duration using ffmpeg
+            let duration = 5;
+            try {
+                const { stdout } = await util.promisify(exec)(`"${resolvedFfmpegPath}" -i "${filePath}" 2>&1`);
+                const match = stdout.match(/Duration:\s*(\d+):(\d+):(\d+\.\d+)/);
+                if (match) {
+                    duration = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseFloat(match[3]);
+                }
+            } catch (probeErr: any) {
+                const errOut = (probeErr.stdout || '') + (probeErr.stderr || '');
+                const match = errOut.match(/Duration:\s*(\d+):(\d+):(\d+\.\d+)/);
+                if (match) {
+                    duration = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseFloat(match[3]);
+                }
+            }
+            
+            if (isNaN(duration) || duration <= 0) duration = 5;
+            
+            const seekTimes = [
+                Math.max(0.1, duration * 0.1),
+                Math.max(0.5, duration * 0.5),
+                Math.max(0.9, Math.min(duration - 0.2, duration * 0.85))
+            ];
+            
+            const frames: string[] = [];
+            const tempDir = path.dirname(filePath);
+            const prefix = `frame_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+            
+            for (let i = 0; i < seekTimes.length; i++) {
+                const outPath = path.join(tempDir, `${prefix}_${i}.jpg`);
+                try {
+                    await util.promisify(exec)(
+                        `"${resolvedFfmpegPath}" -ss ${seekTimes[i].toFixed(2)} -i "${filePath}" -vframes 1 -vf "scale='min(640,iw)':-2" -q:v 3 -y "${outPath}"`,
+                        { timeout: 15000 }
+                    );
+                    if (fs.existsSync(outPath)) {
+                        const buffer = fs.readFileSync(outPath);
+                        frames.push(`data:image/jpeg;base64,${buffer.toString('base64')}`);
+                        try { fs.unlinkSync(outPath); } catch (e) {}
+                    }
+                } catch (frameErr: any) {
+                    console.warn(`[Video Frame Extraction] Failed to extract frame at ${seekTimes[i]}s:`, frameErr.message);
+                    try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch (e) {}
+                }
+            }
+            
+            if (frames.length === 0) {
+                // Fallback: extract single frame at start
+                const fallbackOut = path.join(tempDir, `${prefix}_fallback.jpg`);
+                try {
+                    await util.promisify(exec)(
+                        `"${resolvedFfmpegPath}" -i "${filePath}" -vframes 1 -vf "scale='min(640,iw)':-2" -q:v 3 -y "${fallbackOut}"`,
+                        { timeout: 15000 }
+                    );
+                    if (fs.existsSync(fallbackOut)) {
+                        const buffer = fs.readFileSync(fallbackOut);
+                        frames.push(`data:image/jpeg;base64,${buffer.toString('base64')}`);
+                        try { fs.unlinkSync(fallbackOut); } catch (e) {}
+                    }
+                } catch (fallbackErr) {}
+            }
+            
+            if (frames.length === 0) {
+                return res.status(500).json({ error: 'FFmpeg failed to extract any frames from video.' });
+            }
+            
+            res.json({ success: true, frames });
+        } catch (err: any) {
+            console.error('[Video Frame Extraction] Error:', err);
+            res.status(500).json({ error: err.message || 'Video frame extraction failed' });
+        } finally {
+            cleanupFn();
+        }
+    });
+
     app.post('/api/generate-metadata', async (req, res) => {
         try {
             const { frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata } = req.body;
