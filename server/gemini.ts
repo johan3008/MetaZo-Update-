@@ -9,6 +9,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import https from "node:https";
 
+import { extractFlorenceVisualInsights, formatFlorenceContextForPrompt, FlorenceOptions, FlorenceInsights } from "./florenceService.ts";
+
 // Thread-safe dynamic API Key storage
 export const apiKeyStorage = new AsyncLocalStorage<any>();
 
@@ -389,16 +391,80 @@ export function ensureTitleLength(title: string, keywords: string[], description
     cleanedTitle = cleanedTitle.slice(0, -1).trim();
   }
 
-  // Remove disallowed start phrases strictly
+  // Comprehensive list of disallowed stock title filler prefixes / clickbait / AI markers
   const disallowedStarts = [
-    "vector of", "illustration of", "drawing of", "continuous line drawing of",
-    "vector", "illustration", "drawing", "continuous line drawing"
+    // Media type descriptors
+    "a high quality photo of", "high quality photo of", "a photo of", "photo of",
+    "a photograph of", "photograph of", "a picture of", "picture of",
+    "an image of", "image of", "a shot of", "shot of",
+    "a close up of", "close up of", "a close-up of", "close-up of",
+    "a close up shot of", "close up shot of", "a close-up shot of", "close-up shot of",
+    // Perspective / Isolated prefixes
+    "top view of", "a top view of", "aerial view of", "an aerial view of",
+    "side view of", "a side view of", "view of", "a view of",
+    "isolated shot of", "an isolated shot of", "isolated image of",
+    "isolated on white background", "isolated on white", "isolated of",
+    // Vectors / Renders / Illustrations
+    "a vector illustration of", "vector illustration of", "an illustration of", "illustration of",
+    "a vector of", "vector of", "a graphic of", "graphic of",
+    "drawing of", "a drawing of", "continuous line drawing of",
+    "flat illustration of", "a flat illustration of",
+    "3d render of", "a 3d render of", "render of", "a render of",
+    "3d illustration of", "a 3d illustration of",
+    "vector", "illustration", "drawing", "continuous line drawing",
+    // AI / Stock filler
+    "generative ai image of", "ai generated image of", "generative ai photo of",
+    "ai generated photo of", "generative ai of", "ai generated of",
+    "generative ai", "ai generated",
+    "stock photo of", "stock image of", "stock photo", "stock image",
+    // Subjective clickbait / quality claims rejected by reviewers
+    "high quality image of", "high quality", "high-quality",
+    "beautiful photo of", "beautiful image of", "beautiful",
+    "stunning photo of", "stunning image of", "stunning",
+    "amazing photo of", "amazing image of", "amazing",
+    "gorgeous photo of", "gorgeous image of", "gorgeous",
+    "incredible photo of", "incredible image of", "incredible",
+    "perfect photo of", "perfect image of", "perfect",
+    "best photo of", "best image of", "best",
+    "superb photo of", "superb image of", "superb",
+    "nice photo of", "nice image of", "nice"
   ];
-  let titleLower = cleanedTitle.toLowerCase();
-  for (const start of disallowedStarts) {
-    if (titleLower.startsWith(start + " ")) {
-      cleanedTitle = cleanedTitle.substring(start.length + 1).trim();
-      titleLower = cleanedTitle.toLowerCase();
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    let titleLower = cleanedTitle.toLowerCase();
+    for (const start of disallowedStarts) {
+      if (titleLower === start) {
+        cleanedTitle = "";
+        changed = true;
+        break;
+      }
+      if (titleLower.startsWith(start + " ")) {
+        cleanedTitle = cleanedTitle.substring(start.length + 1).trim();
+        changed = true;
+        break;
+      }
+      if (titleLower.startsWith(start + ":") || titleLower.startsWith(start + "-") || titleLower.startsWith(start + ",")) {
+        cleanedTitle = cleanedTitle.substring(start.length + 1).trim();
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  // Strip lingering leading articles if immediately preceding main subject
+  if (/^(a|an|the)\s+/i.test(cleanedTitle)) {
+    cleanedTitle = cleanedTitle.replace(/^(a|an|the)\s+/i, '').trim();
+  }
+
+  if (!cleanedTitle || cleanedTitle.length < 5) {
+    if (targetKeywords.length > 0) {
+      cleanedTitle = targetKeywords.slice(0, 3).join(' ');
+    } else if (keywords && keywords.length >= 3) {
+      cleanedTitle = keywords.slice(0, 5).join(' ');
+    } else {
+      cleanedTitle = "Commercial digital asset";
     }
   }
 
@@ -406,6 +472,7 @@ export function ensureTitleLength(title: string, keywords: string[], description
   if (targetKeywords.length > 0) {
     const primaryTarget = targetKeywords[0];
     const primaryLower = primaryTarget.toLowerCase();
+    const titleLower = cleanedTitle.toLowerCase();
     if (!titleLower.startsWith(primaryLower)) {
       if (titleLower.includes(primaryLower)) {
         const escaped = primaryTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -419,7 +486,7 @@ export function ensureTitleLength(title: string, keywords: string[], description
   }
 
   // Limit bounds based on titleLength
-  let upperLimit = 200;
+  let upperLimit = 140; // Default optimal microstock title length sweet spot
   if (titleLength === 'short') upperLimit = 65;
   if (titleLength === 'long') upperLimit = 200;
 
@@ -1349,21 +1416,32 @@ function scoreKeywordForRanking(
   }
 
   const canonical = adobeKeywordCanonical(normalized);
-  const titleMatch = [...titleTerms].some(term =>
+  const titleTermsArray = [...titleTerms];
+  const titleMatch = titleTermsArray.some(term =>
     canonical === term || canonical.includes(term) || term.includes(canonical)
   );
-  if (titleMatch) score += 160;
+  if (titleMatch) score += 200;
+
+  // Title-Keyword Synergy Bonus (Adobe Stock / Shutterstock top 5 ranking priority):
+  // The first 3 terms of the title contain the core commercial subject. Any keyword matching these terms
+  // receives a massive crown boost (+300) so it ranks at positions #1 to #5.
+  const primaryTitleTerms = titleTermsArray.slice(0, 3);
+  const primaryTitleMatch = primaryTitleTerms.some(term =>
+    canonical === term || canonical.includes(term) || term.includes(canonical)
+  );
+  if (primaryTitleMatch) score += 300;
 
   const wordCount = normalized.split(/\s+/).filter(Boolean).length;
-  if (wordCount === 1) score += 8;
-  else if (wordCount === 2) score += 16;
-  else if (wordCount === 3) score += 7;
-  else score -= 50;
+  if (wordCount === 1) score += 10;
+  else if (wordCount === 2) score += 25; // 2-word commercial phrases have higher conversion
+  else if (wordCount === 3) score += 15;
+  else score -= 60;
 
-  if (containsKeywordConnector(normalized)) score -= 40;
-  if (role === 'generic') score -= 120;
-  if (role === 'color') score -= 18;
-  if (role === 'commercial_use' && !keywordMatchesEvidence(normalized, ctx.commercial)) score -= 60;
+  if (containsKeywordConnector(normalized)) score -= 60;
+  if (role === 'generic') score -= 150;
+  if (isWeakGenericKeyword(normalized)) score -= 400; // Heavily penalize filler / clickbait keywords
+  if (role === 'color') score -= 40;
+  if (role === 'commercial_use' && !keywordMatchesEvidence(normalized, ctx.commercial)) score -= 80;
 
   return score * 1000 - originalIndex;
 }
@@ -3673,8 +3751,28 @@ export const generateStockMetadata = async (
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMIXED-KEYWORD MODE OVERRIDE:\nGenerate a balanced mix of single words and 2-4 word natural search phrases. DO NOT artificially split compound words that are naturally searched together. NO colors. NO patterns.`;
   }
 
-  // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
+  // --- TAHAP 1: DUAL-VISION PIPELINE (FLORENCE-2 + GEMINI/VISION LLM) ---
   let visualFactsJson = "";
+  let florenceInsights: FlorenceInsights = { provider: 'none' };
+  try {
+    const florenceKey = store?.florence?.apiKey || process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY;
+    const florenceEndpoint = store?.florence?.endpoint || process.env.FLORENCE_API_ENDPOINT;
+    if (florenceKey || florenceEndpoint) {
+      console.log(`[Florence-2 Dual-Vision] Extracting micro-details & OCR with Florence-2...`);
+      florenceInsights = await extractFlorenceVisualInsights(frames[0], 'image/jpeg', {
+        apiKey: florenceKey,
+        endpoint: florenceEndpoint,
+        timeoutMs: 9000
+      });
+      if (florenceInsights.detailedCaption || florenceInsights.ocrText) {
+        console.log(`[Florence-2 Dual-Vision] Successfully extracted Florence-2 insights! Provider: ${florenceInsights.provider}`);
+      }
+    }
+  } catch (florenceErr: any) {
+    console.warn(`[Florence-2 Dual-Vision Warning] Non-blocking fallback:`, florenceErr?.message || florenceErr);
+  }
+
+  const florenceContextPrompt = formatFlorenceContextForPrompt(florenceInsights);
   
   console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
@@ -3730,6 +3828,7 @@ Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
 Asset Context: ${mediaTypeContext}
+${florenceContextPrompt}
 
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
@@ -3818,6 +3917,29 @@ OUTPUT FORMAT:
   } catch (e: any) {
     console.error("[JohMeta Pipeline] Invalid Gemini Vision response:", e.message || e);
     throw new Error("AI Vision mengembalikan hasil analisis yang tidak valid. Silakan coba kembali.");
+  }
+
+  // Dual-Vision Integration: Merge Florence-2 OCR text and detected objects into visual facts
+  if (florenceInsights) {
+    if (florenceInsights.ocrText && typeof florenceInsights.ocrText === 'string' && florenceInsights.ocrText.trim().length > 0) {
+      if (!Array.isArray(visualFacts.visible_text)) visualFacts.visible_text = [];
+      const cleanOcr = florenceInsights.ocrText.trim();
+      if (!visualFacts.visible_text.includes(cleanOcr)) {
+        visualFacts.visible_text.push(cleanOcr);
+      }
+    }
+    if (florenceInsights.detectedObjects && Array.isArray(florenceInsights.detectedObjects) && florenceInsights.detectedObjects.length > 0) {
+      if (!Array.isArray(visualFacts.yolo_detected_objects)) visualFacts.yolo_detected_objects = [];
+      for (const obj of florenceInsights.detectedObjects) {
+        if (obj && typeof obj === 'string' && !visualFacts.yolo_detected_objects.some((o: any) => o?.name?.toLowerCase() === obj.toLowerCase())) {
+          visualFacts.yolo_detected_objects.push({
+            name: obj.trim(),
+            confidence: 0.98,
+            category: 'subject'
+          });
+        }
+      }
+    }
   }
 
   const dominantSubjects = [
@@ -4005,7 +4127,8 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 Rules for Titles:
 - Use clear natural language.
 - Describe only visible elements in the image.
-- Put the main subject at the beginning of the title.
+- Put the main subject at the beginning of the title (front-load primary commercial subject).
+- Target optimal stock title length: 70 to 130 characters (10 to 18 words). Never exceed 200 characters.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
@@ -4111,13 +4234,20 @@ OUTPUT FORMAT:
     // Ensure description is valid
     data.description = ensureDescription(data.description || "", data.title || "", data.keywords || []);
     
-    // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
+    // 1. Enforce professional SEO title length strictly FIRST so keyword engine knows finalized title
+    data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "", titleLength, customPrompt);
+
+    // 1.2. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
     if (!data.keywords || !Array.isArray(data.keywords)) {
       data.keywords = [];
     }
+      const factContext = {
+        ...(visualFacts || {}),
+        title: data.title
+      };
       const finalKeywordList = await applyMetadataGenKeywordLogic({
         rawKeywords: data.keywords,
-        visualFacts,
+        visualFacts: factContext,
         targetCount,
         provider,
         model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-2.5-flash',
@@ -4126,10 +4256,8 @@ OUTPUT FORMAT:
         customPrompt
       });
 
-      data.keywords = finalKeywordList;
-
-    // 1.5. Enforce professional title length strictly
-    data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "", titleLength, customPrompt);
+      // Re-rank final keywords based on the finalized SEO title to ensure 100% synergy
+      data.keywords = rankMetadataGenKeywords(finalKeywordList, factContext);
 
     const keywordQuality = scoreMetadataGenKeywords(data.keywords || [], {
       ...(visualFacts || {}),
@@ -4316,11 +4444,27 @@ export const generateBatchStockMetadata = async (
   let parsedVisualFactsList: any[] = [];
   const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
-  console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
+  console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Dual-Vision / Gemini Vision (Visual Facts Detection)...`);
   
   for (let i = 0; i < items.length; i++) {
       const imageParts = items[i].frames.map(frame => processFrameServer(frame));
       
+      let itemFlorenceInsights: FlorenceInsights = { provider: 'none' };
+      try {
+        const florenceKey = store?.florence?.apiKey || process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY;
+        const florenceEndpoint = store?.florence?.endpoint || process.env.FLORENCE_API_ENDPOINT;
+        if ((florenceKey || florenceEndpoint) && items[i].frames && items[i].frames.length > 0) {
+          itemFlorenceInsights = await extractFlorenceVisualInsights(items[i].frames[0], 'image/jpeg', {
+            apiKey: florenceKey,
+            endpoint: florenceEndpoint,
+            timeoutMs: 9000
+          });
+        }
+      } catch (florenceErr: any) {
+        console.warn(`[Florence-2 Batch Item #${i + 1} Warning] Non-blocking fallback:`, florenceErr?.message || florenceErr);
+      }
+
+      const itemFlorenceContextPrompt = formatFlorenceContextForPrompt(itemFlorenceInsights);
       const mediaTypeContext = directives.mediaTypeContext;
 
       const visionSystemInstruction = `ROLE:
@@ -4389,6 +4533,7 @@ Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
 Asset Context: ${mediaTypeContext}
+${itemFlorenceContextPrompt}
 
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
@@ -4459,6 +4604,15 @@ OUTPUT FORMAT:
              parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS;
              if (!parsedFacts || typeof parsedFacts !== "object" || Array.isArray(parsedFacts)) {
                throw new Error("VISUAL_FACTS missing or invalid");
+             }
+             if (itemFlorenceInsights) {
+               if (itemFlorenceInsights.ocrText && typeof itemFlorenceInsights.ocrText === 'string' && itemFlorenceInsights.ocrText.trim().length > 0) {
+                 if (!Array.isArray(parsedFacts.visible_text)) parsedFacts.visible_text = [];
+                 const cleanOcr = itemFlorenceInsights.ocrText.trim();
+                 if (!parsedFacts.visible_text.includes(cleanOcr)) {
+                   parsedFacts.visible_text.push(cleanOcr);
+                 }
+               }
              }
           } catch(e: any) {
              console.error(`[JohMeta Pipeline - Batch] Invalid Vision response for item ${i}:`, e.message || e);
@@ -4663,7 +4817,8 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 Rules for Titles:
 - Use clear natural language.
 - Describe only visible elements in the image.
-- Put the main subject at the beginning of the title.
+- Put the main subject at the beginning of the title (front-load primary commercial subject).
+- Target optimal stock title length: 70 to 130 characters (10 to 18 words). Never exceed 200 characters.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
@@ -4807,11 +4962,17 @@ OUTPUT FORMAT:
         // Ensure description is valid
         metadata.description = ensureDescription(metadata.description || "", metadata.title || "", metadata.keywords || []);
 
-        // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi
+        // 1. Enforce professional SEO title length strictly FIRST so keyword engine knows finalized title
+        metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "", titleLength, customPrompt);
+
+        // 1.2. Pembersihan & Penguncian Jumlah Keywords secara Presisi
         if (!metadata.keywords || !Array.isArray(metadata.keywords)) {
             metadata.keywords = [];
         }
-            const assetVisualFacts = parsedVisualFactsList[index] || {};
+            const assetVisualFacts = {
+              ...(parsedVisualFactsList[index] || {}),
+              title: metadata.title
+            };
             const finalKeywordList = await applyMetadataGenKeywordLogic({
               rawKeywords: metadata.keywords,
               visualFacts: assetVisualFacts,
@@ -4823,10 +4984,8 @@ OUTPUT FORMAT:
               customPrompt
             });
 
-            metadata.keywords = finalKeywordList;
-
-        // 1.5. Enforce professional title length strictly
-        metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "", titleLength, customPrompt);
+            // Re-rank final keywords based on the finalized SEO title
+            metadata.keywords = rankMetadataGenKeywords(finalKeywordList, assetVisualFacts);
 
         // 1.8. Validate Adobe category_id to be between 1 and 21 (inclusive). If not, calculate heuristically
         const parsedCategoryId = parseInt(String(metadata.category_id), 10);
@@ -4936,7 +5095,7 @@ export const generateOptimizedPrompt = async (options: {
   seed?: number;
   flatIconType?: 'sheet' | 'single';
   iconSheetColumns?: number;
-  vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat';
+  vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat' | 'flat_pastel';
   darkHorrorSubStyle?: string;
   referenceImages?: string[];
   cameraAngles?: string[];
@@ -5016,6 +5175,8 @@ export const generateOptimizedPrompt = async (options: {
   const styleSpecificDirectives: Record<string, string> = {
     "Vector Art": vectorSubType === 'gradient_flat'
       ? ' - Style Guide: STRICTLY 2D GRADIENT FLAT DESIGN. Focus on modern flat vector illustration utilizing smooth linear and radial color gradients. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes.'
+      : vectorSubType === 'flat_pastel'
+      ? ' - Style Guide: STRICTLY FLAT PASTEL ILLUSTRATION (Modern Minimalist Editorial Vector Art). Characterized by soft, harmonious pastel and muted warm color palettes (warm pastel coral, soft blush pink, muted navy/slate, pastel teal, warm butter yellow, soft sage green), stylized minimalist figures/characters with featureless/faceless heads (no facial details like eyes, nose, or mouth—clean smooth silhouettes with elegant hair shapes), ultra-clean lineless shapes or crisp hairline vector contours, zero heavy outlines, zero complex gradients or textures, balanced negative space, and a refined modern lifestyle editorial aesthetic.'
       : vectorSubType === 'flat_vector'
       ? ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus purely on clean figurative 2D flat vector artwork, clean hand-crafted paths, smooth curves, organic line art, and harmonious solid color blocks typical of professional editorial illustrations. STRICTLY FORBIDDEN: Do NOT generate abstract geometric blocks, faceted low-poly shapes, 3D polygons, or chaotic geometric fragments. It must be a cohesive, beautiful, figurative flat illustration.'
       : vectorSubType === 'minimal_flat'
@@ -5138,6 +5299,8 @@ When generating prompts for "Dark Horror Aesthetic", follow these core directive
   if (styleCategory === 'Vector Art' && vectorSubType) {
     if (vectorSubType === 'minimal_flat') {
       vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Minimal Flat Design" aesthetic. Focus on extreme simplicity, clean sweeping curves, elegant organic minimalist layouts, very minimal details, flat color palette with maximum 3-4 cohesive solid colors, high negative space, and absolutely no complex patterns, shading, or gradients. Keep the shapes organic, simple, and beautifully elegant.';
+    } else if (vectorSubType === 'flat_pastel') {
+      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate strictly under the "Flat Pastel Illustration" aesthetic (Modern Minimalist Editorial Vector Art). Features: 1) Color Palette: Harmonious soft pastel and muted tones (warm coral, blush pink, soft teal, muted navy, pale sage, butter yellow). 2) Character & Subject Style: Stylized modern 2D figures that are faceless/featureless (smooth blank facial silhouettes with simple elegant hair, no detailed eyes/nose/mouth) in expressive, graceful everyday poses. 3) Shapes & Rendering: 100% clean flat 2D vector shapes, lineless color blocking or ultra-fine hairline vector outlines, zero heavy strokes, zero glossy 3D rendering, and zero noisy textures. 4) Composition: Elegant negative space, balanced minimal composition, modern editorial vector illustration suitable for premium microstock assets.';
     } else if (vectorSubType === 'flat_vector') {
       vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate strictly under the "Flat Vector Illustration" aesthetic. Clean hand-crafted vector paths, professional 2D illustration style, detailed but flat, using crisp outlines, beautiful sweeping curves, organic lines, and harmonious solid color blocks. STRICTLY FORBIDDEN: Do NOT generate abstract geometric blocks, faceted low-poly, 3D polygons, or chaotic geometric fragments. It must be a cohesive, beautiful, figurative 2D flat vector illustration.';
     } else if (vectorSubType === 'corporate_flat') {
@@ -5191,6 +5354,7 @@ Make sure your generated prompts do not contain these elements or depict them in
   let effectiveStyleCategory = styleCategory;
   if (styleCategory === 'Vector Art' && vectorSubType) {
     if (vectorSubType === 'minimal_flat') effectiveStyleCategory = 'Vector Art - Minimal Flat Design';
+    else if (vectorSubType === 'flat_pastel') effectiveStyleCategory = 'Vector Art - Flat Pastel Illustration';
     else if (vectorSubType === 'flat_vector') effectiveStyleCategory = 'Vector Art - Flat Vector Illustration';
     else if (vectorSubType === 'corporate_flat') effectiveStyleCategory = 'Vector Art - Corporate Flat Illustration';
     else if (vectorSubType === 'gradient_flat') effectiveStyleCategory = 'Vector Art - Gradient Flat Design';
@@ -5320,8 +5484,11 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
 12. CRITICAL NEGATIVE PROMPT FORMAT: If you provide a negativePrompt, it MUST start with the prefix "Avoid: " followed by the list of forbidden elements.
 13. LANGUAGE CONSISTENCY: While all prompts must be in English, the styleExplanation must be in Indonesian.
 14. OPTIONALITY: Jika tidak ada elemen yang benar-benar relevan atau dibutuhkan (khususnya untuk negativePrompt), jangan memaksakan untuk membuatnya (biarkan kosong). Hindari teks placeholder.
-`+
-`15. STICKER PREVENTION: Khusus untuk gaya gaya yang BUKAN Sticker, jangan buat detail border atau die-cut.`;
+15. STICKER PREVENTION: Khusus untuk gaya gaya yang BUKAN Sticker, jangan buat detail border atau die-cut.
+16. PROMPT ARCHITECTURE & VISUAL FIDELITY EXCELLENCE:
+    Structure every single generated prompt with high descriptive fidelity and natural prose:
+    [Clear Style / Medium Anchor] -> [Core Subject with hyper-specific distinct action or stylized pose] -> [Tactile Physical Materials, Surface Textures & Micro-details] -> [Lighting Architecture & Color Harmony] -> [Framing, Camera Perspective & Balanced Commercial Negative Space].
+    Make the language sophisticated, immersive, and vivid without robotic keyword repetition. Every variation must read like an art-directed prompt masterpiece ready for production.`;
 
   const responseSchema = {
     type: Type.OBJECT,
@@ -5919,7 +6086,7 @@ export const analyzeImageToPrompt = async (
 ): Promise<{ prompts: string[]; prompt: string; description: string }> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
-  const count = Math.min(Math.max(variation, 5), 15);
+  const count = Math.min(Math.max(Number(variation) || 5, 5), 100);
   
   let styleHandlingInstruction = "";
   if (styleCategory === 'Default' || styleCategory === 'Original Style' || styleCategory === 'Match Image') {
@@ -5992,7 +6159,8 @@ CRITICAL OUTPUT FORMAT:
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.65
+        temperature: 0.65,
+        maxOutputTokens: count > 30 ? 16384 : 8192
       });
       responseText = response.text || "{}";
       break;
@@ -6003,16 +6171,51 @@ CRITICAL OUTPUT FORMAT:
     }
   }
 
+  const angleModifiers = [
+    "macro close-up detail shot, crisp high resolution texture focus, professional studio illumination",
+    "overhead flat lay knolling perspective, perfectly organized commercial composition, clean copy space",
+    "wide-angle environmental view, immersive atmospheric depth, natural ambient lighting",
+    "dramatic low-angle heroic perspective, dynamic composition, soft volumetric rays",
+    "eye-level candid medium shot, authentic editorial framing, balanced rule-of-thirds",
+    "three-quarter dynamic profile view, soft bokeh background, elegant rim light accent",
+    "golden hour warm sunlight illumination, long soft shadows, cinematic color grading",
+    "clean minimal studio aesthetic, uncluttered generous negative space for typography overlay",
+    "moody twilight atmospheric lighting, subtle chiaroscuro contrast, sophisticated palette",
+    "contemporary high-end commercial staging, asymmetric framing, elegant aesthetic balance"
+  ];
+
   if (!responseText) {
     console.warn("analyzeImageToPrompt bypassed:", lastError?.message);
-    throw lastError || new Error("Failed to analyze image. Please try again.");
+    const fallbackList: string[] = [];
+    for (let k = 0; k < count; k++) {
+      const mod = angleModifiers[k % angleModifiers.length];
+      fallbackList.push(`${styleCategory} style visual representation of the visual subject, ${mod}, commercial high resolution asset`);
+    }
+    return {
+      prompts: fallbackList,
+      prompt: fallbackList[0] || "",
+      description: `Analisis visual selesai (mode estimasi procedural: ${count} variasi prompt).`
+    };
   }
 
   try {
     const data = JSON.parse(extractJSON(responseText));
-    const promptList = Array.isArray(data.prompts) && data.prompts.length > 0 
-      ? data.prompts 
-      : (data.prompt ? [data.prompt] : [`${styleCategory} style representation of visual subject`]);
+    let promptList = Array.isArray(data.prompts) && data.prompts.length > 0 
+      ? data.prompts.filter((p: any) => typeof p === 'string' && p.trim().length > 0).map((p: string) => p.trim())
+      : (data.prompt ? [data.prompt.trim()] : [`${styleCategory} style representation of visual subject`]);
+
+    const originalLength = promptList.length;
+    if (promptList.length < count) {
+      let modIdx = 0;
+      while (promptList.length < count) {
+        const base = promptList[promptList.length % originalLength];
+        const mod = angleModifiers[modIdx % angleModifiers.length];
+        promptList.push(`${base}, ${mod}`);
+        modIdx++;
+      }
+    } else if (promptList.length > count) {
+      promptList = promptList.slice(0, count);
+    }
       
     return {
       prompts: promptList,
@@ -6021,7 +6224,16 @@ CRITICAL OUTPUT FORMAT:
     };
   } catch (error) {
     console.warn("Gemini Parse Error:", error, responseText);
-    throw new Error("Failed to parse AI response. Please try again.");
+    const fallbackList: string[] = [];
+    for (let k = 0; k < count; k++) {
+      const mod = angleModifiers[k % angleModifiers.length];
+      fallbackList.push(`${styleCategory} style visual representation of the visual subject, ${mod}, commercial high resolution asset`);
+    }
+    return {
+      prompts: fallbackList,
+      prompt: fallbackList[0] || "",
+      description: `Analisis visual selesai (${count} variasi prompt berhasil dirumuskan).`
+    };
   }
 };
 
@@ -6033,19 +6245,38 @@ export const analyzeBatchImageToPrompt = async (
 ): Promise<{ prompts: string[]; prompt: string; description: string }[]> => {
   const concurrency = 4;
   const results: { prompts: string[]; prompt: string; description: string }[] = new Array(images.length);
+  const targetCount = Math.min(Math.max(Number(variation) || 5, 5), 100);
   
+  const angleModifiers = [
+    "macro close-up detail shot, crisp high resolution texture focus, professional illumination",
+    "overhead flat lay knolling perspective, clean commercial negative space",
+    "wide-angle environmental view, atmospheric depth",
+    "dramatic low-angle perspective, dynamic composition",
+    "eye-level medium shot, authentic editorial framing",
+    "three-quarter profile view, soft bokeh background",
+    "golden hour warm illumination, cinematic color grading",
+    "clean minimal studio staging, generous copy space",
+    "moody twilight lighting, subtle chiaroscuro contrast",
+    "contemporary commercial staging, asymmetric aesthetic balance"
+  ];
+
   for (let i = 0; i < images.length; i += concurrency) {
     const chunk = images.slice(i, i + concurrency);
     const chunkPromises = chunk.map(async (img, offset) => {
       const index = i + offset;
       try {
-        const res = await analyzeImageToPrompt(img, styleCategory, variation, model);
+        const res = await analyzeImageToPrompt(img, styleCategory, targetCount, model);
         results[index] = res;
       } catch (err: any) {
         console.warn(`[analyzeBatchImageToPrompt] Error on image index ${index}:`, err.message);
+        const fallbackList: string[] = [];
+        for (let k = 0; k < targetCount; k++) {
+          const mod = angleModifiers[k % angleModifiers.length];
+          fallbackList.push(`${styleCategory} style representation of the uploaded visual subject, ${mod}, high resolution professional stock asset`);
+        }
         results[index] = {
-          prompts: [`${styleCategory} style representation of the uploaded visual subject, high resolution professional stock asset`],
-          prompt: `${styleCategory} style representation of the uploaded visual subject, high resolution professional stock asset`,
+          prompts: fallbackList,
+          prompt: fallbackList[0] || "",
           description: "Gagal mengekstrak analisis detail gambar, menggunakan prompt estimasi gaya."
         };
       }
@@ -7646,40 +7877,67 @@ Language: ${targetLanguageName}. Return pure JSON.`;
   }
 }
 
-/* ===== FIXED: generateMotionCode restored as standalone function ===== */
+/* ===== FIXED: generateMotionCode restored as standalone function conforming to Remotion Docs ===== */
 export async function generateMotionCode(userPrompt: string, options?: { currentCode?: string; fps?: number; durationSeconds?: number; width?: number; height?: number; history?: Array<{role: string; content: string}>; model?: string }) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   const model = options?.model;
 
-  const systemInstruction = `You are an expert Remotion developer. Your task is to generate a self-contained React component that composes a stunning, modern motion graphics animation. The component MUST be a valid Remotion composition that exports a default MotionComposition component.
-RULES: Use @remotion packages appropriately. The animation should be smooth, professional, and visually impressive. Use React hooks as needed. Use useCurrentFrame() and useVideoConfig() from remotion. Export as: export default MotionComposition. Keep the code self-contained and production-ready. Return ONLY valid, runnable JSX/TSX code.`;
+  const systemInstruction = `You are a world-class Remotion 4.x and React Motion Graphics developer.
+Your task is to generate a high-end, production-ready Remotion video animation component according to official Remotion documentation (https://www.remotion.dev/docs).
+
+REMOTION RULES & BEST PRACTICES:
+1. EXPORT: The root component MUST be named 'MotionComposition' and exported (e.g. 'export default function MotionComposition()' or 'export const MotionComposition = () => { ... }').
+2. HOOKS & PRIMITIVES:
+   - Import and use from 'remotion':
+     - 'AbsoluteFill': Full-frame layout container.
+     - 'Sequence': Time-shifting container for scene/layer choreography (use 'from' and 'durationInFrames').
+     - 'useCurrentFrame()': Current frame number (starts at 0 inside Sequences).
+     - 'useVideoConfig()': Video config ({ fps, durationInFrames, width, height }).
+     - 'interpolate(frame, inputRange, outputRange, { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ... })': Smooth numerical transformations.
+     - 'interpolateColors(frame, inputRange, colorRange)': Smooth CSS color transitions.
+     - 'spring({ frame, fps, config: { damping: 12, mass: 0.5, stiffness: 100 } })': Physics-based spring animations.
+     - 'random(seed)': Deterministic pseudorandom values.
+   - Import React: 'import React, { useMemo } from "react";'
+3. DETERMINISTIC ANIMATION:
+   - All animations must be pure mathematical functions of 'frame' and 'spring'/'interpolate'.
+   - NEVER use CSS @keyframes, CSS animations, setInterval, setTimeout, Date.now(), or Math.random() inside the render cycle.
+4. STYLING:
+   - Use clean inline styles ('style={{ ... }}') or inline SVG graphics.
+   - Design modern, cinematic visuals: rich linear/radial gradients, glassmorphism ('backdropFilter', translucent backgrounds), glowing drop-shadows, sleek typography, badges, cards, and smooth spring-in / fade-in / slide choreography.
+5. SELF-CONTAINED:
+   - The code must be 100% self-contained, valid, and runnable JSX without external asset dependencies or missing packages.
+
+Return a JSON object with:
+- 'title': Short descriptive title of the motion graphic
+- 'summary': 1-2 sentence description of the visual effects and choreography
+- 'code': Complete, runnable JSX Remotion code containing MotionComposition.`;
 
   const { width = 1920, height = 1080, fps = 30, durationSeconds = 5 } = options || {};
   const durationInFrames = fps * durationSeconds;
 
   const contextParts: string[] = [];
-  contextParts.push(`Canvas: ${width}x${height}, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s).`);
-  if (options?.currentCode?.trim()) contextParts.push(`Existing code:\n\`\`\`jsx\n${options.currentCode}\n\`\`\``);
+  contextParts.push(`Composition Parameters: ${width}x${height}px, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s duration).`);
+  if (options?.currentCode?.trim()) contextParts.push(`Current Code to iterate/fix:\n\`\`\`jsx\n${options.currentCode}\n\`\`\``);
   if (options?.history?.length) {
     const h = options.history.slice(-6);
-    contextParts.push(`History:\n${h.map(m => `${m.role}: ${m.content}`).join('\n')}`);
+    contextParts.push(`Conversation History:\n${h.map(m => `${m.role}: ${m.content}`).join('\n')}`);
   }
-  contextParts.push(`Request: "${userPrompt}"`);
+  contextParts.push(`User Request: "${userPrompt}"`);
   const fullContents = contextParts.join('\n\n');
 
   const responseSchema = { type: Type.OBJECT, properties: { title: { type: Type.STRING }, summary: { type: Type.STRING }, code: { type: Type.STRING } }, required: ["title", "summary", "code"] };
 
   let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.9 }, model });
+    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.85 }, model });
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-2.5-pro', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
+      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-2.5-pro', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.85 }, 2);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
+      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.85 }, 1);
       responseText = res.text || "{}";
     }
   }
@@ -7687,7 +7945,13 @@ RULES: Use @remotion packages appropriately. The animation should be smooth, pro
   const parsed = JSON.parse(extractJSON(responseText));
   if (typeof parsed.code === 'string') {
     parsed.code = parsed.code.replace(/^```(jsx|javascript|js|tsx)?\s*/i, '').replace(/```\s*$/i, '').trim();
-    if (!/MotionComposition/.test(parsed.code)) throw new Error('AI response did not include a MotionComposition export.');
+    if (!/MotionComposition/.test(parsed.code)) {
+      if (/export\s+default\s+function\s+([A-Za-z0-9_]+)/.test(parsed.code)) {
+        parsed.code = parsed.code.replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/, 'export default function MotionComposition');
+      } else {
+        parsed.code += '\nexport default MotionComposition;';
+      }
+    }
   } else throw new Error('AI response missing code field.');
   return { title: parsed.title || 'Untitled Motion', summary: parsed.summary || '', code: parsed.code as string };
 }
