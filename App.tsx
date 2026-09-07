@@ -5053,7 +5053,7 @@ const App: React.FC = () => {
                 filesWithErrorCount={filesWithErrorCount} 
               />
 
-              {/* âš ï¸ R2 WARNING BANNER â€” muncul jika R2 belum dikonfigurasi */}
+              {/* ⚠️ R2 WARNING BANNER — muncul jika R2 belum dikonfigurasi */}
               {[ToolType.VECTOR, ToolType.VIDEO, ToolType.IMAGE, ToolType.MUTE_VIDEO].includes(activeTool) && r2Status === false && (
                 <div className="flex items-start gap-3 px-4 py-3 rounded-2xl border border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-300 animate-in fade-in slide-in-from-top-2 duration-300">
                   <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -5081,9 +5081,9 @@ const App: React.FC = () => {
                   </div>
                   <button
                     onClick={() => setR2Status(null)}
-                    className="ml-auto shrink-0 opacity-50 hover:opacity-100 transition-opacity text-lg leading-none"
+                    className="ml-auto shrink-0 opacity-50 hover:opacity-100 transition-opacity text-lg leading-none cursor-pointer"
                     title="Tutup"
-                  >Ã—</button>
+                  >×</button>
                 </div>
               )}
 
