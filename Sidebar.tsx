@@ -195,7 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       activeTool === ToolType.IMAGE 
                         ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-md shadow-black/5 font-black border-l-2 border-violet-500 pl-2.5" 
-                        : "text-slate-250 hover:bg-white/5 hover:text-slate-900 dark:text-white"
+                        : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
                     }`}
                   >
                     <ImageIcon size={14} className={activeTool === ToolType.IMAGE ? "text-emerald-400" : "text-slate-400"} />
@@ -205,7 +205,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       activeTool === ToolType.VIDEO 
                         ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-md shadow-black/5 font-black border-l-2 border-violet-500 pl-2.5" 
-                        : "text-slate-250 hover:bg-white/5 hover:text-slate-900 dark:text-white"
+                        : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
                     }`}
                   >
                     <Film size={14} className={activeTool === ToolType.VIDEO ? "text-purple-400" : "text-slate-400"} />
@@ -215,7 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className={`w-full text-left flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       activeTool === ToolType.VECTOR 
                         ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-md shadow-black/5 font-black border-l-2 border-violet-500 pl-2.5" 
-                        : "text-slate-250 hover:bg-white/5 hover:text-slate-900 dark:text-white"
+                        : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
                     }`}
                   >
                     <FileCode size={14} className={activeTool === ToolType.VECTOR ? "text-amber-400" : "text-slate-400"} />
