@@ -644,15 +644,183 @@ export function embedEpsMetadata(epsString: string, metadata: MicrostockMetadata
   return new TextDecoder('latin1').decode(updatedBytes);
 }
 
+function writeU32BE(buf: Uint8Array, val: number, offset: number) {
+  buf[offset] = (val >>> 24) & 0xff;
+  buf[offset + 1] = (val >>> 16) & 0xff;
+  buf[offset + 2] = (val >>> 8) & 0xff;
+  buf[offset + 3] = val & 0xff;
+}
+
+function writeU16BE(buf: Uint8Array, val: number, offset: number) {
+  buf[offset] = (val >>> 8) & 0xff;
+  buf[offset + 1] = val & 0xff;
+}
+
+function concatUint8Arrays(arrays: Uint8Array[]): Uint8Array {
+  let totalLength = 0;
+  for (const arr of arrays) totalLength += arr.length;
+  const result = new Uint8Array(totalLength);
+  let pos = 0;
+  for (const arr of arrays) {
+    result.set(arr, pos);
+    pos += arr.length;
+  }
+  return result;
+}
+
+function buildIlstItem(fourCC: string, text: string): Uint8Array {
+  const textBytes = new TextEncoder().encode(text);
+  const dataSize = 16 + textBytes.length;
+  const itemSize = 8 + dataSize;
+  const buf = new Uint8Array(itemSize);
+  writeU32BE(buf, itemSize, 0);
+  for (let i = 0; i < 4; i++) buf[4 + i] = fourCC.charCodeAt(i);
+  writeU32BE(buf, dataSize, 8);
+  buf[12] = 0x64; buf[13] = 0x61; buf[14] = 0x74; buf[15] = 0x61; // 'data'
+  writeU32BE(buf, 1, 16); // type 1 = UTF-8
+  writeU32BE(buf, 0, 20); // locale 0
+  buf.set(textBytes, 24);
+  return buf;
+}
+
+function buildQtTextAtom(fourCC: string, text: string): Uint8Array {
+  const textBytes = new TextEncoder().encode(text);
+  const totalSize = 12 + textBytes.length;
+  const buf = new Uint8Array(totalSize);
+  writeU32BE(buf, totalSize, 0);
+  for (let i = 0; i < 4; i++) buf[4 + i] = fourCC.charCodeAt(i);
+  writeU16BE(buf, textBytes.length, 8);
+  writeU16BE(buf, 0x55c4, 10);
+  buf.set(textBytes, 12);
+  return buf;
+}
+
+function buildQtXmpAtom(xmpText: string): Uint8Array {
+  const textBytes = new TextEncoder().encode(xmpText);
+  const totalSize = 8 + textBytes.length;
+  const buf = new Uint8Array(totalSize);
+  writeU32BE(buf, totalSize, 0);
+  buf[4] = 0x58; buf[5] = 0x4d; buf[6] = 0x50; buf[7] = 0x5f; // 'XMP_'
+  buf.set(textBytes, 8);
+  return buf;
+}
+
+function buildComprehensiveUdta(
+  title: string,
+  description: string,
+  keywords: string[] | string,
+  creator: string = 'MetaZo Contributor',
+  xmpText: string = ''
+): Uint8Array {
+  const keywordArr = cleanKeywordArray(keywords);
+  const keywordStr = keywordArr.join('; ');
+
+  const ilstItems = [
+    buildIlstItem('\xa9nam', title),
+    buildIlstItem('desc', description),
+    buildIlstItem('\xa9des', description),
+    buildIlstItem('\xa9cmt', description),
+    buildIlstItem('keyw', keywordStr),
+    buildIlstItem('\xa9gen', keywordStr),
+    buildIlstItem('\xa9art', creator),
+    buildIlstItem('aART', creator),
+    buildIlstItem('\xa9too', 'MetaZo Microstock Assistant'),
+    buildIlstItem('cprt', 'All rights reserved')
+  ];
+
+  const ilstPayload = concatUint8Arrays(ilstItems);
+  const ilstSize = 8 + ilstPayload.length;
+  const ilstBox = new Uint8Array(ilstSize);
+  writeU32BE(ilstBox, ilstSize, 0);
+  ilstBox[4] = 0x69; ilstBox[5] = 0x6c; ilstBox[6] = 0x73; ilstBox[7] = 0x74; // 'ilst'
+  ilstBox.set(ilstPayload, 8);
+
+  const hdlr = new Uint8Array([
+    0x00, 0x00, 0x00, 0x21,
+    0x68, 0x64, 0x6c, 0x72,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x6d, 0x64, 0x69, 0x72,
+    0x61, 0x70, 0x70, 0x6c,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00
+  ]);
+
+  const metaSize = 12 + hdlr.length + ilstBox.length;
+  const metaBox = new Uint8Array(metaSize);
+  writeU32BE(metaBox, metaSize, 0);
+  metaBox[4] = 0x6d; metaBox[5] = 0x65; metaBox[6] = 0x74; metaBox[7] = 0x61; // 'meta'
+  writeU32BE(metaBox, 0, 8); // version/flags = 0
+  metaBox.set(hdlr, 12);
+  metaBox.set(ilstBox, 12 + hdlr.length);
+
+  const directAtoms = [
+    metaBox,
+    buildQtTextAtom('\xa9nam', title),
+    buildQtTextAtom('\xa9des', description),
+    buildQtTextAtom('\xa9cmt', description),
+    buildQtTextAtom('\xa9gen', keywordStr),
+    buildQtTextAtom('\xa9art', creator),
+    buildQtTextAtom('cprt', 'All rights reserved')
+  ];
+
+  if (xmpText) {
+    directAtoms.push(buildQtXmpAtom(xmpText));
+  }
+
+  const udtaPayload = concatUint8Arrays(directAtoms);
+  const udtaSize = 8 + udtaPayload.length;
+  const udtaBox = new Uint8Array(udtaSize);
+  writeU32BE(udtaBox, udtaSize, 0);
+  udtaBox[4] = 0x75; udtaBox[5] = 0x64; udtaBox[6] = 0x74; udtaBox[7] = 0x61; // 'udta'
+  udtaBox.set(udtaPayload, 8);
+
+  return udtaBox;
+}
+
+function adjustChunkOffsets(moovBuf: Uint8Array, delta: number) {
+  let offset = 0;
+  const view = new DataView(moovBuf.buffer, moovBuf.byteOffset, moovBuf.byteLength);
+  while (offset + 8 <= moovBuf.length) {
+    const bType = String.fromCharCode(moovBuf[offset + 4], moovBuf[offset + 5], moovBuf[offset + 6], moovBuf[offset + 7]);
+    if (bType === 'stco') {
+      const boxSize = view.getUint32(offset, false);
+      const entryCount = view.getUint32(offset + 12, false);
+      let p = offset + 16;
+      for (let i = 0; i < entryCount; i++) {
+        const curOffset = view.getUint32(p, false);
+        view.setUint32(p, curOffset + delta, false);
+        p += 4;
+      }
+      offset += boxSize;
+    } else if (bType === 'co64') {
+      const boxSize = view.getUint32(offset, false);
+      const entryCount = view.getUint32(offset + 12, false);
+      let p = offset + 16;
+      for (let i = 0; i < entryCount; i++) {
+        const curOffset = view.getBigUint64(p, false);
+        view.setBigUint64(p, curOffset + BigInt(delta), false);
+        p += 8;
+      }
+      offset += boxSize;
+    } else {
+      offset += 1;
+    }
+  }
+}
+
 const XMP_ISOBMFF_UUID = new Uint8Array([
   0xbe, 0x7a, 0xcf, 0xcb, 0x97, 0xa9, 0x42, 0xe8, 0x9c, 0x71, 0x99, 0x94, 0x91, 0xe3, 0xaf, 0xac
 ]);
 
 /**
- * Universal ISOBMFF (MP4, MOV, M4V) XMP Metadata Injector.
- * Injects Adobe XMP UUID box (BE7ACFCB-97A9-42E8-9C71-999491E3AFAC) into the
- * video container. Recognized natively by Adobe Premiere, After Effects, Bridge,
- * Adobe Stock, Shutterstock, and ExifTool.
+ * Universal ISOBMFF (MP4, MOV, M4V) Metadata Injector.
+ * Native pure TypeScript/JavaScript engine that writes:
+ * 1. moov.udta.meta.ilst (QuickTime / iTunes Title, Subtitle, Comments, Tags, Artists) for Windows Explorer & Apple Finder
+ * 2. moov.udta direct atoms (\xa9nam, \xa9des, \xa9cmt, \xa9gen, XMP_)
+ * 3. Top-level ISOBMFF Adobe XMP UUID container box (BE7ACFCB-97A9-42E8-9C71-999491E3AFAC)
+ * 4. Sample table chunk offset recalculation (stco/co64) to ensure 100% video stream integrity.
  */
 export function embedMp4MetadataBytes(
   inputBytes: Uint8Array,
@@ -660,73 +828,140 @@ export function embedMp4MetadataBytes(
 ): Uint8Array {
   if (inputBytes.length < 8) return inputBytes;
 
+  const title = String(metadata.title || '').trim();
+  const description = String(metadata.description || title).trim();
+  const creator = metadata.creator || 'MetaZo Contributor';
   const mimeType = 'video/mp4';
   const xmpPacket = buildXmpPacket(metadata, mimeType);
-  const xmpBytes = new TextEncoder().encode(xmpPacket);
 
-  // Build the ISOBMFF 'uuid' box (24 bytes header + XMP payload)
-  const boxLength = 24 + xmpBytes.length;
-  const box = new Uint8Array(boxLength);
-  const boxView = new DataView(box.buffer);
-  boxView.setUint32(0, boxLength, false); // 32-bit Big-Endian length
-  // 'uuid'
-  box[4] = 0x75;
-  box[5] = 0x75;
-  box[6] = 0x69;
-  box[7] = 0x64;
-  // 16-byte Adobe XMP UUID
-  box.set(XMP_ISOBMFF_UUID, 8);
-  // Payload
-  box.set(xmpBytes, 24);
-
-  // Check if an existing XMP uuid box already exists in top-level atoms
+  // 1. Locate moov and mdat boxes
   const view = new DataView(inputBytes.buffer, inputBytes.byteOffset, inputBytes.byteLength);
   let offset = 0;
-  let existingBoxStart = -1;
-  let existingBoxEnd = -1;
+  let moovOffset = -1;
+  let moovSize = 0;
+  let mdatOffset = -1;
 
   while (offset + 8 <= inputBytes.length) {
-    const atomSize = view.getUint32(offset, false);
-    if (atomSize < 8) break;
+    const boxSize = view.getUint32(offset, false);
+    const boxType = String.fromCharCode(
+      inputBytes[offset + 4],
+      inputBytes[offset + 5],
+      inputBytes[offset + 6],
+      inputBytes[offset + 7]
+    );
+    if (boxType === 'moov') {
+      moovOffset = offset;
+      moovSize = boxSize;
+    } else if (boxType === 'mdat') {
+      mdatOffset = offset;
+    }
+    if (boxSize < 8) break;
+    offset += boxSize;
+  }
 
-    // Check if box type is 'uuid'
-    if (
-      inputBytes[offset + 4] === 0x75 &&
-      inputBytes[offset + 5] === 0x75 &&
-      inputBytes[offset + 6] === 0x69 &&
-      inputBytes[offset + 7] === 0x64 &&
-      atomSize >= 24
-    ) {
-      let isXmpUuid = true;
+  const udtaBox = buildComprehensiveUdta(title, description, metadata.keywords, creator, xmpPacket);
+  let intermediateFile = inputBytes;
+
+  if (moovOffset !== -1) {
+    const moovBytes = new Uint8Array(inputBytes.subarray(moovOffset, moovOffset + moovSize));
+    const moovView = new DataView(moovBytes.buffer, moovBytes.byteOffset, moovBytes.byteLength);
+    let udtaOffsetInsideMoov = -1;
+    let existingUdtaSize = 0;
+    let mOff = 8;
+
+    while (mOff + 8 <= moovBytes.length) {
+      const bSize = moovView.getUint32(mOff, false);
+      const bType = String.fromCharCode(
+        moovBytes[mOff + 4],
+        moovBytes[mOff + 5],
+        moovBytes[mOff + 6],
+        moovBytes[mOff + 7]
+      );
+      if (bType === 'udta') {
+        udtaOffsetInsideMoov = mOff;
+        existingUdtaSize = bSize;
+        break;
+      }
+      if (bSize < 8) break;
+      mOff += bSize;
+    }
+
+    let newMoov: Uint8Array;
+    let delta = 0;
+
+    if (udtaOffsetInsideMoov !== -1) {
+      delta = udtaBox.length - existingUdtaSize;
+      newMoov = concatUint8Arrays([
+        moovBytes.subarray(0, udtaOffsetInsideMoov),
+        udtaBox,
+        moovBytes.subarray(udtaOffsetInsideMoov + existingUdtaSize)
+      ]);
+    } else {
+      delta = udtaBox.length;
+      newMoov = concatUint8Arrays([moovBytes, udtaBox]);
+    }
+
+    writeU32BE(newMoov, newMoov.length, 0);
+
+    if (mdatOffset > moovOffset) {
+      adjustChunkOffsets(newMoov, delta);
+    }
+
+    intermediateFile = concatUint8Arrays([
+      inputBytes.subarray(0, moovOffset),
+      newMoov,
+      inputBytes.subarray(moovOffset + moovSize)
+    ]);
+  }
+
+  // 2. Also ensure standard top-level Adobe XMP UUID box is present
+  const xmpBytes = new TextEncoder().encode(xmpPacket);
+  const uuidBoxLen = 24 + xmpBytes.length;
+  const uuidBox = new Uint8Array(uuidBoxLen);
+  writeU32BE(uuidBox, uuidBoxLen, 0);
+  uuidBox[4] = 0x75; uuidBox[5] = 0x75; uuidBox[6] = 0x69; uuidBox[7] = 0x64; // 'uuid'
+  uuidBox.set(XMP_ISOBMFF_UUID, 8);
+  uuidBox.set(xmpBytes, 24);
+
+  const interView = new DataView(intermediateFile.buffer, intermediateFile.byteOffset, intermediateFile.byteLength);
+  let uuidStart = -1;
+  let uuidSize = 0;
+  let off2 = 0;
+
+  while (off2 + 8 <= intermediateFile.length) {
+    const bSize = interView.getUint32(off2, false);
+    const bType = String.fromCharCode(
+      intermediateFile[off2 + 4],
+      intermediateFile[off2 + 5],
+      intermediateFile[off2 + 6],
+      intermediateFile[off2 + 7]
+    );
+    if (bType === 'uuid' && bSize >= 24) {
+      let isXmp = true;
       for (let i = 0; i < 16; i++) {
-        if (inputBytes[offset + 8 + i] !== XMP_ISOBMFF_UUID[i]) {
-          isXmpUuid = false;
+        if (intermediateFile[off2 + 8 + i] !== XMP_ISOBMFF_UUID[i]) {
+          isXmp = false;
           break;
         }
       }
-      if (isXmpUuid) {
-        existingBoxStart = offset;
-        existingBoxEnd = offset + atomSize;
+      if (isXmp) {
+        uuidStart = off2;
+        uuidSize = bSize;
         break;
       }
     }
-    offset += atomSize;
+    if (bSize < 8) break;
+    off2 += bSize;
   }
 
-  if (existingBoxStart >= 0 && existingBoxEnd > existingBoxStart) {
-    // Replace existing XMP box
-    const totalLen = existingBoxStart + box.length + (inputBytes.length - existingBoxEnd);
-    const result = new Uint8Array(totalLen);
-    result.set(inputBytes.subarray(0, existingBoxStart), 0);
-    result.set(box, existingBoxStart);
-    result.set(inputBytes.subarray(existingBoxEnd), existingBoxStart + box.length);
-    return result;
+  if (uuidStart !== -1) {
+    return concatUint8Arrays([
+      intermediateFile.subarray(0, uuidStart),
+      uuidBox,
+      intermediateFile.subarray(uuidStart + uuidSize)
+    ]);
   } else {
-    // Append uuid box to end of container (standard top-level container box)
-    const result = new Uint8Array(inputBytes.length + box.length);
-    result.set(inputBytes, 0);
-    result.set(box, inputBytes.length);
-    return result;
+    return concatUint8Arrays([intermediateFile, uuidBox]);
   }
 }
 
