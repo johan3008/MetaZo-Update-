@@ -9,8 +9,6 @@ import path from "node:path";
 import crypto from "node:crypto";
 import https from "node:https";
 
-import { extractFlorenceVisualInsights, formatFlorenceContextForPrompt, FlorenceOptions, FlorenceInsights } from "./florenceService.ts";
-
 // Thread-safe dynamic API Key storage
 export const apiKeyStorage = new AsyncLocalStorage<any>();
 
@@ -391,80 +389,16 @@ export function ensureTitleLength(title: string, keywords: string[], description
     cleanedTitle = cleanedTitle.slice(0, -1).trim();
   }
 
-  // Comprehensive list of disallowed stock title filler prefixes / clickbait / AI markers
+  // Remove disallowed start phrases strictly
   const disallowedStarts = [
-    // Media type descriptors
-    "a high quality photo of", "high quality photo of", "a photo of", "photo of",
-    "a photograph of", "photograph of", "a picture of", "picture of",
-    "an image of", "image of", "a shot of", "shot of",
-    "a close up of", "close up of", "a close-up of", "close-up of",
-    "a close up shot of", "close up shot of", "a close-up shot of", "close-up shot of",
-    // Perspective / Isolated prefixes
-    "top view of", "a top view of", "aerial view of", "an aerial view of",
-    "side view of", "a side view of", "view of", "a view of",
-    "isolated shot of", "an isolated shot of", "isolated image of",
-    "isolated on white background", "isolated on white", "isolated of",
-    // Vectors / Renders / Illustrations
-    "a vector illustration of", "vector illustration of", "an illustration of", "illustration of",
-    "a vector of", "vector of", "a graphic of", "graphic of",
-    "drawing of", "a drawing of", "continuous line drawing of",
-    "flat illustration of", "a flat illustration of",
-    "3d render of", "a 3d render of", "render of", "a render of",
-    "3d illustration of", "a 3d illustration of",
-    "vector", "illustration", "drawing", "continuous line drawing",
-    // AI / Stock filler
-    "generative ai image of", "ai generated image of", "generative ai photo of",
-    "ai generated photo of", "generative ai of", "ai generated of",
-    "generative ai", "ai generated",
-    "stock photo of", "stock image of", "stock photo", "stock image",
-    // Subjective clickbait / quality claims rejected by reviewers
-    "high quality image of", "high quality", "high-quality",
-    "beautiful photo of", "beautiful image of", "beautiful",
-    "stunning photo of", "stunning image of", "stunning",
-    "amazing photo of", "amazing image of", "amazing",
-    "gorgeous photo of", "gorgeous image of", "gorgeous",
-    "incredible photo of", "incredible image of", "incredible",
-    "perfect photo of", "perfect image of", "perfect",
-    "best photo of", "best image of", "best",
-    "superb photo of", "superb image of", "superb",
-    "nice photo of", "nice image of", "nice"
+    "vector of", "illustration of", "drawing of", "continuous line drawing of",
+    "vector", "illustration", "drawing", "continuous line drawing"
   ];
-
-  let changed = true;
-  while (changed) {
-    changed = false;
-    let titleLower = cleanedTitle.toLowerCase();
-    for (const start of disallowedStarts) {
-      if (titleLower === start) {
-        cleanedTitle = "";
-        changed = true;
-        break;
-      }
-      if (titleLower.startsWith(start + " ")) {
-        cleanedTitle = cleanedTitle.substring(start.length + 1).trim();
-        changed = true;
-        break;
-      }
-      if (titleLower.startsWith(start + ":") || titleLower.startsWith(start + "-") || titleLower.startsWith(start + ",")) {
-        cleanedTitle = cleanedTitle.substring(start.length + 1).trim();
-        changed = true;
-        break;
-      }
-    }
-  }
-
-  // Strip lingering leading articles if immediately preceding main subject
-  if (/^(a|an|the)\s+/i.test(cleanedTitle)) {
-    cleanedTitle = cleanedTitle.replace(/^(a|an|the)\s+/i, '').trim();
-  }
-
-  if (!cleanedTitle || cleanedTitle.length < 5) {
-    if (targetKeywords.length > 0) {
-      cleanedTitle = targetKeywords.slice(0, 3).join(' ');
-    } else if (keywords && keywords.length >= 3) {
-      cleanedTitle = keywords.slice(0, 5).join(' ');
-    } else {
-      cleanedTitle = "Commercial digital asset";
+  let titleLower = cleanedTitle.toLowerCase();
+  for (const start of disallowedStarts) {
+    if (titleLower.startsWith(start + " ")) {
+      cleanedTitle = cleanedTitle.substring(start.length + 1).trim();
+      titleLower = cleanedTitle.toLowerCase();
     }
   }
 
@@ -472,7 +406,6 @@ export function ensureTitleLength(title: string, keywords: string[], description
   if (targetKeywords.length > 0) {
     const primaryTarget = targetKeywords[0];
     const primaryLower = primaryTarget.toLowerCase();
-    const titleLower = cleanedTitle.toLowerCase();
     if (!titleLower.startsWith(primaryLower)) {
       if (titleLower.includes(primaryLower)) {
         const escaped = primaryTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -486,7 +419,7 @@ export function ensureTitleLength(title: string, keywords: string[], description
   }
 
   // Limit bounds based on titleLength
-  let upperLimit = 140; // Default optimal microstock title length sweet spot
+  let upperLimit = 200;
   if (titleLength === 'short') upperLimit = 65;
   if (titleLength === 'long') upperLimit = 200;
 
@@ -1416,32 +1349,21 @@ function scoreKeywordForRanking(
   }
 
   const canonical = adobeKeywordCanonical(normalized);
-  const titleTermsArray = [...titleTerms];
-  const titleMatch = titleTermsArray.some(term =>
+  const titleMatch = [...titleTerms].some(term =>
     canonical === term || canonical.includes(term) || term.includes(canonical)
   );
-  if (titleMatch) score += 200;
-
-  // Title-Keyword Synergy Bonus (Adobe Stock / Shutterstock top 5 ranking priority):
-  // The first 3 terms of the title contain the core commercial subject. Any keyword matching these terms
-  // receives a massive crown boost (+300) so it ranks at positions #1 to #5.
-  const primaryTitleTerms = titleTermsArray.slice(0, 3);
-  const primaryTitleMatch = primaryTitleTerms.some(term =>
-    canonical === term || canonical.includes(term) || term.includes(canonical)
-  );
-  if (primaryTitleMatch) score += 300;
+  if (titleMatch) score += 160;
 
   const wordCount = normalized.split(/\s+/).filter(Boolean).length;
-  if (wordCount === 1) score += 10;
-  else if (wordCount === 2) score += 25; // 2-word commercial phrases have higher conversion
-  else if (wordCount === 3) score += 15;
-  else score -= 60;
+  if (wordCount === 1) score += 8;
+  else if (wordCount === 2) score += 16;
+  else if (wordCount === 3) score += 7;
+  else score -= 50;
 
-  if (containsKeywordConnector(normalized)) score -= 60;
-  if (role === 'generic') score -= 150;
-  if (isWeakGenericKeyword(normalized)) score -= 400; // Heavily penalize filler / clickbait keywords
-  if (role === 'color') score -= 40;
-  if (role === 'commercial_use' && !keywordMatchesEvidence(normalized, ctx.commercial)) score -= 80;
+  if (containsKeywordConnector(normalized)) score -= 40;
+  if (role === 'generic') score -= 120;
+  if (role === 'color') score -= 18;
+  if (role === 'commercial_use' && !keywordMatchesEvidence(normalized, ctx.commercial)) score -= 60;
 
   return score * 1000 - originalIndex;
 }
@@ -3751,28 +3673,8 @@ export const generateStockMetadata = async (
     keywordRulePromptText = UNIVERSAL_KEYWORD_RULES + `\n\nMIXED-KEYWORD MODE OVERRIDE:\nGenerate a balanced mix of single words and 2-4 word natural search phrases. DO NOT artificially split compound words that are naturally searched together. NO colors. NO patterns.`;
   }
 
-  // --- TAHAP 1: DUAL-VISION PIPELINE (FLORENCE-2 + GEMINI/VISION LLM) ---
+  // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) ---
   let visualFactsJson = "";
-  let florenceInsights: FlorenceInsights = { provider: 'none' };
-  try {
-    const florenceKey = store?.florence?.apiKey || process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY;
-    const florenceEndpoint = store?.florence?.endpoint || process.env.FLORENCE_API_ENDPOINT;
-    if (florenceKey || florenceEndpoint) {
-      console.log(`[Florence-2 Dual-Vision] Extracting micro-details & OCR with Florence-2...`);
-      florenceInsights = await extractFlorenceVisualInsights(frames[0], 'image/jpeg', {
-        apiKey: florenceKey,
-        endpoint: florenceEndpoint,
-        timeoutMs: 9000
-      });
-      if (florenceInsights.detailedCaption || florenceInsights.ocrText) {
-        console.log(`[Florence-2 Dual-Vision] Successfully extracted Florence-2 insights! Provider: ${florenceInsights.provider}`);
-      }
-    }
-  } catch (florenceErr: any) {
-    console.warn(`[Florence-2 Dual-Vision Warning] Non-blocking fallback:`, florenceErr?.message || florenceErr);
-  }
-
-  const florenceContextPrompt = formatFlorenceContextForPrompt(florenceInsights);
   
   console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
@@ -3828,7 +3730,6 @@ Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
 Asset Context: ${mediaTypeContext}
-${florenceContextPrompt}
 
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
@@ -3917,29 +3818,6 @@ OUTPUT FORMAT:
   } catch (e: any) {
     console.error("[JohMeta Pipeline] Invalid Gemini Vision response:", e.message || e);
     throw new Error("AI Vision mengembalikan hasil analisis yang tidak valid. Silakan coba kembali.");
-  }
-
-  // Dual-Vision Integration: Merge Florence-2 OCR text and detected objects into visual facts
-  if (florenceInsights) {
-    if (florenceInsights.ocrText && typeof florenceInsights.ocrText === 'string' && florenceInsights.ocrText.trim().length > 0) {
-      if (!Array.isArray(visualFacts.visible_text)) visualFacts.visible_text = [];
-      const cleanOcr = florenceInsights.ocrText.trim();
-      if (!visualFacts.visible_text.includes(cleanOcr)) {
-        visualFacts.visible_text.push(cleanOcr);
-      }
-    }
-    if (florenceInsights.detectedObjects && Array.isArray(florenceInsights.detectedObjects) && florenceInsights.detectedObjects.length > 0) {
-      if (!Array.isArray(visualFacts.yolo_detected_objects)) visualFacts.yolo_detected_objects = [];
-      for (const obj of florenceInsights.detectedObjects) {
-        if (obj && typeof obj === 'string' && !visualFacts.yolo_detected_objects.some((o: any) => o?.name?.toLowerCase() === obj.toLowerCase())) {
-          visualFacts.yolo_detected_objects.push({
-            name: obj.trim(),
-            confidence: 0.98,
-            category: 'subject'
-          });
-        }
-      }
-    }
   }
 
   const dominantSubjects = [
@@ -4127,8 +4005,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 Rules for Titles:
 - Use clear natural language.
 - Describe only visible elements in the image.
-- Put the main subject at the beginning of the title (front-load primary commercial subject).
-- Target optimal stock title length: 70 to 130 characters (10 to 18 words). Never exceed 200 characters.
+- Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
@@ -4234,20 +4111,13 @@ OUTPUT FORMAT:
     // Ensure description is valid
     data.description = ensureDescription(data.description || "", data.title || "", data.keywords || []);
     
-    // 1. Enforce professional SEO title length strictly FIRST so keyword engine knows finalized title
-    data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "", titleLength, customPrompt);
-
-    // 1.2. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
+    // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi (Hard Slice)
     if (!data.keywords || !Array.isArray(data.keywords)) {
       data.keywords = [];
     }
-      const factContext = {
-        ...(visualFacts || {}),
-        title: data.title
-      };
       const finalKeywordList = await applyMetadataGenKeywordLogic({
         rawKeywords: data.keywords,
-        visualFacts: factContext,
+        visualFacts,
         targetCount,
         provider,
         model: activeModel || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-2.5-flash',
@@ -4256,8 +4126,10 @@ OUTPUT FORMAT:
         customPrompt
       });
 
-      // Re-rank final keywords based on the finalized SEO title to ensure 100% synergy
-      data.keywords = rankMetadataGenKeywords(finalKeywordList, factContext);
+      data.keywords = finalKeywordList;
+
+    // 1.5. Enforce professional title length strictly
+    data.title = ensureTitleLength(data.title, data.keywords || [], data.description || "", titleLength, customPrompt);
 
     const keywordQuality = scoreMetadataGenKeywords(data.keywords || [], {
       ...(visualFacts || {}),
@@ -4444,27 +4316,11 @@ export const generateBatchStockMetadata = async (
   let parsedVisualFactsList: any[] = [];
   const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
-  console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Dual-Vision / Gemini Vision (Visual Facts Detection)...`);
+  console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
   for (let i = 0; i < items.length; i++) {
       const imageParts = items[i].frames.map(frame => processFrameServer(frame));
       
-      let itemFlorenceInsights: FlorenceInsights = { provider: 'none' };
-      try {
-        const florenceKey = store?.florence?.apiKey || process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY;
-        const florenceEndpoint = store?.florence?.endpoint || process.env.FLORENCE_API_ENDPOINT;
-        if ((florenceKey || florenceEndpoint) && items[i].frames && items[i].frames.length > 0) {
-          itemFlorenceInsights = await extractFlorenceVisualInsights(items[i].frames[0], 'image/jpeg', {
-            apiKey: florenceKey,
-            endpoint: florenceEndpoint,
-            timeoutMs: 9000
-          });
-        }
-      } catch (florenceErr: any) {
-        console.warn(`[Florence-2 Batch Item #${i + 1} Warning] Non-blocking fallback:`, florenceErr?.message || florenceErr);
-      }
-
-      const itemFlorenceContextPrompt = formatFlorenceContextForPrompt(itemFlorenceInsights);
       const mediaTypeContext = directives.mediaTypeContext;
 
       const visionSystemInstruction = `ROLE:
@@ -4533,7 +4389,6 @@ Return JSON ONLY under the key "VISUAL_FACTS".
 Do not generate title or keywords.
 
 Asset Context: ${mediaTypeContext}
-${itemFlorenceContextPrompt}
 
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
@@ -4604,15 +4459,6 @@ OUTPUT FORMAT:
              parsedFacts = JSON.parse(extractJSON(facts)).VISUAL_FACTS;
              if (!parsedFacts || typeof parsedFacts !== "object" || Array.isArray(parsedFacts)) {
                throw new Error("VISUAL_FACTS missing or invalid");
-             }
-             if (itemFlorenceInsights) {
-               if (itemFlorenceInsights.ocrText && typeof itemFlorenceInsights.ocrText === 'string' && itemFlorenceInsights.ocrText.trim().length > 0) {
-                 if (!Array.isArray(parsedFacts.visible_text)) parsedFacts.visible_text = [];
-                 const cleanOcr = itemFlorenceInsights.ocrText.trim();
-                 if (!parsedFacts.visible_text.includes(cleanOcr)) {
-                   parsedFacts.visible_text.push(cleanOcr);
-                 }
-               }
              }
           } catch(e: any) {
              console.error(`[JohMeta Pipeline - Batch] Invalid Vision response for item ${i}:`, e.message || e);
@@ -4817,8 +4663,7 @@ CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 Rules for Titles:
 - Use clear natural language.
 - Describe only visible elements in the image.
-- Put the main subject at the beginning of the title (front-load primary commercial subject).
-- Target optimal stock title length: 70 to 130 characters (10 to 18 words). Never exceed 200 characters.
+- Put the main subject at the beginning of the title.
 - Include important commercial keywords naturally.
 - Do not use keyword stuffing.
 - Do not use brand names, trademarks, company names, or copyrighted terms.
@@ -4962,17 +4807,11 @@ OUTPUT FORMAT:
         // Ensure description is valid
         metadata.description = ensureDescription(metadata.description || "", metadata.title || "", metadata.keywords || []);
 
-        // 1. Enforce professional SEO title length strictly FIRST so keyword engine knows finalized title
-        metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "", titleLength, customPrompt);
-
-        // 1.2. Pembersihan & Penguncian Jumlah Keywords secara Presisi
+        // 1. Pembersihan & Penguncian Jumlah Keywords secara Presisi
         if (!metadata.keywords || !Array.isArray(metadata.keywords)) {
             metadata.keywords = [];
         }
-            const assetVisualFacts = {
-              ...(parsedVisualFactsList[index] || {}),
-              title: metadata.title
-            };
+            const assetVisualFacts = parsedVisualFactsList[index] || {};
             const finalKeywordList = await applyMetadataGenKeywordLogic({
               rawKeywords: metadata.keywords,
               visualFacts: assetVisualFacts,
@@ -4984,8 +4823,10 @@ OUTPUT FORMAT:
               customPrompt
             });
 
-            // Re-rank final keywords based on the finalized SEO title
-            metadata.keywords = rankMetadataGenKeywords(finalKeywordList, assetVisualFacts);
+            metadata.keywords = finalKeywordList;
+
+        // 1.5. Enforce professional title length strictly
+        metadata.title = ensureTitleLength(metadata.title, metadata.keywords || [], metadata.description || "", titleLength, customPrompt);
 
         // 1.8. Validate Adobe category_id to be between 1 and 21 (inclusive). If not, calculate heuristically
         const parsedCategoryId = parseInt(String(metadata.category_id), 10);
@@ -5095,7 +4936,7 @@ export const generateOptimizedPrompt = async (options: {
   seed?: number;
   flatIconType?: 'sheet' | 'single';
   iconSheetColumns?: number;
-  vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat' | 'flat_pastel';
+  vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat';
   darkHorrorSubStyle?: string;
   referenceImages?: string[];
   cameraAngles?: string[];
@@ -5175,8 +5016,6 @@ export const generateOptimizedPrompt = async (options: {
   const styleSpecificDirectives: Record<string, string> = {
     "Vector Art": vectorSubType === 'gradient_flat'
       ? ' - Style Guide: STRICTLY 2D GRADIENT FLAT DESIGN. Focus on modern flat vector illustration utilizing smooth linear and radial color gradients. Sleek modern gradients, organic 2D shapes, and sharp digital outlines typical of Adobe Illustrator. Absolutely NO 3D rendering, NO photorealism, NO drop shadows, and NO metallic finishes.'
-      : vectorSubType === 'flat_pastel'
-      ? ' - Style Guide: STRICTLY FLAT PASTEL ILLUSTRATION (Modern Minimalist Editorial Vector Art). Characterized by soft, harmonious pastel and muted warm color palettes (warm pastel coral, soft blush pink, muted navy/slate, pastel teal, warm butter yellow, soft sage green), stylized minimalist figures/characters with featureless/faceless heads (no facial details like eyes, nose, or mouth—clean smooth silhouettes with elegant hair shapes), ultra-clean lineless shapes or crisp hairline vector contours, zero heavy outlines, zero complex gradients or textures, balanced negative space, and a refined modern lifestyle editorial aesthetic.'
       : vectorSubType === 'flat_vector'
       ? ' - Style Guide: STRICTLY 2D FLAT VECTOR ILLUSTRATION. Focus purely on clean figurative 2D flat vector artwork, clean hand-crafted paths, smooth curves, organic line art, and harmonious solid color blocks typical of professional editorial illustrations. STRICTLY FORBIDDEN: Do NOT generate abstract geometric blocks, faceted low-poly shapes, 3D polygons, or chaotic geometric fragments. It must be a cohesive, beautiful, figurative flat illustration.'
       : vectorSubType === 'minimal_flat'
@@ -5211,14 +5050,7 @@ export const generateOptimizedPrompt = async (options: {
     "Dark Horror Aesthetic": ' - Focus on extremely dark, eerie, unsettling, and atmospheric horror themes. MUST look like a photorealistic, real-world photograph or live-action movie still. Emphasize crushing pitch-black shadows, high-contrast chiaroscuro lighting with minimal illumination, macabre elements, muted or monochromatic color palettes with stark accents (like crimson red), thick fog/mist, decaying textures, and a profound sense of dread. AVOID: Digital painting, illustration, cartoonish styles, bright daylight, cheerful elements, or well-lit scenes. It must look breathtakingly real.',
     "Lego Style": ' - Focus on compositions entirely constructed from interlocking plastic building bricks (gaya mainan balok plastik). Emphasize sharp geometric brick shapes, visible circular studs on top of bricks, glossy plastic textures with subtle scratches, vibrant primary colors, and macro photography lighting (depth of field, studio lighting) to make it look like a miniature diorama or toy set. Do NOT use the word "Lego" in the prompt if possible, use "interlocking plastic bricks" or "brick toy style".',
     "Voxel Art": ' - Focus on 3D pixel art constructed from volumetric cubes (voxels). Emphasize a blocky, retro video game aesthetic similar to Minecraft, with low-resolution 3D geometry but modern high-quality lighting (raytracing, global illumination). Use sharp pixelated textures, crisp cube edges, and a rigid grid-based structure. CRITICAL: Do not use the word "Minecraft" or specific game IP; instead use "voxel art", "3D blocky pixel art", or "cubical world". AVOID: Realism, photorealistic rendering, real-world natural aesthetics, or smooth continuous surfaces.',
-    "Abstract": ` - Style Guide: DYNAMIC KINETIC & CRYSTALLINE SHATTERED GEOMETRIC ABSTRACT STYLE.
-Visual Characteristics & Core Elements:
-1. Dynamic Motion & Kinetic Energy: Portray the subject "${subject}" in high-energy, freeze-frame athletic or kinetic action poses with explosive forward momentum, dynamic speed arcs, and speed streaks.
-2. Floating Shattered Geometric & Crystalline Glass Shards: Surround the subject and motion path with sharp, floating polygonal/triangular glass fragments, faceted crystalline prisms, and refractive geometric shards dispersing dynamically through the air.
-3. Glowing Neon Light Trails & Speed Ribbons: Incorporate luminous flowing neon light trails, speed streaks, and glowing energetic ribbons (in vibrant cyan, electric blue, magenta, neon amber, or radiant white) tracing the movement and trajectory of action.
-4. Dramatic High-Contrast Dark Arena/Stadium Lighting: Set against a moody dark arena, stadium track, or stage backdrop illuminated by powerful volumetric spotlights, intense rim lighting, and dramatic chiaroscuro contrast that makes the glowing elements and crystalline facets pop.
-5. Kinetic Particle Explosions & Debris: Include explosive particle bursts, glowing sparks, luminous embers, or ice spray/shattered debris erupting from contact, footwork, or pivot points.
-6. Aesthetic & Quality: Hyper-detailed, ultra-sharp focus on the subject in dynamic motion, 8k resolution, cinematic action freeze-frame composition, Octane/Unreal volumetric lighting aesthetic.`,
+    "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject—focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.',
     "Corporate Technology Concept": ' - Focus on realistic photography and business themes combined with holographic UI overlays such as floating icons, glowing digital lights, and advanced tech elements. Emphasize a photorealistic corporate environment infused with futuristic, high-tech digital interfaces and data streams.',
     "Graphic Design": `You are an elite Commercial Art Director and Graphic Designer creating premium, high-selling commercial assets tailored for Adobe Stock, advertising campaigns, and professional marketing media.
 
@@ -5306,8 +5138,6 @@ When generating prompts for "Dark Horror Aesthetic", follow these core directive
   if (styleCategory === 'Vector Art' && vectorSubType) {
     if (vectorSubType === 'minimal_flat') {
       vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate under the "Minimal Flat Design" aesthetic. Focus on extreme simplicity, clean sweeping curves, elegant organic minimalist layouts, very minimal details, flat color palette with maximum 3-4 cohesive solid colors, high negative space, and absolutely no complex patterns, shading, or gradients. Keep the shapes organic, simple, and beautifully elegant.';
-    } else if (vectorSubType === 'flat_pastel') {
-      vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate strictly under the "Flat Pastel Illustration" aesthetic (Modern Minimalist Editorial Vector Art). Features: 1) Color Palette: Harmonious soft pastel and muted tones (warm coral, blush pink, soft teal, muted navy, pale sage, butter yellow). 2) Character & Subject Style: Stylized modern 2D figures that are faceless/featureless (smooth blank facial silhouettes with simple elegant hair, no detailed eyes/nose/mouth) in expressive, graceful everyday poses. 3) Shapes & Rendering: 100% clean flat 2D vector shapes, lineless color blocking or ultra-fine hairline vector outlines, zero heavy strokes, zero glossy 3D rendering, and zero noisy textures. 4) Composition: Elegant negative space, balanced minimal composition, modern editorial vector illustration suitable for premium microstock assets.';
     } else if (vectorSubType === 'flat_vector') {
       vectorSubTypeDirective = ' - SUB-STYLE SPECIFIC REQUIREMENT: You MUST generate strictly under the "Flat Vector Illustration" aesthetic. Clean hand-crafted vector paths, professional 2D illustration style, detailed but flat, using crisp outlines, beautiful sweeping curves, organic lines, and harmonious solid color blocks. STRICTLY FORBIDDEN: Do NOT generate abstract geometric blocks, faceted low-poly, 3D polygons, or chaotic geometric fragments. It must be a cohesive, beautiful, figurative 2D flat vector illustration.';
     } else if (vectorSubType === 'corporate_flat') {
@@ -5361,7 +5191,6 @@ Make sure your generated prompts do not contain these elements or depict them in
   let effectiveStyleCategory = styleCategory;
   if (styleCategory === 'Vector Art' && vectorSubType) {
     if (vectorSubType === 'minimal_flat') effectiveStyleCategory = 'Vector Art - Minimal Flat Design';
-    else if (vectorSubType === 'flat_pastel') effectiveStyleCategory = 'Vector Art - Flat Pastel Illustration';
     else if (vectorSubType === 'flat_vector') effectiveStyleCategory = 'Vector Art - Flat Vector Illustration';
     else if (vectorSubType === 'corporate_flat') effectiveStyleCategory = 'Vector Art - Corporate Flat Illustration';
     else if (vectorSubType === 'gradient_flat') effectiveStyleCategory = 'Vector Art - Gradient Flat Design';
@@ -5428,8 +5257,7 @@ Rules for the Generated Prompts:
       - 🧱 3D / CGI & RENDER (3D Render, 3D CGI, Lowpoly, Voxel Art, Isometric): Use ONLY 3D geometry, polygon meshes, PBR materials, global illumination, and ray-tracing. FORBIDDEN: "2D flat drawing", "vector path", "real physical photograph".
       - 🖌️ TRADITIONAL FINE ART (Oil Painting, Watercolor, HandDrawn Sketch, Paper Cut, Embroidery, Origami): Use ONLY tactile physical medium characteristics (brushstrokes, impasto pigments, paper grain, stitched thread, folded paper). FORBIDDEN: "digital 3D CGI", "DSLR camera lens", "vector shapes".
       - 🎮 STYLIZED & TOY (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style, Claymation): Use ONLY the specific medium vocabulary (cel-shaded animation, 8-bit pixels, interlocking plastic brick studs, hand-molded clay). FORBIDDEN: "realistic photo", "photorealistic".
-      - 💎 DYNAMIC ABSTRACT & KINETIC ENERGY (Abstract): Emphasize dynamic freeze-frame action poses, floating shattered crystalline/geometric glass shards, glowing speed streaks and neon light ribbons, explosive particle bursts, and high-contrast dramatic stadium/arena lighting on dark backgrounds.
-      - UNDER NO CIRCUMSTANCES should any prompt drift into unrelated styles unless explicitly requested.
+      - UNDER NO CIRCUMSTANCES should any prompt drift into abstract geometric patterns or unrelated styles unless explicitly requested.
 0.2 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
 1. BASE SUBJECT TRANSLATION & LOCK: First, accurately translate the core subject "${subject}" into vivid English. You MUST LOCK onto this subject. Under no circumstances can you swap the main subject for something else.
 2. Return EXACTLY ${count} unique prompt variations as an array. Each must feature the LOCKED subject, be professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
@@ -5492,11 +5320,8 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
 12. CRITICAL NEGATIVE PROMPT FORMAT: If you provide a negativePrompt, it MUST start with the prefix "Avoid: " followed by the list of forbidden elements.
 13. LANGUAGE CONSISTENCY: While all prompts must be in English, the styleExplanation must be in Indonesian.
 14. OPTIONALITY: Jika tidak ada elemen yang benar-benar relevan atau dibutuhkan (khususnya untuk negativePrompt), jangan memaksakan untuk membuatnya (biarkan kosong). Hindari teks placeholder.
-15. STICKER PREVENTION: Khusus untuk gaya gaya yang BUKAN Sticker, jangan buat detail border atau die-cut.
-16. PROMPT ARCHITECTURE & VISUAL FIDELITY EXCELLENCE:
-    Structure every single generated prompt with high descriptive fidelity and natural prose:
-    [Clear Style / Medium Anchor] -> [Core Subject with hyper-specific distinct action or stylized pose] -> [Tactile Physical Materials, Surface Textures & Micro-details] -> [Lighting Architecture & Color Harmony] -> [Framing, Camera Perspective & Balanced Commercial Negative Space].
-    Make the language sophisticated, immersive, and vivid without robotic keyword repetition. Every variation must read like an art-directed prompt masterpiece ready for production.`;
+`+
+`15. STICKER PREVENTION: Khusus untuk gaya gaya yang BUKAN Sticker, jangan buat detail border atau die-cut.`;
 
   const responseSchema = {
     type: Type.OBJECT,
@@ -5850,16 +5675,16 @@ CRITICAL DIRECTIVES:
       "vintage hand-painted portrait oil technique, rich pigments, weathered fine-art appeal"
     ],
     "Abstract": [
-      "Dynamic action freeze-frame shot of the subject in explosive motion, surrounded by floating shattered crystal glass shards, vibrant glowing cyan and electric blue speed trails, kinetic particle sparks, dark stadium arena background with volumetric floodlights, high-contrast rim lighting, 8k, Octane render",
-      "Futuristic kinetic composition of the subject sprinting with explosive momentum, encased in floating geometric polygonal prism shards, glowing orange and cyan neon light streaks, dark high-tech track with luminous ground lines, hyper-detailed, 8k",
-      "Dynamic athletic subject mid-motion, explosive burst of shattered crystalline glass fragments and glowing sparks, swirling vibrant neon energy ribbons, dramatic dark arena with overhead spotlight, sharp focus, cinematic lighting",
-      "Dynamic high-speed action shot of the subject, floating faceted geometric prism shards refracting light, glowing electric speed lines, kinetic ice debris and glowing ember particles, dramatic dark stadium, volumetric rim lighting, 8k",
-      "Artistic kinetic jump in mid-air, flowing neon ribbon trails forming geometric abstract rings, floating shattered glass polygons, dark stage with warm overhead spotlight, intense high-contrast rim light, hyper-detailed, 8k",
-      "Explosive kinetic energy composition with the subject, surrounded by floating translucent crystal shards and refractive geometric prisms, glowing magenta and electric blue light trails, dark moody backdrop with cinematic spotlights, 8k",
-      "High-speed freeze-frame of the subject in dynamic motion, shattered glass fragments dispersing through the air, vibrant glowing neon light arcs, kinetic spark explosion at contact points, dark arena with dramatic rim lighting, 8k",
-      "Futuristic cybernetic subject bursting with kinetic energy, glowing cyan and amber speed streaks, floating sharp geometric crystals, dark futuristic stadium with glowing track markings, ultra-sharp detail, 8k",
-      "Dynamic abstract kinetic artwork of the subject, swirling glowing neon light trails intertwined with faceted polygonal glass prisms, explosive particle dispersal, deep dark background with intense volumetric spotlights, 8k",
-      "Cinematic dynamic action shot of the subject, explosive burst of floating shattered glass shards, glowing light ribbons tracing the motion trajectory, high contrast rim lighting against a dark arena, hyper-detailed, 8k Octane render"
+      "Dynamic abstract light trails on dark background, energetic flowing waves, vivid neon accents, sharp geometric glass shards",
+      "High-contrast abstract energy, glowing sphere amidst swirling light ribbons, mysterious dark void, futuristic abstract art",
+      "Radiant abstract light pulses, ethereal dark atmosphere, vibrant accent streaks, complex motion and light play",
+      "Abstract digital light art, deep dark void background, sharp crystalline motion, vibrant glowing focal point",
+      "Energetic abstract composition, fluid white light waves, sharp angular glass fragments, intense vibrant spotlight, dark noir atmosphere",
+      "Vibrant fluid liquid art, colorful swirling thick pigments, high viscosity motion, chaotic yet harmonious abstract flow",
+      "Futuristic geometric abstract, complex interlocking angular shapes, metallic textures, neon grid lines, cinematic dark theme",
+      "Abstract particle simulation, dense glowing dots in motion, dark deep void, energetic dispersal, cinematic moody lighting",
+      "Holographic gradient abstract, iridescent flowing curves, light refraction, mysterious ethereal textures, dark background",
+      "Complex abstract fractal geometry, infinite intricate patterns, glowing edges, dark contrast lighting, futuristic artistic design"
     ],
     "Vintage Photography": [
       "authentic vintage analog photograph, film grain texture, classic 1970s warm color grading, nostalgic light leaks",
@@ -6094,7 +5919,7 @@ export const analyzeImageToPrompt = async (
 ): Promise<{ prompts: string[]; prompt: string; description: string }> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
-  const count = Math.min(Math.max(Number(variation) || 5, 5), 100);
+  const count = Math.min(Math.max(variation, 5), 15);
   
   let styleHandlingInstruction = "";
   if (styleCategory === 'Default' || styleCategory === 'Original Style' || styleCategory === 'Match Image') {
@@ -6167,8 +5992,7 @@ CRITICAL OUTPUT FORMAT:
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.65,
-        maxOutputTokens: count > 30 ? 16384 : 8192
+        temperature: 0.65
       });
       responseText = response.text || "{}";
       break;
@@ -6179,51 +6003,16 @@ CRITICAL OUTPUT FORMAT:
     }
   }
 
-  const angleModifiers = [
-    "macro close-up detail shot, crisp high resolution texture focus, professional studio illumination",
-    "overhead flat lay knolling perspective, perfectly organized commercial composition, clean copy space",
-    "wide-angle environmental view, immersive atmospheric depth, natural ambient lighting",
-    "dramatic low-angle heroic perspective, dynamic composition, soft volumetric rays",
-    "eye-level candid medium shot, authentic editorial framing, balanced rule-of-thirds",
-    "three-quarter dynamic profile view, soft bokeh background, elegant rim light accent",
-    "golden hour warm sunlight illumination, long soft shadows, cinematic color grading",
-    "clean minimal studio aesthetic, uncluttered generous negative space for typography overlay",
-    "moody twilight atmospheric lighting, subtle chiaroscuro contrast, sophisticated palette",
-    "contemporary high-end commercial staging, asymmetric framing, elegant aesthetic balance"
-  ];
-
   if (!responseText) {
     console.warn("analyzeImageToPrompt bypassed:", lastError?.message);
-    const fallbackList: string[] = [];
-    for (let k = 0; k < count; k++) {
-      const mod = angleModifiers[k % angleModifiers.length];
-      fallbackList.push(`${styleCategory} style visual representation of the visual subject, ${mod}, commercial high resolution asset`);
-    }
-    return {
-      prompts: fallbackList,
-      prompt: fallbackList[0] || "",
-      description: `Analisis visual selesai (mode estimasi procedural: ${count} variasi prompt).`
-    };
+    throw lastError || new Error("Failed to analyze image. Please try again.");
   }
 
   try {
     const data = JSON.parse(extractJSON(responseText));
-    let promptList = Array.isArray(data.prompts) && data.prompts.length > 0 
-      ? data.prompts.filter((p: any) => typeof p === 'string' && p.trim().length > 0).map((p: string) => p.trim())
-      : (data.prompt ? [data.prompt.trim()] : [`${styleCategory} style representation of visual subject`]);
-
-    const originalLength = promptList.length;
-    if (promptList.length < count) {
-      let modIdx = 0;
-      while (promptList.length < count) {
-        const base = promptList[promptList.length % originalLength];
-        const mod = angleModifiers[modIdx % angleModifiers.length];
-        promptList.push(`${base}, ${mod}`);
-        modIdx++;
-      }
-    } else if (promptList.length > count) {
-      promptList = promptList.slice(0, count);
-    }
+    const promptList = Array.isArray(data.prompts) && data.prompts.length > 0 
+      ? data.prompts 
+      : (data.prompt ? [data.prompt] : [`${styleCategory} style representation of visual subject`]);
       
     return {
       prompts: promptList,
@@ -6232,16 +6021,7 @@ CRITICAL OUTPUT FORMAT:
     };
   } catch (error) {
     console.warn("Gemini Parse Error:", error, responseText);
-    const fallbackList: string[] = [];
-    for (let k = 0; k < count; k++) {
-      const mod = angleModifiers[k % angleModifiers.length];
-      fallbackList.push(`${styleCategory} style visual representation of the visual subject, ${mod}, commercial high resolution asset`);
-    }
-    return {
-      prompts: fallbackList,
-      prompt: fallbackList[0] || "",
-      description: `Analisis visual selesai (${count} variasi prompt berhasil dirumuskan).`
-    };
+    throw new Error("Failed to parse AI response. Please try again.");
   }
 };
 
@@ -6253,38 +6033,19 @@ export const analyzeBatchImageToPrompt = async (
 ): Promise<{ prompts: string[]; prompt: string; description: string }[]> => {
   const concurrency = 4;
   const results: { prompts: string[]; prompt: string; description: string }[] = new Array(images.length);
-  const targetCount = Math.min(Math.max(Number(variation) || 5, 5), 100);
   
-  const angleModifiers = [
-    "macro close-up detail shot, crisp high resolution texture focus, professional illumination",
-    "overhead flat lay knolling perspective, clean commercial negative space",
-    "wide-angle environmental view, atmospheric depth",
-    "dramatic low-angle perspective, dynamic composition",
-    "eye-level medium shot, authentic editorial framing",
-    "three-quarter profile view, soft bokeh background",
-    "golden hour warm illumination, cinematic color grading",
-    "clean minimal studio staging, generous copy space",
-    "moody twilight lighting, subtle chiaroscuro contrast",
-    "contemporary commercial staging, asymmetric aesthetic balance"
-  ];
-
   for (let i = 0; i < images.length; i += concurrency) {
     const chunk = images.slice(i, i + concurrency);
     const chunkPromises = chunk.map(async (img, offset) => {
       const index = i + offset;
       try {
-        const res = await analyzeImageToPrompt(img, styleCategory, targetCount, model);
+        const res = await analyzeImageToPrompt(img, styleCategory, variation, model);
         results[index] = res;
       } catch (err: any) {
         console.warn(`[analyzeBatchImageToPrompt] Error on image index ${index}:`, err.message);
-        const fallbackList: string[] = [];
-        for (let k = 0; k < targetCount; k++) {
-          const mod = angleModifiers[k % angleModifiers.length];
-          fallbackList.push(`${styleCategory} style representation of the uploaded visual subject, ${mod}, high resolution professional stock asset`);
-        }
         results[index] = {
-          prompts: fallbackList,
-          prompt: fallbackList[0] || "",
+          prompts: [`${styleCategory} style representation of the uploaded visual subject, high resolution professional stock asset`],
+          prompt: `${styleCategory} style representation of the uploaded visual subject, high resolution professional stock asset`,
           description: "Gagal mengekstrak analisis detail gambar, menggunakan prompt estimasi gaya."
         };
       }
@@ -8118,34 +7879,38 @@ export async function generateCinematicPrompt(topic: string): Promise<string> {
 }
 
 export const ABSTRACT_STYLE_INSTRUCTION = `
-You are a Master Creative Director and AI Prompt Designer specializing in Dynamic Kinetic Abstract Art, Crystalline Shattered Geometry, and High-Contrast Cinematic Energy.
+You are a Master Abstract Artist and Creative Director specializing in deconstructive, non-literal visual art, fluid dynamics, and expressive modern compositions.
 
 When generating or refining prompts for the "Abstract" style, you MUST strictly follow these rules:
 
-1. DYNAMIC KINETIC MOTION & ACTION FREEZE-FRAME
-   - Portray the subject in high-speed, dynamic athletic or kinetic action poses with explosive forward momentum, dynamic speed arcs, and freeze-frame action moments.
-   - Maintain the subject as the recognizable energetic hero interacting seamlessly with abstract forces.
+1. CORE CONCEPT & DECONSTRUCTION
+   - Deconstruct the user's input subject into dynamic expressions of motion, kinetic energy, emotion, and non-literal forms.
+   - Shift focus away from recognizable real-world subjects toward atmospheric mood, fluid rhythm, and spatial energy.
 
-2. FLOATING SHATTERED CRYSTAL & GEOMETRIC GLASS SHARDS
-   - Seamlessly surround the subject and motion path with sharp, floating polygonal glass shards, faceted crystalline prisms, and transparent geometric fragments dispersing dynamically through the air.
-   - The shards refract and reflect the scene's vibrant light sources with sharp, crystalline edges.
+2. VISUAL CHARACTERISTICS & TEXTURES
+   - Incorporate vivid tactile textures: explosive pigment swirls, kinetic motion trails, thick impasto brushwork, layered translucent facets, or fluid marble inks.
+   - Enforce dramatic asymmetric compositions and balance of organic versus structured forms.
 
-3. GLOWING NEON LIGHT TRAILS & SPEED STREAKS
-   - Trace the motion trajectory with vibrant glowing neon light trails, electric speed streaks, and luminescent flowing ribbons (such as electric cyan, neon orange, magenta, glowing amber, or radiant white).
+3. EMBEDDED ABSTRACT MOVEMENTS & TECHNIQUES
+   - Automatically blend or select appropriate abstract movements based on the topic context:
+     * Abstract Expressionism: Bold gestural strokes and raw emotional marks.
+     * Fluid / Marble Art: Smooth liquid ink flows, acrylic pouring, and swirling colors.
+     * Neon & Kinetic: Glowing light trails, luminescent energy vectors, and vibrant neon pulses.
+     * Geometric & Cubist: Fractured geometric facets, intersecting translucent planes, and mathematical precision.
+     * Glitch Art & Distortion: Digital signal degradation, scanline distortions, and chromatic shifting.
 
-4. DRAMATIC HIGH-CONTRAST ARENA / STADIUM LIGHTING
-   - Set the scene against a moody dark arena, stadium track, or stage backdrop with volumetric stadium floodlights, intense rim lighting, and dramatic chiaroscuro contrast that makes the glowing light trails and crystalline facets pop.
+4. MANDATORY PROMPT STRUCTURE
+   - Formulate the output prompt using this structural pattern:
+     "Abstract, [subject deconstructed into energy/form] using [selected abstract style/movement] with [specific textures, e.g., vibrant paint splatters, crystalline facets, or liquid silk flow] and [atmospheric lighting]."
 
-5. KINETIC PARTICLE BURST & DEBRIS EXPLOSIONS
-   - Include explosive bursts of glowing sparks, ice debris, crystalline dust, or luminous particles erupting from pivot, footwork, or impact points.
-
-6. MANDATORY PROMPT STRUCTURE
-   - Formulate prompts using rich, cinematic descriptors:
-     "Dynamic action freeze-frame of [Subject in motion], surrounded by floating shattered crystal glass shards, vibrant glowing [neon colors] speed trails, kinetic particle explosion, dramatic dark stadium/arena background with volumetric floodlights, high-contrast rim lighting, 8k resolution, Octane render."
+5. STRICT PROHIBITIONS (STRICTLY AVOID)
+   - DO NOT generate photorealistic renders or literal human/object anatomy.
+   - DO NOT include camera lens specs (e.g., 50mm, f/1.8), raytracing parameters, or realistic world-building elements.
+   - DO NOT create static, flat, or featureless background fills.
 `;
 
 export async function generateAbstractPrompt(topic: string): Promise<string> {
-  const userQuery = `Generate a high-impact dynamic abstract image prompt for the subject: "${topic}". \nFocus on dynamic kinetic action, floating shattered crystal/geometric glass shards, vibrant glowing neon speed trails, explosive particle bursts, and dramatic high-contrast dark arena/stadium lighting. \nOutput ONLY the refined prompt text without intro or explanations.`;
+  const userQuery = `Generate a highly artistic abstract image prompt for the subject: "${topic}". \nFocus on deconstructing the subject into energy, motion, and non-literal forms. Incorporate vivid textures (impasto, fluid marble, geometric facets) and dynamic compositions. \nOutput ONLY the refined prompt text without intro or explanations.`;
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
