@@ -606,29 +606,10 @@ export const VideoQualityCheck: React.FC<{
 
               {/* Detailed Feedback */}
               <div>
-                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400 mb-3">
-                  {isIndo ? 'Umpan Balik Kurasi Video' : 'Detailed Curator Feedback'}
-                </h4>
-                <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed mb-4">
+                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400 mb-3">Detailed Feedback</h4>
+                <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
                   {report.detailed_feedback}
                 </p>
-
-                {/* Rekomendasi Solusi & Tindakan Kurasi Video */}
-                {report.recommendation !== 'PASS' && report.recommendation !== 'PASS_COMMERCIAL' && (
-                  <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
-                    <div className="flex items-center gap-2 mb-1.5 text-amber-600 dark:text-amber-400">
-                      <Zap size={14} />
-                      <p className="text-xs font-black uppercase tracking-wider">
-                        {isIndo ? 'Panduan Perbaikan Video Sebelum Re-upload' : 'Actionable Fix Advice Before Re-upload'}
-                      </p>
-                    </div>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                      {isIndo 
-                        ? 'Lakukan color grading untuk mengoreksi flat/log profile, potong (trim) frame statis/hitam di awal/akhir klip, stabilkan gerakan kamera dengan warp stabilizer jika bergetar, dan pastikan bitrate video minimal 15-20 Mbps untuk resolusi 1080p/4K.'
-                        : 'Apply color grading to correct flat/log profile, trim any empty/static black heads or tails, stabilize motion with warp stabilizer if handheld shaking occurs, and ensure target video bitrate is at least 15-20 Mbps for 1080p/4K delivery.'}
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Detailed Quality Audit Checklist */}

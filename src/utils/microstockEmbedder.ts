@@ -770,13 +770,15 @@ function buildXtraBox(tags: { name: string; values: string[]; type?: number }[])
 }
 
 function buildComprehensiveUdta(
-  title: string,
-  description: string,
-  keywords: string[] | string,
-  creator: string = 'MetaZo Contributor',
+  metadata: MicrostockMetadataInput,
   xmpText: string = ''
 ): Uint8Array {
-  const keywordArr = cleanKeywordArray(keywords);
+  const title = String(metadata.title || '').trim();
+  const description = String(metadata.description || title).trim();
+  const creator = metadata.creator || 'MetaZo Contributor';
+  const copyright = metadata.copyright || 'All rights reserved';
+  const software = metadata.software || 'MetaZo Microstock AI Assistant';
+  const keywordArr = cleanKeywordArray(metadata.keywords);
   const keywordStr = keywordArr.join('; ');
 
   const ilstItems = [
@@ -788,8 +790,8 @@ function buildComprehensiveUdta(
     buildIlstItem('\xa9gen', keywordStr),
     buildIlstItem('\xa9art', creator),
     buildIlstItem('aART', creator),
-    buildIlstItem('\xa9too', 'MetaZo Microstock Assistant'),
-    buildIlstItem('cprt', 'All rights reserved')
+    buildIlstItem('\xa9too', software),
+    buildIlstItem('cprt', copyright)
   ];
 
   const ilstPayload = concatUint8Arrays(ilstItems);
@@ -819,16 +821,27 @@ function buildComprehensiveUdta(
   metaBox.set(hdlr, 12);
   metaBox.set(ilstBox, 12 + hdlr.length);
 
-  // Dedicated Windows Media / Explorer 'Xtra' atom for Windows Explorer Property Handler:
+  // Dedicated Windows Media / Explorer 'Xtra' atom matching 100% of JPG EXIF & IPTC fields:
   // WM/Category -> System.Keywords (Windows Explorer 'Tags' field)
   // WM/SubTitle -> System.Media.SubTitle (Windows Explorer 'Subtitle' field)
-  // WM/Genre -> System.Music.Genre
-  // Author -> System.Author
+  // WM/Genre -> System.Music.Genre (Genre)
+  // Author & WM/Writer & WM/Director -> System.Author / System.ItemAuthors
+  // Copyright & WM/Copyright -> System.Copyright
+  // WM/ToolName -> System.ApplicationName (Program Name)
   const xtraBox = buildXtraBox([
     { name: 'WM/Category', values: keywordArr },
     { name: 'WM/SubTitle', values: [title] },
-    { name: 'WM/Genre', values: [keywordArr.slice(0, 3).join(', ')] },
-    { name: 'Author', values: [creator] }
+    { name: 'WM/Genre', values: [keywordArr.slice(0, 5).join(', ')] },
+    { name: 'Author', values: [creator] },
+    { name: 'WM/Author', values: [creator] },
+    { name: 'WM/Writer', values: [creator] },
+    { name: 'WM/Director', values: [creator] },
+    { name: 'WM/Producer', values: [creator] },
+    { name: 'WM/Publisher', values: [creator] },
+    { name: 'WM/EncodedBy', values: [creator] },
+    { name: 'Copyright', values: [copyright] },
+    { name: 'WM/Copyright', values: [copyright] },
+    { name: 'WM/ToolName', values: [software] }
   ]);
 
   const directAtoms = [
@@ -839,7 +852,7 @@ function buildComprehensiveUdta(
     buildQtTextAtom('\xa9cmt', description),
     buildQtTextAtom('\xa9gen', keywordStr),
     buildQtTextAtom('\xa9art', creator),
-    buildQtTextAtom('cprt', 'All rights reserved')
+    buildQtTextAtom('cprt', copyright)
   ];
 
   if (xmpText) {
@@ -936,7 +949,7 @@ export function embedMp4MetadataBytes(
     offset += boxSize;
   }
 
-  const udtaBox = buildComprehensiveUdta(title, description, metadata.keywords, creator, xmpPacket);
+  const udtaBox = buildComprehensiveUdta(metadata, xmpPacket);
   let intermediateFile = inputBytes;
 
   if (moovOffset !== -1) {
