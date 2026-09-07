@@ -2314,6 +2314,12 @@ const callGeminiWithRetry = async (
 ): Promise<any> => {
   let lastError: any;
   let currentModel = modelName;
+
+  // Pre-resolve aliases / Lite models to official Google GenAI endpoints immediately
+  if (currentModel.includes('lite') || currentModel.includes('3.1') || currentModel.includes('3.5') || currentModel.includes('3.8') || currentModel.includes('3.7') || currentModel.includes('3.6') || currentModel.includes('3-flash')) {
+    currentModel = 'gemini-2.5-flash';
+  }
+
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       return await getAIClient().models.generateContent({
@@ -2326,12 +2332,16 @@ const callGeminiWithRetry = async (
       const statusCode = err.status || err.code;
       const errorMsg = String(err.message || err.status || err.details || "").toLowerCase();
 
-      // Handle invalid model names or hallucinated models
+      // Handle invalid model names or hallucinated models with smart resolution
       if (statusCode === 400 || statusCode === 404) {
           if (errorMsg.includes("model") || errorMsg.includes("not found") || errorMsg.includes("invalid") || errorMsg.includes("support")) {
-              const fallback = 'gemini-3.5-flash';
+              let fallback = 'gemini-2.5-flash';
+              // Smart mapping for lite models: map 3.5/3.1 flash lite to official stable Gemini 2.5 Flash
+              if (currentModel.includes('lite') || currentModel.includes('3.1') || currentModel.includes('3.5')) {
+                  fallback = 'gemini-2.5-flash';
+              }
               if (currentModel !== fallback) {
-                  console.warn(`[callGeminiWithRetry] Model ${currentModel} invalid/not found. Falling back to ${fallback}.`);
+                  console.warn(`[callGeminiWithRetry] Model ${currentModel} invalid/not found. Smart mapping to ${fallback}.`);
                   currentModel = fallback;
                   continue; // retry immediately
               }
@@ -2359,7 +2369,7 @@ const callGeminiWithRetry = async (
         // Dynamically rotate models on 429 (quota) or 503 (high demand) to bypass the wait time
         const isQuotaOrLimit = statusCode === 429 || statusCode === 503;
         if (isQuotaOrLimit) {
-          const rotationModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite-preview'];
+          const rotationModels = ['gemini-2.5-flash', 'gemini-2.5-pro'];
           const currentIndex = rotationModels.indexOf(currentModel);
           const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % rotationModels.length : 0;
           let nextModel = rotationModels[nextIndex];
@@ -3959,12 +3969,20 @@ MANDATORY RULES FOR TARGET KEYWORDS & TITLE (STRICT PRIORITY):
 4. DESIGNER/COMMERCIAL MINDSET: If the instruction implies a graphic design, promo, commercial layout, or background with copy space (e.g. "Graphic Design", "Promo", "Copy Space"), describe the asset's utility for commercial advertising, emphasize where the copy space is, and use professional marketing/design terminology.
 5. ASSET RELEVANCE: While following this instruction completely, ensure you still ground the description in the actual visual facts of the asset.` : "";
 
-  const mediaContext = mediaTypeContext;
+  const isLiteOrFlash = !activeModel || activeModel.includes('lite') || activeModel.includes('flash');
+  const liteSmartDirective = isLiteOrFlash ? `
+[INTELLIGENT LITE MODEL GROUNDING DIRECTIVE]:
+You are operating in High-Precision Stock Contributor Mode. 
+1. 100% FACTUAL ANCHORING: Every keyword, title element, and description detail MUST directly originate from the provided VISUAL_FACTS. Do NOT hallucinate unseen accessories, people, or environments.
+2. ZERO FILLER TOLERANCE: Absolutely FORBIDDEN to use generic filler or spam keywords: "photo", "photography", "image", "picture", "vector", "illustration", "background", "wallpaper", "beautiful", "nice", "stunning", "high quality", "hd", "4k", "generic".
+3. FRONT-LOAD RELEVANCE: Positions 1-10 of keywords MUST contain the core physical subject and direct visible attributes.
+4. NATURAL TITLE: The title must read like a human editorial headline without keyword stuffing or robotic repetition.` : "";
+
   const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
 OUTPUT MUST BE STRICTLY IN ${getLanguageName(metadataLanguage)} for Title, Description, and Keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
-${mediaContext}${customPromptCommand}${exifInstruction}
+${mediaContext}${customPromptCommand}${exifInstruction}${liteSmartDirective}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
@@ -4027,6 +4045,8 @@ OUTPUT FORMAT:
 }
 If generation fails, return {"error": "metadata_generation_failed"}.`;
 
+  const effectiveGenTemp = temperature ?? (isLiteOrFlash ? 0.15 : 0.3);
+
   let draftMetadata: any = {};
   try {
     let genResponse: any;
@@ -4036,7 +4056,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
                 systemInstruction: genSystemInstruction,
                 contents: `Generate draft metadata based on VISUAL_FACTS. IMPORTANT: Fill all fields. [RunID: ${Date.now()}-${Math.random()}]`,
                 responseMimeType: "application/json",
-                config: { temperature: temperature ?? 0.3, topP: 0.9 },
+                config: { temperature: effectiveGenTemp, topP: 0.9 },
                 model: activeModel
             });
         } catch (providerError: any) {
@@ -4047,7 +4067,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
                 }, {
                   systemInstruction: genSystemInstruction,
                   responseMimeType: "application/json",
-                  temperature: temperature ?? 0.3,
+                  temperature: effectiveGenTemp,
                   topP: 0.9 
                 });
         }
@@ -4057,7 +4077,7 @@ If generation fails, return {"error": "metadata_generation_failed"}.`;
           }, {
             systemInstruction: genSystemInstruction,
             responseMimeType: "application/json",
-            temperature: temperature ?? 0.3,
+            temperature: effectiveGenTemp,
             topP: 0.9 
           });
     }
@@ -4646,11 +4666,20 @@ MANDATORY RULES FOR TARGET KEYWORDS & TITLE (STRICT PRIORITY):
 4. DESIGNER/COMMERCIAL MINDSET: If the instruction implies a graphic design, promo, commercial layout, or background with copy space (e.g. "Graphic Design", "Promo", "Copy Space"), describe the asset's utility for commercial advertising, emphasize where the copy space is, and use professional marketing/design terminology.
 5. ASSET RELEVANCE: While following this instruction completely, ensure you still ground the description in the actual visual facts of the asset.` : "";
 
+  const isLiteOrFlash = !activeModel || activeModel.includes('lite') || activeModel.includes('flash');
+  const liteSmartDirective = isLiteOrFlash ? `
+[INTELLIGENT LITE MODEL GROUNDING DIRECTIVE]:
+You are operating in High-Precision Stock Contributor Mode for batch generation. 
+1. 100% FACTUAL ANCHORING: Every keyword, title element, and description detail MUST directly originate from the provided VISUAL_FACTS. Do NOT hallucinate unseen accessories, people, or environments.
+2. ZERO FILLER TOLERANCE: Absolutely FORBIDDEN to use generic filler or spam keywords: "photo", "photography", "image", "picture", "vector", "illustration", "background", "wallpaper", "beautiful", "nice", "stunning", "high quality", "hd", "4k", "generic".
+3. FRONT-LOAD RELEVANCE: Positions 1-10 of keywords MUST contain the core physical subject and direct visible attributes.
+4. NATURAL TITLE: The title must read like a human editorial headline without keyword stuffing or robotic repetition.` : "";
+
   const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
 OUTPUT MUST BE STRICTLY IN ${getLanguageName(metadataLanguage)} for Title, Description, and Keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
-${mediaContext}${customPromptCommand}
+${mediaContext}${customPromptCommand}${liteSmartDirective}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
@@ -6530,9 +6559,11 @@ STANDAR MODERASI & PEDOMAN RESMI ADOBE STOCK:
    - Simbol & Emblems Khusus: Aset NASA (logo, astronot, misi ruang angkasa — DILARANG KERAS untuk konten AI generatif), Palang Merah / Bulan Sabit Merah, Cincin Olimpiade, Lambang PBB, uang kertas/mata uang utuh.
    - Model & Property Release: Wajib model release untuk wajah manusia yang dapat dikenali, dan property release untuk lokasi privat / arsitektur khusus.
 
-2. STANDAR KUALITAS & KECACATAN PROPORSI (Quality Issues & Proportion Defects - https://helpx.adobe.com/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html):
-   - Kecacatan Proporsi & Skala: Disproporsi anggota tubuh (kepala, tangan, kaki, jari), ketidakwajaran skala objek terhadap lingkungan (misal cangkir sebesar meja), distorsi geometri atau perspektif 3D yang merusak kealamian gambar.
-   - Artefak AI Generatif: Jari berlebih/menyatu, mata tidak simetris, tekstur kulit lilin (waxy skin) abnormal, objek meleleh (melting), teks/huruf yang tidak terbaca (gibberish).
+2. STANDAR KUALITAS, KECACATAN MEKANIKAL & ANATOMI AI (Quality Issues, Structural Defects & Proportion Anomalies):
+   - Ketelitian Anatomi & Anggota Tubuh: Periksa dengan ketat jumlah jari tangan/kaki (polydactyly / syndactyly), kuku yang menyatu atau meleleh, struktur sendi yang patah/tidak wajar, simetri mata, dan posisi pupil.
+   - Integritas Mekanikal & Logika Fisika: Periksa struktur benda mekanis buatan AI (misalnya rantai sepeda yang melayang tanpa gear, pedal menyatu dengan rangka, roda gigi yang bertabrakan secara fisika, kabel/port yang hilang tujuannya, tangga dengan anak tangga terputus, atau perspektif furnitur yang cacat). Bila ada ketidakwajaran struktur fisik/mekanis, WAJIB tandai FAIL.
+   - Teks & Grafis Semu (OCR / Gibberish Artifacts): Deteksi teks semu, huruf alien/tidak terbaca pada plang jalan, billboard, label kemasan, neon sign, atau lencana. Teks yang tidak koheren adalah alasan penolakan utama Adobe Stock untuk AI ("Non-compliant generative AI / Quality issues").
+   - Artefak AI Generatif Lainnya: Tekstur kulit lilin abnormal (plastic/waxy skin), objek meleleh ke latar belakang (melting borders), artefak haloing di sekeliling subjek.
 
 3. STANDAR TEKNIS FOTOGRAFI (Technical Standards):
    - Fokus & Ketajaman: Subjek utama wajib fokus tajam (tack-sharp) pada inspeksi crop 100%. Bebas dari camera shake dan motion blur yang merusak.
@@ -6540,19 +6571,19 @@ STANDAR MODERASI & PEDOMAN RESMI ADOBE STOCK:
    - Noise & Kompresi: Bebas dari digital sensor noise berlebih, artefak kompresi JPEG (macro-blocking, color banding, pixelation).
 
 4. PERALATAN FORENSIK YANG DIGUNAKAN (Detection Tools Used):
-   - AI Multimodal Vision Quality Inspector (Pemeriksaan Semantik & Visual Mendalam)
+   - AI Multimodal Vision Quality Inspector (Pemeriksaan Semantik, Anatomi & Logika Visual Mendalam)
    - OpenCV Forensic Pixel Engine (Inspeksi Crop 100% & Edge Laplacian Sharpness Analysis)
    - BRISQUE & NIQE Spatial Quality & Distortion Metric Analyzer
-   - YOLO (You Only Look Once) Neural Object & Feature Grounding
+   - YOLO (You Only Look Once) Neural Object & Structural Feature Grounding
    - Luma & Chrominance Histogram Exposure Inspector
 
 FORMAT LAPORAN:
 Kembalikan keterangan naratif terpadu yang jelas, terstruktur, dan elegan (TIDAK terpecah-pecah per-part) untuk:
 - detection_tools_used: Daftar nama alat forensik yang digunakan.
 - ip_audit_summary: Keterangan naratif lengkap audit hak cipta, merek dagang, landmark, dan kebutuhan rilis.
-- quality_issues_summary: Keterangan naratif lengkap audit kualitas visual, proporsi, anatomi, dan keutuhan bentuk.
+- quality_issues_summary: Keterangan naratif lengkap audit kualitas visual, proporsi, anatomi jari/wajah, logika mekanikal benda, dan keutuhan bentuk.
 - technical_issues_summary: Keterangan naratif lengkap audit standar teknis fotografi (ketajaman 100%, pencahayaan, noise, kompresi).
-- detailed_feedback: Kesimpulan akhir kurator Adobe Stock dan langkah perbaikan yang disarankan.` + metadataInstruction;
+- detailed_feedback: Kesimpulan akhir kurator Adobe Stock, alasan spesifik jika ditolak, serta PANDUAN LANGKAH PERBAIKAN NYATA (Actionable Fix Advice, misalnya: inpaint area jari, hapus teks semu via Content-Aware/Generative Fill, perbaiki exposure, atau kurangi noise).` + metadataInstruction;
 
   const responseSchema = {
     type: Type.OBJECT,
@@ -6648,12 +6679,7 @@ Kembalikan keterangan naratif terpadu yang jelas, terstruktur, dan elegan (TIDAK
   }
   const imageParts = resolvedImages.map(img => processFrameServer(img));
   
-  let selectedModel = model || 'gemini-3.1-pro-preview';
-  if (selectedModel === 'auto' || !selectedModel.startsWith('gemini')) {
-    selectedModel = 'gemini-3.1-pro-preview';
-  }
-
-  const modelsToTry = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+  let selectedModel = (model && model.startsWith('gemini')) ? model : 'gemini-2.5-flash';
   let responseText = "";
   let lastError;
 
@@ -6695,22 +6721,27 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
       console.error(`[checkImageQuality] Non-Gemini API call failed with model ${activeModel}:`, err.message || err);
     }
   } else {
-    const activeModel = selectedModel;
-    const modelsToTryList = activeModel && activeModel.startsWith('gemini') ? [activeModel, ...modelsToTry] : modelsToTry;
-    
-    for (const modelName of modelsToTryList) {
-      try {
-        const res = await callGeminiWithRetry(modelName, { parts: [...imageParts, { text: promptText }] }, {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema
-        });
-        responseText = res.text || "{}";
-        break;
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[checkImageQuality] Failed with ${modelName}:`, err.message || err);
-        if (err.message && err.message.includes('API_KEY')) throw err;
+    try {
+      const res = await callGeminiWithRetry(selectedModel, { parts: [...imageParts, { text: promptText }] }, {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema
+      });
+      responseText = res.text || "{}";
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[checkImageQuality] Primary call with ${selectedModel} failed:`, err.message || err);
+      if (selectedModel !== 'gemini-2.5-flash') {
+        try {
+          const fallbackRes = await callGeminiWithRetry('gemini-2.5-flash', { parts: [...imageParts, { text: promptText }] }, {
+            systemInstruction,
+            responseMimeType: "application/json",
+            responseSchema
+          });
+          responseText = fallbackRes.text || "{}";
+        } catch (fbErr: any) {
+          lastError = fbErr;
+        }
       }
     }
   }
