@@ -4432,7 +4432,54 @@ const App: React.FC = () => {
       exportName = getExportFilename(item.customFileName || item.file.name, item.file);
     }
 
-    // 1. High-speed client-side embedding for Images, Vectors & Videos (JPG, PNG, SVG, EPS, MP4, MOV, WEBM)
+    const isVideo = ['mp4', 'mov', 'webm', 'm4v', 'avi'].includes(origExt);
+
+    // 1. For Video files: prioritize Server FFmpeg engine to write full native Windows Explorer & Microstock metadata atoms
+    if (isVideo) {
+      try {
+        const formData = new FormData();
+        formData.append('file', item.file, exportName);
+        formData.append('title', title);
+        formData.append('description', description);
+        formData.append('keywords', JSON.stringify(keywords));
+        if (item.adobeCategoryId) formData.append('adobeCategoryId', String(item.adobeCategoryId));
+        if (item.shutterstockCategory1) formData.append('shutterstockCategory1', item.shutterstockCategory1);
+        if (item.shutterstockCategory2) formData.append('shutterstockCategory2', item.shutterstockCategory2);
+        if (item.dreamstimeCategory) formData.append('dreamstimeCategory', item.dreamstimeCategory);
+        if (item.miriCanvasCategory) formData.append('miriCanvasCategory', item.miriCanvasCategory);
+        if (commonAiOptions?.model) formData.append('model', commonAiOptions.model);
+
+        const reqHeaders = { ...getHeaders(commonAiOptions) };
+        delete reqHeaders['Content-Type'];
+
+        const resp = await fetch('/api/embed-metadata', {
+          method: 'POST',
+          headers: reqHeaders,
+          body: formData
+        });
+
+        if (resp.ok) {
+          const contentType = resp.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const data = await resp.json();
+            if (data.downloadUrl) {
+              const urlResp = await fetch(data.downloadUrl);
+              if (urlResp.ok) {
+                const urlBlob = await urlResp.blob();
+                return { blob: urlBlob, exportName };
+              }
+            }
+          } else {
+            const blob = await resp.blob();
+            return { blob, exportName };
+          }
+        }
+      } catch (serverErr) {
+        console.warn('[Download Embedded Video] Server FFmpeg error, falling back to client-side:', serverErr);
+      }
+    }
+
+    // 2. High-speed client-side embedding for Images & Vectors (JPG, PNG, SVG, EPS) and Video fallback
     try {
       const embeddedBlob = await embedMicrostockMetadata(item.file, {
         title,
@@ -4451,50 +4498,7 @@ const App: React.FC = () => {
         return { blob: embeddedBlob, exportName };
       }
     } catch (clientErr) {
-      console.warn('[Download Embedded] Client embed warning, trying server endpoint:', clientErr);
-    }
-
-    // 2. Server endpoint for Video or fallback
-    try {
-      const formData = new FormData();
-      formData.append('file', item.file, exportName);
-      formData.append('title', title);
-      formData.append('description', description);
-      formData.append('keywords', JSON.stringify(keywords));
-      if (item.adobeCategoryId) formData.append('adobeCategoryId', String(item.adobeCategoryId));
-      if (item.shutterstockCategory1) formData.append('shutterstockCategory1', item.shutterstockCategory1);
-      if (item.shutterstockCategory2) formData.append('shutterstockCategory2', item.shutterstockCategory2);
-      if (item.dreamstimeCategory) formData.append('dreamstimeCategory', item.dreamstimeCategory);
-      if (item.miriCanvasCategory) formData.append('miriCanvasCategory', item.miriCanvasCategory);
-      if (commonAiOptions?.model) formData.append('model', commonAiOptions.model);
-
-      const reqHeaders = { ...getHeaders(commonAiOptions) };
-      delete reqHeaders['Content-Type'];
-
-      const resp = await fetch('/api/embed-metadata', {
-        method: 'POST',
-        headers: reqHeaders,
-        body: formData
-      });
-
-      if (resp.ok) {
-        const contentType = resp.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          const data = await resp.json();
-          if (data.downloadUrl) {
-            const urlResp = await fetch(data.downloadUrl);
-            if (urlResp.ok) {
-              const urlBlob = await urlResp.blob();
-              return { blob: urlBlob, exportName };
-            }
-          }
-        } else {
-          const blob = await resp.blob();
-          return { blob, exportName };
-        }
-      }
-    } catch (serverErr) {
-      console.warn('[Download Embedded] Server endpoint error:', serverErr);
+      console.warn('[Download Embedded] Client embed warning:', clientErr);
     }
 
     // 3. Fallback: Raw file
