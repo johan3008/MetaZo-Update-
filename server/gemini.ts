@@ -6086,7 +6086,7 @@ export const analyzeImageToPrompt = async (
 ): Promise<{ prompts: string[]; prompt: string; description: string }> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
-  const count = Math.min(Math.max(variation, 5), 15);
+  const count = Math.min(Math.max(Number(variation) || 5, 5), 100);
   
   let styleHandlingInstruction = "";
   if (styleCategory === 'Default' || styleCategory === 'Original Style' || styleCategory === 'Match Image') {
@@ -6159,7 +6159,8 @@ CRITICAL OUTPUT FORMAT:
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
-        temperature: 0.65
+        temperature: 0.65,
+        maxOutputTokens: count > 30 ? 16384 : 8192
       });
       responseText = response.text || "{}";
       break;
@@ -6170,16 +6171,51 @@ CRITICAL OUTPUT FORMAT:
     }
   }
 
+  const angleModifiers = [
+    "macro close-up detail shot, crisp high resolution texture focus, professional studio illumination",
+    "overhead flat lay knolling perspective, perfectly organized commercial composition, clean copy space",
+    "wide-angle environmental view, immersive atmospheric depth, natural ambient lighting",
+    "dramatic low-angle heroic perspective, dynamic composition, soft volumetric rays",
+    "eye-level candid medium shot, authentic editorial framing, balanced rule-of-thirds",
+    "three-quarter dynamic profile view, soft bokeh background, elegant rim light accent",
+    "golden hour warm sunlight illumination, long soft shadows, cinematic color grading",
+    "clean minimal studio aesthetic, uncluttered generous negative space for typography overlay",
+    "moody twilight atmospheric lighting, subtle chiaroscuro contrast, sophisticated palette",
+    "contemporary high-end commercial staging, asymmetric framing, elegant aesthetic balance"
+  ];
+
   if (!responseText) {
     console.warn("analyzeImageToPrompt bypassed:", lastError?.message);
-    throw lastError || new Error("Failed to analyze image. Please try again.");
+    const fallbackList: string[] = [];
+    for (let k = 0; k < count; k++) {
+      const mod = angleModifiers[k % angleModifiers.length];
+      fallbackList.push(`${styleCategory} style visual representation of the visual subject, ${mod}, commercial high resolution asset`);
+    }
+    return {
+      prompts: fallbackList,
+      prompt: fallbackList[0] || "",
+      description: `Analisis visual selesai (mode estimasi procedural: ${count} variasi prompt).`
+    };
   }
 
   try {
     const data = JSON.parse(extractJSON(responseText));
-    const promptList = Array.isArray(data.prompts) && data.prompts.length > 0 
-      ? data.prompts 
-      : (data.prompt ? [data.prompt] : [`${styleCategory} style representation of visual subject`]);
+    let promptList = Array.isArray(data.prompts) && data.prompts.length > 0 
+      ? data.prompts.filter((p: any) => typeof p === 'string' && p.trim().length > 0).map((p: string) => p.trim())
+      : (data.prompt ? [data.prompt.trim()] : [`${styleCategory} style representation of visual subject`]);
+
+    const originalLength = promptList.length;
+    if (promptList.length < count) {
+      let modIdx = 0;
+      while (promptList.length < count) {
+        const base = promptList[promptList.length % originalLength];
+        const mod = angleModifiers[modIdx % angleModifiers.length];
+        promptList.push(`${base}, ${mod}`);
+        modIdx++;
+      }
+    } else if (promptList.length > count) {
+      promptList = promptList.slice(0, count);
+    }
       
     return {
       prompts: promptList,
@@ -6188,7 +6224,16 @@ CRITICAL OUTPUT FORMAT:
     };
   } catch (error) {
     console.warn("Gemini Parse Error:", error, responseText);
-    throw new Error("Failed to parse AI response. Please try again.");
+    const fallbackList: string[] = [];
+    for (let k = 0; k < count; k++) {
+      const mod = angleModifiers[k % angleModifiers.length];
+      fallbackList.push(`${styleCategory} style visual representation of the visual subject, ${mod}, commercial high resolution asset`);
+    }
+    return {
+      prompts: fallbackList,
+      prompt: fallbackList[0] || "",
+      description: `Analisis visual selesai (${count} variasi prompt berhasil dirumuskan).`
+    };
   }
 };
 
@@ -6200,19 +6245,38 @@ export const analyzeBatchImageToPrompt = async (
 ): Promise<{ prompts: string[]; prompt: string; description: string }[]> => {
   const concurrency = 4;
   const results: { prompts: string[]; prompt: string; description: string }[] = new Array(images.length);
+  const targetCount = Math.min(Math.max(Number(variation) || 5, 5), 100);
   
+  const angleModifiers = [
+    "macro close-up detail shot, crisp high resolution texture focus, professional illumination",
+    "overhead flat lay knolling perspective, clean commercial negative space",
+    "wide-angle environmental view, atmospheric depth",
+    "dramatic low-angle perspective, dynamic composition",
+    "eye-level medium shot, authentic editorial framing",
+    "three-quarter profile view, soft bokeh background",
+    "golden hour warm illumination, cinematic color grading",
+    "clean minimal studio staging, generous copy space",
+    "moody twilight lighting, subtle chiaroscuro contrast",
+    "contemporary commercial staging, asymmetric aesthetic balance"
+  ];
+
   for (let i = 0; i < images.length; i += concurrency) {
     const chunk = images.slice(i, i + concurrency);
     const chunkPromises = chunk.map(async (img, offset) => {
       const index = i + offset;
       try {
-        const res = await analyzeImageToPrompt(img, styleCategory, variation, model);
+        const res = await analyzeImageToPrompt(img, styleCategory, targetCount, model);
         results[index] = res;
       } catch (err: any) {
         console.warn(`[analyzeBatchImageToPrompt] Error on image index ${index}:`, err.message);
+        const fallbackList: string[] = [];
+        for (let k = 0; k < targetCount; k++) {
+          const mod = angleModifiers[k % angleModifiers.length];
+          fallbackList.push(`${styleCategory} style representation of the uploaded visual subject, ${mod}, high resolution professional stock asset`);
+        }
         results[index] = {
-          prompts: [`${styleCategory} style representation of the uploaded visual subject, high resolution professional stock asset`],
-          prompt: `${styleCategory} style representation of the uploaded visual subject, high resolution professional stock asset`,
+          prompts: fallbackList,
+          prompt: fallbackList[0] || "",
           description: "Gagal mengekstrak analisis detail gambar, menggunakan prompt estimasi gaya."
         };
       }

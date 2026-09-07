@@ -51,23 +51,23 @@ const DARK_HORROR_SUB_STYLES = [
   { id: 'Painterly Digital Art', label: 'Painterly Digital Art', desc: 'Goresan kuas tebal (impasto) ala mahakarya lukisan digital.' }
 ];
 
-const STYLE_OPTIONS = (t: any) => [
-  { id: 'Default', label: 'Default (Style Asli)', icon: '🎯', desc: 'Sesuai Style Gambar Asli' },
-  { id: 'Flat Illustration', label: 'Flat Illustration', icon: '🎨', desc: '2D Flat Vector Art' },
-  { id: 'Photorealistic', label: t.style_photorealistic || 'Photorealistic', icon: '📷', desc: 'Realism' },
-  { id: 'Cinematic', label: t.style_cinematic || 'Cinematic', icon: '🎬', desc: 'Movie light' },
-  { id: 'Adobe Stock', label: t.style_adobe_stock || 'Adobe Stock', icon: '💎', desc: 'Commercial' },
-  { id: 'Editorial', label: t.style_editorial || 'Editorial', icon: '📖', desc: 'Magazine' },
-  { id: 'Lifestyle', label: t.style_lifestyle || 'Lifestyle', icon: '✨', desc: 'Natural' },
-  { id: 'Fine Art', label: t.style_fine_art || 'Fine Art', icon: '🏛️', desc: 'Artistic' },
+const STYLE_OPTIONS = (t: any, isIndo = false) => [
+  { id: 'Default', label: isIndo ? 'Default (Style Asli)' : 'Default (Original Style)', icon: '🎯', desc: isIndo ? 'Sesuai Style Gambar Asli' : 'Match Original Style' },
+  { id: 'Flat Illustration', label: 'Flat Illustration', icon: '🎨', desc: isIndo ? 'Seni Vektor Datar 2D' : '2D Flat Vector Art' },
+  { id: 'Photorealistic', label: t.style_photorealistic || 'Photorealistic', icon: '📷', desc: isIndo ? 'Realisme Foto' : 'Realism' },
+  { id: 'Cinematic', label: t.style_cinematic || 'Cinematic', icon: '🎬', desc: isIndo ? 'Pencahayaan Sinematik' : 'Movie lighting' },
+  { id: 'Adobe Stock', label: t.style_adobe_stock || 'Adobe Stock', icon: '💎', desc: isIndo ? 'Standar Komersial' : 'Commercial' },
+  { id: 'Editorial', label: t.style_editorial || 'Editorial', icon: '📖', desc: isIndo ? 'Majalah & Publikasi' : 'Magazine' },
+  { id: 'Lifestyle', label: t.style_lifestyle || 'Lifestyle', icon: '✨', desc: isIndo ? 'Alami & Natural' : 'Natural' },
+  { id: 'Fine Art', label: t.style_fine_art || 'Fine Art', icon: '🏛️', desc: isIndo ? 'Artistik Galeri' : 'Artistic' },
   { id: '3D Render', label: '3D Render', icon: '🧊', desc: 'Octane Engine' },
-  { id: 'Anime', label: 'Anime', icon: '🌸', desc: 'Japanese' },
-  { id: 'Embroidery', label: 'Embroidery', icon: '🧵', desc: 'Needlework' },
+  { id: 'Anime', label: 'Anime', icon: '🌸', desc: 'Japanese Style' },
+  { id: 'Embroidery', label: 'Embroidery', icon: '🧵', desc: isIndo ? 'Bordir & Jahitan' : 'Needlework' },
   { id: 'Disney Cartoon', label: 'Disney Cartoon', icon: '🏰', desc: 'Animation' },
   { id: 'Dark Horror Aesthetic', label: 'Dark Horror Aesthetic', icon: '🦇', desc: 'Macabre' },
   { id: 'Lego Style', label: 'Lego Style', icon: '🧱', desc: 'Bricks' },
   { id: 'Voxel Art', label: 'Voxel Art', icon: '🟩', desc: 'Cubes' },
-  { id: 'Graphic Design', label: 'Graphic Design', icon: '📐', desc: 'Commercial Design' }
+  { id: 'Graphic Design', label: 'Graphic Design', icon: '📐', desc: isIndo ? 'Desain Grafis Komersial' : 'Commercial Design' }
 ];
 
 export const PromptImageView: React.FC<PromptImageViewProps> = ({ 
@@ -79,6 +79,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
   setShowLimitModal,
   uiLanguage = 'en'
 }) => {
+  const isIndo = uiLanguage === 'id';
   const [images, setImages] = useState<ImageItem[]>([]);
   const handleFilesRef = useRef<(files: FileList | File[] | null) => Promise<void>>((_f) => Promise.resolve());
   useEffect(() => {
@@ -242,10 +243,14 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
           return;
         }
       }
-      alert('Tidak ada gambar di clipboard. Silakan klik kanan "Salin Gambar" (Copy Image) di web lain atau gunakan Screenshot (Win + Shift + S), lalu tekan tombol ini atau tekan Ctrl+V.');
+      alert(isIndo
+        ? 'Tidak ada gambar di clipboard. Silakan klik kanan "Salin Gambar" (Copy Image) di web lain atau gunakan Screenshot (Win + Shift + S), lalu tekan tombol ini atau tekan Ctrl+V.'
+        : 'No image found in clipboard. Please right-click "Copy Image" on any web page or take a Screenshot (Win + Shift + S), then click this button or press Ctrl+V.');
     } catch (err) {
       console.warn('Clipboard read error or not permitted:', err);
-      alert('Silakan langsung tekan tombol Ctrl+V pada keyboard untuk menempelkan (Paste) gambar yang sudah disalin!');
+      alert(isIndo
+        ? 'Silakan langsung tekan tombol Ctrl+V pada keyboard untuk menempelkan (Paste) gambar yang sudah disalin!'
+        : 'Please press Ctrl+V on your keyboard to paste the copied image directly!');
     }
   };
 
@@ -264,15 +269,15 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
 
       // Extract prompt lines/blocks
       const rawBlocks = rawText
-        .split(/(?:={5,}|-{5,}|\[GAMBAR\s*\d+\])/i)
+        .split(/(?:={5,}|-{5,}|\[GAMBAR\s*\d+\]|\[IMAGE\s*\d+\])/i)
         .map(b => b.trim())
-        .filter(b => b.length > 0 && !b.startsWith('METAZO') && !b.startsWith('Tanggal') && !b.startsWith('Total Gambar'));
+        .filter(b => b.length > 0 && !b.startsWith('METAZO') && !b.startsWith('Tanggal') && !b.startsWith('Export') && !b.startsWith('Total Gambar'));
 
       const promptsExtracted: string[] = [];
       if (rawBlocks.length > 0) {
         rawBlocks.forEach(blk => {
           // split variations
-          const varChunks = blk.split(/Variasi\s*\d+:/i).map(v => v.trim()).filter(Boolean);
+          const varChunks = blk.split(/(?:Variasi|Variation)\s*\d+:/i).map(v => v.trim()).filter(Boolean);
           if (varChunks.length > 0) {
             promptsExtracted.push(...varChunks);
           } else {
@@ -292,7 +297,9 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
         result: {
           prompts: promptsExtracted,
           prompt: promptsExtracted[0] || "",
-          description: `Berhasil diimpor dari berkas teks: ${file.name} (${promptsExtracted.length} prompt termuat).`
+          description: isIndo
+            ? `Berhasil diimpor dari berkas teks: ${file.name} (${promptsExtracted.length} prompt termuat).`
+            : `Successfully imported from text file: ${file.name} (${promptsExtracted.length} prompts loaded).`
         }
       };
 
@@ -309,16 +316,16 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
 
     let content = `====================================================\n`;
     content += `METAZO PROMPT STUDIO - BATCH PROMPT EXPORT\n`;
-    content += `Waktu Ekspor : ${new Date().toLocaleString('id-ID')}\n`;
-    content += `Total Item   : ${finishedImages.length}\n`;
-    content += `Target Style : ${noStyle ? 'Tanpa Style (Style Alami Gambar)' : styleCategory}\n`;
+    content += `${isIndo ? 'Waktu Ekspor' : 'Export Time'} : ${new Date().toLocaleString(isIndo ? 'id-ID' : 'en-US')}\n`;
+    content += `${isIndo ? 'Total Item' : 'Total Items'}   : ${finishedImages.length}\n`;
+    content += `Target Style : ${noStyle ? (isIndo ? 'Tanpa Style (Style Alami Gambar)' : 'Without Style (Natural Image Style)') : styleCategory}\n`;
     content += `====================================================\n\n`;
 
     finishedImages.forEach((img, idx) => {
       content += `====================================================\n`;
-      content += `[GAMBAR ${idx + 1}]: ${img.name}\n`;
+      content += `[${isIndo ? 'GAMBAR' : 'IMAGE'} ${idx + 1}]: ${img.name}\n`;
       if (img.result?.description) {
-        content += `Deskripsi Analisis: ${img.result.description}\n`;
+        content += `${isIndo ? 'Deskripsi Analisis' : 'Analysis Description'}: ${img.result.description}\n`;
       }
       content += `----------------------------------------------------\n`;
       const pList = img.result?.prompts && img.result.prompts.length > 0
@@ -326,7 +333,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
         : [img.result?.prompt || ''];
 
       pList.forEach((p, pIdx) => {
-        content += `Variasi ${pIdx + 1}:\n${p}\n\n`;
+        content += `${isIndo ? 'Variasi' : 'Variation'} ${pIdx + 1}:\n${p}\n\n`;
       });
       content += `\n`;
     });
@@ -435,9 +442,26 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
             return await singleResp.json();
           } catch (e: any) {
             console.warn('[PromptImageView] Single fallback failed for an image:', e.message);
+            const fallbackPrompts: string[] = [];
+            const angleMods = [
+              "macro close-up detail shot, crisp texture focus, professional illumination",
+              "overhead flat lay perspective, clean commercial negative space",
+              "wide-angle environmental view, atmospheric depth",
+              "dramatic low-angle perspective, dynamic composition",
+              "eye-level medium shot, authentic editorial framing",
+              "three-quarter profile view, soft bokeh background",
+              "golden hour warm illumination, cinematic color grading",
+              "clean minimal studio staging, generous copy space",
+              "moody twilight lighting, subtle chiaroscuro contrast",
+              "contemporary commercial staging, asymmetric aesthetic balance"
+            ];
+            for (let k = 0; k < variation; k++) {
+              const mod = angleMods[k % angleMods.length];
+              fallbackPrompts.push(`${effectiveStyle} style visual representation of the subject, ${mod}, commercial high resolution asset`);
+            }
             return {
-              prompts: [`${effectiveStyle} style visual representation of the subject, commercial high resolution asset`],
-              prompt: `${effectiveStyle} style visual representation of the subject, commercial high resolution asset`,
+              prompts: fallbackPrompts,
+              prompt: fallbackPrompts[0] || "",
               description: "Prompt berhasil diestimasi berdasarkan gaya visual."
             };
           }
@@ -484,7 +508,21 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
     }
   };
 
-  const currentStyleOptions = STYLE_OPTIONS(t);
+  const formatItemForClipboard = (item: ImageItem): string => {
+    const pList = item.result?.prompts && item.result.prompts.length > 0
+      ? item.result.prompts
+      : [item.result?.prompt || ''];
+
+    let content = '';
+    if (item.result?.description) {
+      content += `${isIndo ? 'Caption Deskripsi' : 'Caption Description'}:\n${item.result.description}\n\n`;
+    }
+    content += `AI Prompt Variations (${pList.length} ${isIndo ? 'Variasi' : 'Variations'}):\n`;
+    content += pList.map((p, idx) => `${isIndo ? 'Variasi' : 'Variation'} ${idx + 1}:\n${p}`).join('\n\n');
+    return content;
+  };
+
+  const currentStyleOptions = STYLE_OPTIONS(t, isIndo);
 
   return (
     <div className="w-full space-y-6">
@@ -585,10 +623,10 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                       type="button"
                       onClick={handlePasteFromClipboardButton}
                       className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
-                      title="Tempel gambar langsung dari clipboard (salin dari web lain)"
+                      title={isIndo ? "Tempel gambar langsung dari clipboard (salin dari web lain)" : "Paste image directly from clipboard"}
                     >
                       <ClipboardPaste size={12} />
-                      <span>Salin Tempel (Ctrl+V)</span>
+                      <span>{isIndo ? 'Salin Tempel (Ctrl+V)' : 'Paste Image (Ctrl+V)'}</span>
                     </button>
                   </div>
                 </div>
@@ -607,11 +645,11 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                     <Sliders size={13} className="text-emerald-500" />
-                    <span>Jumlah Variasi Prompt</span>
+                    <span>{isIndo ? 'Jumlah Variasi Prompt' : 'Prompt Variations Count'}</span>
                   </label>
                   <div className="flex items-center gap-1.5">
                     <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-black">
-                      {variation} Variasi
+                      {variation} {isIndo ? 'Variasi' : 'Variations'}
                     </span>
                   </div>
                 </div>
@@ -677,16 +715,16 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                   />
                   <div className="flex flex-col">
                     <span className="text-xs font-black uppercase tracking-tight text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                      <span>🎯</span> Tanpa Style
+                      <span>🎯</span> {isIndo ? 'Tanpa Style' : 'No Style / Auto'}
                     </span>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                      Hasil prompt otomatis mengikuti medium & style gambar asli
+                      {isIndo ? 'Hasil prompt otomatis mengikuti medium & style gambar asli' : 'Prompts automatically match the medium & style of the original image'}
                     </span>
                   </div>
                 </label>
                 {noStyle && (
                   <span className="text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full tracking-wider animate-pulse">
-                    AKTIF
+                    {isIndo ? 'AKTIF' : 'ACTIVE'}
                   </span>
                 )}
               </div>
@@ -694,7 +732,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
               {noStyle && (
                 <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[10px] text-amber-600 dark:text-amber-400 font-bold flex items-center gap-2">
                   <span>ℹ️</span>
-                  <span>Semua preset style di bawah dinonaktifkan karena opsi &quot;Tanpa Style&quot; aktif.</span>
+                  <span>{isIndo ? 'Semua preset style di bawah dinonaktifkan karena opsi "Tanpa Style" aktif.' : 'All preset styles below are disabled because "No Style / Auto" is active.'}</span>
                 </div>
               )}
 
@@ -782,7 +820,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                       <span>
                         {hasUnanalyzed 
                           ? t.image_studio_btn_analyze.replace('{count}', images.filter(img => !img.result).length.toString())
-                          : `Analisis Ulang dengan Estetika: ${styleCategory}`
+                          : (isIndo ? `Analisis Ulang dengan Estetika: ${styleCategory}` : `Re-analyze with Aesthetic: ${styleCategory}`)
                         }
                       </span>
                     </>
@@ -812,10 +850,10 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                 <button
                   onClick={handlePasteFromClipboardButton}
                   className="flex items-center space-x-1.5 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 shadow-sm"
-                  title="Tempel gambar dari clipboard (Ctrl+V)"
+                  title={isIndo ? "Tempel gambar dari clipboard (Ctrl+V)" : "Paste image from clipboard (Ctrl+V)"}
                 >
                   <ClipboardPaste size={12} />
-                  <span>Tempel Gambar</span>
+                  <span>{isIndo ? 'Tempel Gambar' : 'Paste Image'}</span>
                 </button>
 
                 {/* 📂 Input & Tombol Unggah TXT */}
@@ -829,10 +867,10 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                 <button
                   onClick={() => txtInputRef.current?.click()}
                   className="flex items-center space-x-1.5 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-white/20 border border-slate-200 dark:border-white/5 shadow-sm"
-                  title="Unggah / Impor prompt dari berkas .txt"
+                  title={isIndo ? "Unggah / Impor prompt dari berkas .txt" : "Upload / Import prompts from .txt file"}
                 >
                   <FileText size={12} className="text-emerald-500" />
-                  <span>Unggah TXT</span>
+                  <span>{isIndo ? 'Unggah TXT' : 'Upload TXT'}</span>
                 </button>
 
                 {images.some(img => img.result) && (
@@ -842,26 +880,40 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                     <button 
                       onClick={downloadAllPromptsAsTxt}
                       className="flex items-center space-x-1.5 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 shadow-sm"
-                      title="Unduh semua prompt hasil generate ke dalam berkas .txt"
+                      title={isIndo ? "Unduh semua prompt hasil generate ke dalam berkas .txt" : "Download all generated prompts as .txt"}
                     >
                       <Download size={12} />
-                      <span>Unduh TXT ({images.filter(img => img.result).length})</span>
+                      <span>{isIndo ? 'Unduh TXT' : 'Download TXT'} ({images.filter(img => img.result).length})</span>
                     </button>
 
                     {/* 📋 Tombol Salin Semua */}
                     <button 
                       onClick={() => {
-                        const allPrompts = images
+                        const allFormatted = images
                           .filter(img => img.result)
-                          .map(img => `--- ${img.name} ---\n${img.result?.prompt}`)
+                          .map((img, idx) => {
+                            const pList = img.result?.prompts && img.result.prompts.length > 0 
+                              ? img.result.prompts 
+                              : [img.result?.prompt || ''];
+                            
+                            let text = `====================================================\n`;
+                            text += `[${isIndo ? 'GAMBAR' : 'IMAGE'} ${idx + 1}]: ${img.name}\n`;
+                            if (img.result?.description) {
+                              text += `${isIndo ? 'Caption Deskripsi' : 'Caption Description'}:\n${img.result.description}\n\n`;
+                            }
+                            text += `AI Prompt Variations (${pList.length} ${isIndo ? 'Variasi' : 'Variations'}):\n`;
+                            text += pList.map((p, pIdx) => `${isIndo ? 'Variasi' : 'Variation'} ${pIdx + 1}:\n${p}`).join('\n\n');
+                            return text;
+                          })
                           .join('\n\n');
-                        copyToClipboard(allPrompts, 'all-batch');
+                        copyToClipboard(allFormatted, 'all-batch');
                       }}
                       className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all ${
                         copiedId === 'all-batch'
                           ? 'bg-emerald-500 text-white'
                           : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 shadow-sm'
                       }`}
+                      title={isIndo ? "Salin semua hasil batch (Caption Deskripsi & Seluruh Variasi Prompt)" : "Copy all batch results (Caption Description & All Prompt Variations)"}
                     >
                       {copiedId === 'all-batch' ? <Check size={12} /> : <Layers size={12} />}
                       <span>{copiedId === 'all-batch' ? t.image_studio_btn_copied_all : t.image_studio_btn_copy_all}</span>
@@ -911,7 +963,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                           {item.loading && (
                             <div className="absolute inset-0 bg-emerald-900/40 backdrop-blur-sm flex flex-col items-center justify-center space-y-3">
                               <RefreshCw size={28} className="text-emerald-400 animate-spin" />
-                              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Processing...</span>
+                              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">{isIndo ? 'Memproses...' : 'Processing...'}</span>
                             </div>
                           )}
                         </div>
@@ -925,17 +977,17 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                 {item.result ? (
                                   <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10 text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-wider">
                                     <Check size={10} />
-                                    <span>{styleCategory} Success</span>
+                                    <span>{styleCategory} {isIndo ? 'Sukses' : 'Success'}</span>
                                   </div>
                                 ) : item.loading ? (
                                   <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 tracking-wider">
                                     <RefreshCw size={10} className="animate-spin" />
-                                    <span>AI Processing...</span>
+                                    <span>{isIndo ? 'AI Memproses...' : 'AI Processing...'}</span>
                                   </div>
                                 ) : (
                                   <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-500/10 text-[9px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
                                     <Layers size={10} />
-                                    <span>Queued</span>
+                                    <span>{isIndo ? 'Antrian' : 'Queued'}</span>
                                   </div>
                                 )}
                               </div>
@@ -944,26 +996,25 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                   <button
                                     onClick={() => analyzeBatch([item])}
                                     className="flex items-center space-x-2 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all bg-white dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/20 border border-slate-200 dark:border-white/5 shadow-md shadow-black/5"
-                                    title="Regenerasi dengan Target Estetika terpilih"
+                                    title={isIndo ? "Regenerasi dengan Target Estetika terpilih" : "Regenerate with selected Target Aesthetic"}
                                   >
                                     <RefreshCw size={12} className={item.loading ? "animate-spin" : ""} />
                                     <span>Regen</span>
                                   </button>
                                   <button
                                     onClick={() => {
-                                      const pList = item.result?.prompts && item.result.prompts.length > 0 
-                                        ? item.result.prompts.join("\n\n")
-                                        : (item.result?.prompt || '');
-                                      copyToClipboard(pList, item.id);
+                                      const fullText = formatItemForClipboard(item);
+                                      copyToClipboard(fullText, item.id);
                                     }}
                                     className={`flex items-center space-x-2 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase transition-all ${
                                       copiedId === item.id 
                                         ? 'bg-emerald-500 text-white' 
                                         : 'bg-white dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/20 border border-slate-200 dark:border-white/5 shadow-md shadow-black/5'
                                     }`}
+                                    title={isIndo ? "Salin semua hasil analisis (Caption Deskripsi + Seluruh Variasi Prompt)" : "Copy all analysis results (Caption Description + All Prompt Variations)"}
                                   >
                                     {copiedId === item.id ? <Check size={12} /> : <Copy size={12} />}
-                                    <span>{copiedId === item.id ? 'Tersalin' : `Salin Semua (${item.result?.prompts?.length || 1})`}</span>
+                                    <span>{copiedId === item.id ? (isIndo ? 'Tersalin' : 'Copied') : (isIndo ? `Salin Semua (${item.result?.prompts?.length || 1})` : `Copy All (${item.result?.prompts?.length || 1})`)}</span>
                                   </button>
                                 </div>
                               )}
@@ -983,7 +1034,20 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                             ) : item.result ? (
                               <div className="space-y-4 animate-in fade-in duration-500">
                                 <div className="space-y-2">
-                                  <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Caption Deskripsi</label>
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                                      {isIndo ? 'Caption Deskripsi' : 'Caption Description'}
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(item.result?.description || '', `${item.id}-desc`)}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all"
+                                      title={isIndo ? "Salin hanya teks Caption Deskripsi" : "Copy only Caption Description text"}
+                                    >
+                                      {copiedId === `${item.id}-desc` ? <Check size={10} /> : <Copy size={10} />}
+                                      <span>{copiedId === `${item.id}-desc` ? (isIndo ? 'Tersalin' : 'Copied') : (isIndo ? 'Salin Deskripsi' : 'Copy Description')}</span>
+                                    </button>
+                                  </div>
                                   <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 leading-relaxed border-l-2 border-emerald-500 pl-3">
                                     {item.result.description}
                                   </p>
@@ -991,8 +1055,23 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                 <div className="space-y-3">
                                   <div className="flex items-center justify-between">
                                     <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">
-                                      AI Prompt Variations ({item.result.prompts?.length || 1} Variasi)
+                                      AI Prompt Variations ({item.result.prompts?.length || 1} {isIndo ? 'Variasi' : 'Variations'})
                                     </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const onlyPrompts = (item.result?.prompts && item.result.prompts.length > 0 
+                                          ? item.result.prompts 
+                                          : [item.result?.prompt || '']
+                                        ).join('\n\n');
+                                        copyToClipboard(onlyPrompts, `${item.id}-only-prompts`);
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/20 border border-slate-200 dark:border-white/5 transition-all"
+                                      title={isIndo ? "Salin hanya daftar variasi prompt tanpa deskripsi" : "Copy only list of prompt variations without description"}
+                                    >
+                                      {copiedId === `${item.id}-only-prompts` ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+                                      <span>{copiedId === `${item.id}-only-prompts` ? (isIndo ? 'Tersalin' : 'Copied') : (isIndo ? 'Salin Hanya Prompt' : 'Copy Prompts Only')}</span>
+                                    </button>
                                   </div>
                                   
                                   <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
@@ -1020,7 +1099,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                                                   ? 'bg-emerald-500 text-white border-emerald-500'
                                                   : 'bg-white dark:bg-slate-800 text-slate-400 hover:text-emerald-500 border-slate-100 dark:border-white/5 shadow-sm'
                                               }`}
-                                              title="Salin Variasi Ini"
+                                              title={isIndo ? "Salin Variasi Ini" : "Copy This Variation"}
                                             >
                                               {isCopied ? <Check size={12} /> : <Copy size={12} />}
                                             </button>
@@ -1033,7 +1112,7 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                               </div>
                             ) : (
                               <div className="h-full flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/5 rounded-[1.5rem] py-10 opacity-40">
-                                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Menunggu Antrian...</p>
+                                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isIndo ? 'Menunggu Antrian...' : 'Waiting in Queue...'}</p>
                               </div>
                             )}
                           </div>
@@ -1050,7 +1129,11 @@ export const PromptImageView: React.FC<PromptImageViewProps> = ({
                 <Sparkles size={14} className="text-emerald-500" />
               </div>
               <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
-                <span className="font-black text-slate-800 dark:text-slate-200">Tips:</span> Gunakan mode batch untuk memproses ribuan referensi visual ke dalam prompt AI yang sangat presisi dalam hitungan detik. Semua hasil dioptimasi untuk <span className="underline decoration-emerald-500 underline-offset-2">Midjourney</span>, <span className="underline decoration-emerald-500 underline-offset-2">DALL-E 3</span>, dan <span className="underline decoration-emerald-500 underline-offset-2">Adobe Firefly</span>.
+                <span className="font-black text-slate-800 dark:text-slate-200">{isIndo ? 'Tips:' : 'Tip:'}</span> {isIndo 
+                  ? 'Gunakan mode batch untuk memproses ribuan referensi visual ke dalam prompt AI yang sangat presisi dalam hitungan detik. Semua hasil dioptimasi untuk ' 
+                  : 'Use batch mode to process visual references into precise AI prompts within seconds. All results are optimized for '
+                }
+                <span className="underline decoration-emerald-500 underline-offset-2">Midjourney</span>, <span className="underline decoration-emerald-500 underline-offset-2">DALL-E 3</span>, {isIndo ? 'dan' : 'and'} <span className="underline decoration-emerald-500 underline-offset-2">Adobe Firefly</span>.
               </p>
             </div>
           </div>
