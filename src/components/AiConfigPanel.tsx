@@ -96,24 +96,43 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
               />
             </div>
 
-            <div className="flex items-center justify-between p-3.5 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5">
-              <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.keyword_count_label}</label>
-              <input 
-                type="number" 
-                min="1" 
-                max="49" 
-                value={keywordCount} 
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === '') {
-                    setKeywordCount('');
-                  } else {
-                    const num = Math.min(49, Math.max(1, parseInt(val) || 1));
-                    setKeywordCount(num);
-                  }
-                }} 
-                className="w-14 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-[1.5rem] text-center text-xs font-black dark:text-white transition-all focus:ring-2 focus:ring-[#7c3aed]/30 outline-none shadow-md shadow-black/5" 
-              />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5 gap-2">
+              <div className="flex flex-col">
+                <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.keyword_count_label}</label>
+                <span className="text-[9px] text-slate-400 dark:text-slate-500 font-semibold">Standard: 40-49 (Max 49)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {[25, 40, 49].map((cnt) => (
+                  <button
+                    key={cnt}
+                    type="button"
+                    onClick={() => setKeywordCount(cnt)}
+                    className={`px-2 py-1 text-[10px] font-black rounded-lg transition-all cursor-pointer ${
+                      Number(keywordCount) === cnt
+                        ? 'bg-[#7c3aed] text-white shadow-xs'
+                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 hover:border-[#7c3aed]/50'
+                    }`}
+                  >
+                    {cnt}
+                  </button>
+                ))}
+                <input 
+                  type="number" 
+                  min="1" 
+                  max="49" 
+                  value={keywordCount} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setKeywordCount('');
+                    } else {
+                      const num = Math.min(49, Math.max(1, parseInt(val) || 1));
+                      setKeywordCount(num);
+                    }
+                  }} 
+                  className="w-12 p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl text-center text-xs font-black dark:text-white transition-all focus:ring-2 focus:ring-[#7c3aed]/30 outline-none shadow-md shadow-black/5" 
+                />
+              </div>
             </div>
 
             <div className="space-y-2 p-3.5 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5">

@@ -619,8 +619,45 @@ const RenderMotionElement: React.FC<{
   );
 };
 
-// Scene Renderer
+// Scene Renderer with Remotion Timeline Transitions
 const RenderScene: React.FC<{ scene: MotionScene }> = ({ scene }) => {
+  const frame = useCurrentFrame();
+  const transitionType = scene.transition || 'fade';
+  const duration = scene.durationInFrames || 150;
+  const transDuration = Math.min(15, Math.floor(duration / 4));
+
+  // Calculate Scene Entry and Exit Transitions
+  let sceneOpacity = 1;
+  let sceneTransform = '';
+
+  if (transitionType === 'fade' || transitionType === 'crossfade') {
+    if (frame < transDuration) {
+      sceneOpacity = interpolate(frame, [0, transDuration], [0, 1], { extrapolateRight: 'clamp' });
+    } else if (frame > duration - transDuration) {
+      sceneOpacity = interpolate(frame, [duration - transDuration, duration], [1, 0], { extrapolateLeft: 'clamp' });
+    }
+  } else if (transitionType === 'slide' || transitionType === 'slide-up') {
+    if (frame < transDuration) {
+      sceneOpacity = interpolate(frame, [0, transDuration], [0, 1], { extrapolateRight: 'clamp' });
+      const offsetY = interpolate(frame, [0, transDuration], [40, 0], { extrapolateRight: 'clamp' });
+      sceneTransform = `translateY(${offsetY}px)`;
+    } else if (frame > duration - transDuration) {
+      sceneOpacity = interpolate(frame, [duration - transDuration, duration], [1, 0], { extrapolateLeft: 'clamp' });
+      const offsetY = interpolate(frame, [duration - transDuration, duration], [0, -40], { extrapolateLeft: 'clamp' });
+      sceneTransform = `translateY(${offsetY}px)`;
+    }
+  } else if (transitionType === 'zoom') {
+    if (frame < transDuration) {
+      sceneOpacity = interpolate(frame, [0, transDuration], [0, 1], { extrapolateRight: 'clamp' });
+      const scale = interpolate(frame, [0, transDuration], [0.92, 1], { extrapolateRight: 'clamp' });
+      sceneTransform = `scale(${scale})`;
+    } else if (frame > duration - transDuration) {
+      sceneOpacity = interpolate(frame, [duration - transDuration, duration], [1, 0], { extrapolateLeft: 'clamp' });
+      const scale = interpolate(frame, [duration - transDuration, duration], [1, 1.08], { extrapolateLeft: 'clamp' });
+      sceneTransform = `scale(${scale})`;
+    }
+  }
+
   return (
     <AbsoluteFill
       style={{
@@ -630,7 +667,9 @@ const RenderScene: React.FC<{ scene: MotionScene }> = ({ scene }) => {
         justifyContent: 'center',
         gap: '24px',
         padding: '60px',
-        fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
+        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+        opacity: sceneOpacity,
+        transform: sceneTransform || undefined
       }}
     >
       {scene.elements.map((elem, idx) => (

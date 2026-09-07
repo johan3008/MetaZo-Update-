@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { copyToClipboard as robustCopy } from '../utils';
 import { getHeaders } from '../../services/geminiService';
 import { 
-  Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X, Loader2
+  Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X, Loader2,
+  FileSpreadsheet, CheckCheck, FileText, SlidersHorizontal, Layers, ShieldCheck, Filter
 } from 'lucide-react';
 
 import { FeatureGuideButton } from './FeatureGuideModal';
@@ -34,7 +35,7 @@ interface PromptHistoryItem {
   promptMode?: 'background' | 'png';
   pngBgColor?: 'white' | 'black' | 'transparent';
   flatIconType?: 'sheet' | 'single';
-  vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat';
+  vectorSubType?: 'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat' | 'flat_pastel';
 }
 
 const BACKGROUND_STYLE_OPTIONS = [
@@ -114,6 +115,10 @@ const VECTOR_SUB_TYPES = {
     label: 'Minimal Flat Design',
     desc: 'Desain ultra-sederhana dengan warna solid minimalis tanpa detail rumit.'
   },
+  'flat_pastel': {
+    label: 'Flat Pastel Illustration',
+    desc: 'Ilustrasi flat modern berpalet warna pastel lembut, karakter minimalis/faceless, dan bentuk lineless yang harmonis.'
+  },
   'flat_vector': {
     label: 'Flat Vector Illustration',
     desc: 'Ilustrasi vektor 2D detail dengan garis bersih dan blok warna solid yang estetis.'
@@ -167,7 +172,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   const [customCameraAngle, setCustomCameraAngle] = useState('');
   const [flatIconType, setFlatIconType] = useState<'sheet' | 'single'>('single');
   const [showFlatIconModal, setShowFlatIconModal] = useState(false);
-  const [vectorSubType, setVectorSubType] = useState<'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat'>('minimal_flat');
+  const [vectorSubType, setVectorSubType] = useState<'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat' | 'flat_pastel'>('minimal_flat');
   const [showVectorModal, setShowVectorModal] = useState(false);
   
   
@@ -331,8 +336,12 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   
   // Copy state variables
   const [copiedAll, setCopiedAll] = useState(false);
+  const [copiedAllWithNeg, setCopiedAllWithNeg] = useState(false);
   const [copiedNegative, setCopiedNegative] = useState(false);
   const [copiedIndices, setCopiedIndices] = useState<Record<number, boolean>>({});
+  const [copiedWithNegIndices, setCopiedWithNegIndices] = useState<Record<number, boolean>>({});
+  const [formatPreset, setFormatPreset] = useState<'raw' | 'midjourney' | 'firefly' | 'flux'>('raw');
+  const [lengthFilter, setLengthFilter] = useState<'all' | 'short' | 'medium' | 'detailed'>('all');
 
   // Pagination for output list
   const [currentPage, setCurrentPage] = useState(1);
@@ -632,8 +641,34 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
     }
   };
 
+  const formatPromptForEngine = (rawPrompt: string, preset: 'raw' | 'midjourney' | 'firefly' | 'flux'): string => {
+    const trimmed = (rawPrompt || '').trim();
+    if (preset === 'midjourney') {
+      const ar = promptMode === 'png' ? '--ar 1:1' : '--ar 16:9';
+      return `${trimmed} ${ar} --v 6.1 --style raw`;
+    }
+    if (preset === 'firefly') {
+      return trimmed.replace(/--(ar|v|style|no|seed|iw|s)\s+[^\s]+/gi, '').trim();
+    }
+    if (preset === 'flux') {
+      return trimmed;
+    }
+    return trimmed;
+  };
+
+  const formatPromptWithNegative = (rawPrompt: string, negPrompt: string, preset: 'raw' | 'midjourney' | 'firefly' | 'flux'): string => {
+    const formatted = formatPromptForEngine(rawPrompt, preset);
+    if (!negPrompt || !negPrompt.trim()) return formatted;
+    const cleanNeg = negPrompt.replace(/^Avoid\s*:?\s*/i, '').trim();
+    if (preset === 'midjourney') {
+      return `${formatted} --no ${cleanNeg}`;
+    }
+    return `${formatted}\n\nNegative prompt: ${cleanNeg}`;
+  };
+
   const copySinglePrompt = async (text: string, index: number) => {
-    const success = await robustCopy(text);
+    const formatted = formatPromptForEngine(text, formatPreset);
+    const success = await robustCopy(formatted);
     if (success) {
       setCopiedIndices(prev => ({ ...prev, [index]: true }));
       setTimeout(() => {
@@ -642,13 +677,37 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
     }
   };
 
+  const copySinglePromptWithNeg = async (text: string, index: number) => {
+    const formatted = formatPromptWithNegative(text, result?.negativePrompt || '', formatPreset);
+    const success = await robustCopy(formatted);
+    if (success) {
+      setCopiedWithNegIndices(prev => ({ ...prev, [index]: true }));
+      setTimeout(() => {
+        setCopiedWithNegIndices(prev => ({ ...prev, [index]: false }));
+      }, 2000);
+    }
+  };
+
   const copyAllPromptsText = async () => {
     if (!result || !result.prompts || result.prompts.length === 0) return;
-    const allText = result.prompts.join('\n\n');
+    const allText = result.prompts.map(p => formatPromptForEngine(p, formatPreset)).join('\n\n');
     const success = await robustCopy(allText);
     if (success) {
       setCopiedAll(true);
       setTimeout(() => setCopiedAll(false), 2000);
+    }
+  };
+
+  const copyAllPromptsWithNegText = async () => {
+    if (!result || !result.prompts || result.prompts.length === 0) return;
+    const allText = result.prompts.map((p, i) => {
+      const formatted = formatPromptWithNegative(p, result.negativePrompt || '', formatPreset);
+      return `PROMPT #${i + 1}\n${formatted}`;
+    }).join('\n\n------------------------\n\n');
+    const success = await robustCopy(allText);
+    if (success) {
+      setCopiedAllWithNeg(true);
+      setTimeout(() => setCopiedAllWithNeg(false), 2000);
     }
   };
 
@@ -663,22 +722,69 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
   const downloadAsTxt = () => {
     if (!result || !result.prompts || result.prompts.length === 0) return;
-    const header = `=== PROMPT SPECIFICATION SHEET ===\nTema Visual: ${subject}\nGaya Kategori: ${styleCategory}\nJumlah Variasi: ${result.prompts.length}\nNegative Prompt: ${result.negativePrompt}\n\n==================================\n`;
-    const listBody = result.prompts.map((p, i) => `PROMPT #${i + 1}\n--------------------------\n${p}\n`).join('\n');
+    const header = `=== PROMPT SPECIFICATION SHEET ===\nTema Visual: ${subject}\nGaya Kategori: ${styleCategory}\nTarget Engine: ${formatPreset.toUpperCase()}\nJumlah Variasi: ${result.prompts.length}\nNegative Prompt: ${result.negativePrompt}\n\n==================================\n\n`;
+    const listBody = result.prompts.map((p, i) => {
+      const formatted = formatPromptForEngine(p, formatPreset);
+      const wordCount = p.trim().split(/\s+/).length;
+      return `PROMPT #${i + 1} (${wordCount} words)\n--------------------------\n${formatted}\n`;
+    }).join('\n');
     
     const blob = new Blob([header + listBody], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Prompts_${subject.substring(0, 20).replace(/\s+/g, '_')}_${styleCategory}.txt`;
+    link.download = `Prompts_${subject.substring(0, 20).replace(/\s+/g, '_')}_${styleCategory}_${formatPreset}.txt`;
     link.click();
     URL.revokeObjectURL(url);
   };
 
-  // Filter prompts based on search query
+  const downloadAsCsv = () => {
+    if (!result || !result.prompts || result.prompts.length === 0) return;
+    const headers = ['No', 'Subject', 'Style', 'Engine Preset', 'Word Count', 'Char Count', 'Prompt', 'Negative Prompt'];
+    const rows = result.prompts.map((p, idx) => {
+      const formatted = formatPromptForEngine(p, formatPreset);
+      const words = p.trim().split(/\s+/).length;
+      const chars = p.length;
+      return [
+        idx + 1,
+        `"${(subject || '').replace(/"/g, '""')}"`,
+        `"${(styleCategory || '').replace(/"/g, '""')}"`,
+        `"${formatPreset.toUpperCase()}"`,
+        words,
+        chars,
+        `"${formatted.replace(/"/g, '""')}"`,
+        `"${(result.negativePrompt || '').replace(/"/g, '""')}"`
+      ].join(',');
+    });
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Prompts_${subject.substring(0, 20).replace(/\s+/g, '_')}_${styleCategory}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Filter prompts based on search query and length filter
   const filteredPrompts = result?.prompts 
-    ? result.prompts.map((p, originalIdx) => ({ text: p, globalIdx: originalIdx }))
-        .filter(item => item.text.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? result.prompts.map((p, originalIdx) => {
+        const words = p.trim().split(/\s+/).length;
+        return { 
+          text: p, 
+          globalIdx: originalIdx, 
+          wordCount: words, 
+          charCount: p.length 
+        };
+      })
+      .filter(item => {
+        const matchesSearch = item.text.toLowerCase().includes(searchQuery.toLowerCase());
+        if (!matchesSearch) return false;
+        if (lengthFilter === 'short') return item.wordCount < 25;
+        if (lengthFilter === 'medium') return item.wordCount >= 25 && item.wordCount <= 45;
+        if (lengthFilter === 'detailed') return item.wordCount > 45;
+        return true;
+      })
     : [];
 
   // Pagination bounds calculation
@@ -1433,83 +1539,184 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           {/* Main prompt output panel */}
           <div className="lg:col-span-8 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-white/10 rounded-3xl p-5 sm:p-7 text-slate-800 dark:text-slate-100 shadow-xl shadow-black/5 space-y-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/5 blur-3xl rounded-full" />
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/60 dark:border-slate-800 pb-5 gap-3 relative z-10">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-200/60 dark:border-slate-800 pb-5 gap-4 relative z-10">
               <div>
-                <h3 className="text-sm sm:text-base font-bold tracking-tight flex items-center gap-2 text-slate-900 dark:text-slate-100">
-                  {t.prompt_output_title} {result && `(${totalPrompts !== (result?.prompts?.length || 0) ? `${totalPrompts} of ${result?.prompts?.length || 0}` : `${totalPrompts}`})`}
+                <h3 className="text-sm sm:text-base font-extrabold tracking-tight flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                  <Sparkles size={16} className="text-emerald-500" />
+                  {t.prompt_output_title} {result && `(${totalPrompts !== (result?.prompts?.length || 0) ? `${totalPrompts} of ${result?.prompts?.length || 0}` : `${totalPrompts} Variasi`})`}
                 </h3>
                 {result && (
                   <div className="flex flex-wrap items-center gap-2 mt-1.5">
                     <p className="text-[10px] text-slate-400 font-medium font-mono">
                       {t.prompt_output_subtitle}
                     </p>
-                    <span className="text-[9px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold rounded uppercase tracking-wider font-mono">
+                    <span className="text-[9px] px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold rounded uppercase tracking-wider font-mono">
                       {promptMode === 'png' ? t.prompt_output_badge_png.replace('{color}', pngBgColor.toUpperCase()) : t.prompt_output_badge_scene}
                     </span>
+                    {result.prompts?.length > 0 && (
+                      <span className="text-[9px] px-2 py-0.5 bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 font-bold rounded uppercase tracking-wider font-mono">
+                        Avg: {Math.round(result.prompts.reduce((acc, p) => acc + p.trim().split(/\s+/).length, 0) / result.prompts.length)} Kata
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
 
               {result && result.prompts && result.prompts.length > 0 && (
-                <div className="flex items-center space-x-3.5 self-end sm:self-center">
+                <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
+                  {/* Copy All Button */}
                   <button
                     onClick={copyAllPromptsText}
-                    className={`text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
                       copiedAll 
-                        ? 'text-emerald-400 font-bold' 
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-emerald-500 text-white shadow-emerald-500/20' 
+                        : 'bg-slate-100 dark:bg-white/5 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-slate-700 dark:text-slate-200 hover:text-emerald-600 border border-slate-200 dark:border-white/10'
                     }`}
+                    title="Salin semua prompt sesuai format engine aktif"
                   >
-                    {copiedAll ? <Check size={14} className="text-emerald-400 animate-pulse" /> : <Copy size={14} />}
+                    {copiedAll ? <Check size={13} className="animate-pulse" /> : <Copy size={13} />}
                     <span>{copiedAll ? t.prompt_output_btn_copied : t.prompt_output_btn_copy_all}</span>
                   </button>
 
+                  {/* Copy All + Negative Prompt */}
+                  {result.negativePrompt && (
+                    <button
+                      onClick={copyAllPromptsWithNegText}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                        copiedAllWithNeg 
+                          ? 'bg-teal-600 text-white shadow-teal-500/20' 
+                          : 'bg-slate-100 dark:bg-white/5 hover:bg-teal-50 dark:hover:bg-teal-500/10 text-slate-700 dark:text-slate-200 hover:text-teal-600 border border-slate-200 dark:border-white/10'
+                      }`}
+                      title="Salin semua prompt digabung dengan negative prompt"
+                    >
+                      {copiedAllWithNeg ? <Check size={13} className="animate-pulse" /> : <CheckCheck size={13} />}
+                      <span>{copiedAllWithNeg ? 'Tersalin (+Neg)' : 'Salin + Neg'}</span>
+                    </button>
+                  )}
+
+                  {/* TXT Download */}
                   <button
                     onClick={downloadAsTxt}
-                    className="text-slate-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors border border-slate-200 dark:border-white/10"
+                    title="Download teks .txt"
                   >
-                    <Download size={14} />
-                    <span>{t.prompt_output_btn_download}</span>
+                    <FileText size={13} />
+                    <span className="hidden sm:inline">TXT</span>
                   </button>
 
-                  {/* Clean clear-workspace action */}
+                  {/* CSV Download */}
+                  <button
+                    onClick={downloadAsCsv}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-slate-700 dark:text-slate-300 hover:text-emerald-600 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors border border-slate-200 dark:border-white/10"
+                    title="Download format tabel CSV (Excel compatible)"
+                  >
+                    <FileSpreadsheet size={13} />
+                    <span className="hidden sm:inline">CSV</span>
+                  </button>
+
+                  {/* Clean workspace action */}
                   <button
                     onClick={() => {
                       setResult(null);
                       setSearchQuery('');
+                      setLengthFilter('all');
                     }}
-                    className="text-slate-500 hover:text-red-400 text-xs font-semibold flex items-center gap-1 transition-colors ml-1 cursor-pointer"
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer border border-transparent hover:border-red-500/20"
                     title="Bersihkan workspace saat ini"
                   >
-                    <X size={14} />
-                    <span>{t.prompt_output_btn_clear}</span>
+                    <X size={15} />
                   </button>
                 </div>
               )}
             </div>
 
-            {/* LIVE SEARCH FILTER WITHIN OUTPUTS */}
+            {/* ENGINE PRESETS & FILTER CONTROLS BAR */}
             {result && result.prompts && result.prompts.length > 0 && (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder={t.prompt_output_search_placeholder}
-                  className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-[1.5rem] py-2 pl-9 pr-8 text-xs font-medium text-slate-800 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-550 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-mono"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-350"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
+              <div className="space-y-3 relative z-10">
+                {/* Engine Format Preset Selector */}
+                <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-100/70 dark:bg-slate-950/60 border border-slate-200/80 dark:border-white/10 rounded-2xl">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-2 flex items-center gap-1 font-mono">
+                      <SlidersHorizontal size={11} className="text-emerald-500" />
+                      Format AI:
+                    </span>
+                    <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200/60 dark:border-white/5">
+                      {[
+                        { id: 'raw', label: 'Standar Raw', icon: '📝' },
+                        { id: 'midjourney', label: 'Midjourney v6', icon: '⛵' },
+                        { id: 'firefly', label: 'Adobe Firefly', icon: '🔥' },
+                        { id: 'flux', label: 'Flux / SDXL', icon: '⚡' }
+                      ].map(preset => (
+                        <button
+                          key={preset.id}
+                          onClick={() => setFormatPreset(preset.id as any)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            formatPreset === preset.id
+                              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-sm'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          <span>{preset.icon}</span>
+                          <span>{preset.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Length Filter Buttons */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1 flex items-center gap-1 font-mono">
+                      <Filter size={11} className="text-slate-400" />
+                      Filter:
+                    </span>
+                    <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200/60 dark:border-white/5">
+                      {[
+                        { id: 'all', label: 'Semua' },
+                        { id: 'short', label: '<25 kata' },
+                        { id: 'medium', label: '25-45 kata' },
+                        { id: 'detailed', label: '>45 kata' }
+                      ].map(filt => (
+                        <button
+                          key={filt.id}
+                          onClick={() => {
+                            setLengthFilter(filt.id as any);
+                            setCurrentPage(1);
+                          }}
+                          className={`px-2 py-0.5 rounded-md text-[9.5px] font-bold transition-all cursor-pointer ${
+                            lengthFilter === filt.id
+                              ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 shadow-xs'
+                              : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+                          }`}
+                        >
+                          {filt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Search Filter input */}
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    placeholder={t.prompt_output_search_placeholder}
+                    className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200/80 dark:border-white/10 rounded-2xl py-2.5 pl-10 pr-8 text-xs font-medium text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-mono"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1580,32 +1787,70 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
                 {/* Visual Listing with smart pagination */}
                 <div className="space-y-3.5">
-                  {currentItems.map((item, idx) => {
+                  {currentItems.map((item) => {
                     const globalIdx = item.globalIdx;
                     const promptText = item.text;
                     const isCopied = !!copiedIndices[globalIdx];
+                    const isCopiedWithNeg = !!copiedWithNegIndices[globalIdx];
+                    const displayedPrompt = formatPromptForEngine(promptText, formatPreset);
+                    
                     return (
                       <div 
                         key={globalIdx}
-                        className="bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-white/5 rounded-[1.5rem] p-4 sm:p-5 hover:border-emerald-500/30 transition-all duration-200 group flex items-start justify-between gap-4"
+                        className="bg-slate-50/90 dark:bg-slate-950/70 border border-slate-200/80 dark:border-white/10 hover:border-emerald-500/40 rounded-2xl p-4 sm:p-5 transition-all duration-200 group relative hover:shadow-md hover:shadow-emerald-500/5 space-y-3"
                       >
-                        <p className="text-xs sm:text-xs md:text-sm font-mono font-medium text-slate-700 dark:text-slate-300 leading-relaxed break-words select-all whitespace-pre-wrap group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors flex-1">
-                          <span className="text-slate-400 dark:text-slate-500 font-bold mr-2">{globalIdx + 1}.</span>
-                          {promptText}
-                        </p>
+                        {/* Card Top Metadata & Action Bar */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 dark:border-white/5 pb-2.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10.5px] font-mono font-extrabold px-2.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-500/20">
+                              #{String(globalIdx + 1).padStart(2, '0')}
+                            </span>
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-slate-400 rounded-lg">
+                              ⚡ {item.wordCount} kata • {item.charCount} char
+                            </span>
+                            {formatPreset !== 'raw' && (
+                              <span className="text-[9px] font-bold px-2 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg border border-indigo-500/20 uppercase tracking-wider">
+                                {formatPreset === 'midjourney' ? '⛵ MJ v6.1' : formatPreset === 'firefly' ? '🔥 Firefly' : '⚡ Flux / SDXL'}
+                              </span>
+                            )}
+                          </div>
 
-                        <button
-                          onClick={() => copySinglePrompt(promptText, globalIdx)}
-                          className={`p-1.5 rounded-2xl transition-all flex items-center justify-center gap-1 text-[10px] font-semibold uppercase cursor-pointer shrink-0 ${
-                            isCopied 
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                              : 'bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 border border-slate-200 dark:border-white/10'
-                          }`}
-                          title="Salin prompt tunggal ini"
-                        >
-                          {isCopied ? <Check size={11} /> : <Copy size={11} />}
-                          <span className="hidden sm:inline">{isCopied ? 'Copied' : 'Copy'}</span>
-                        </button>
+                          {/* Actions per Card */}
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => copySinglePrompt(promptText, globalIdx)}
+                              className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 text-[11px] font-bold cursor-pointer shrink-0 ${
+                                isCopied 
+                                  ? 'bg-emerald-500 text-white shadow-sm scale-105' 
+                                  : 'bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200/80 dark:border-white/10'
+                              }`}
+                              title="Salin prompt ini sesuai format engine terpilih"
+                            >
+                              {isCopied ? <Check size={12} className="animate-pulse" /> : <Copy size={12} />}
+                              <span>{isCopied ? 'Tersalin' : 'Salin'}</span>
+                            </button>
+
+                            {result?.negativePrompt && (
+                              <button
+                                onClick={() => copySinglePromptWithNeg(promptText, globalIdx)}
+                                className={`px-2.5 py-1.5 rounded-xl transition-all flex items-center gap-1 text-[11px] font-bold cursor-pointer shrink-0 ${
+                                  isCopiedWithNeg 
+                                    ? 'bg-teal-600 text-white shadow-sm scale-105' 
+                                    : 'bg-white dark:bg-slate-900 hover:bg-teal-50 dark:hover:bg-teal-500/10 text-slate-700 dark:text-slate-300 hover:text-teal-600 dark:hover:text-teal-400 border border-slate-200/80 dark:border-white/10'
+                                }`}
+                                title="Salin prompt lengkap digabung dengan negative prompt"
+                              >
+                                {isCopiedWithNeg ? <Check size={12} className="animate-pulse" /> : <CheckCheck size={12} />}
+                                <span>{isCopiedWithNeg ? '+ Neg Tersalin' : '+ Negative'}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Card Prompt Text */}
+                        <p className="text-xs sm:text-[13px] font-mono font-medium text-slate-700 dark:text-slate-300 leading-relaxed break-words select-all whitespace-pre-wrap group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors">
+                          {displayedPrompt}
+                        </p>
                       </div>
                     );
                   })}
@@ -1662,26 +1907,41 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
 
                 {/* Consolidated Negative Prompt Panel */}
                 {result.negativePrompt && (
-                  <div className="space-y-2 border-t border-white/5 pt-4">
+                  <div className="space-y-2 border-t border-slate-200/60 dark:border-white/5 pt-4 bg-slate-50/50 dark:bg-black/20 p-4 rounded-2xl border border-slate-200/60 dark:border-white/5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider flex items-center gap-1">
-                        <AlertCircle size={10} className="text-red-400 font-mono" />
-                        Negative Prompt Global (Gunakan ini untuk hasil bersih)
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="p-1 rounded-lg bg-red-500/10 text-red-500">
+                          <AlertCircle size={13} />
+                        </span>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            Negative Prompt Global
+                          </h4>
+                          <p className="text-[10px] text-slate-400 font-medium">
+                            Gunakan untuk filter artefak, cacat visual, teks, dan noise di AI generator
+                          </p>
+                        </div>
+                      </div>
                       <button
                         onClick={copyNegativeText}
-                        className={`px-2 py-1 rounded text-[9px] font-semibold uppercase flex items-center space-x-1 transition-all cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
                           copiedNegative 
-                            ? 'bg-emerald-500 text-white animate-pulse' 
-                            : 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-500 dark:text-slate-350'
+                            ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30' 
+                            : 'bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10'
                         }`}
                       >
-                        {copiedNegative ? <Check size={10} /> : <Copy size={10} />}
-                        <span>{copiedNegative ? 'Copied' : 'Copy'}</span>
+                        {copiedNegative ? <Check size={12} className="animate-pulse" /> : <Copy size={12} />}
+                        <span>{copiedNegative ? 'Tersalin' : 'Salin Negative'}</span>
                       </button>
                     </div>
-                    <div className="p-3 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-[1.5rem] text-[11px] font-mono leading-relaxed select-all text-slate-600 dark:text-slate-400 max-h-[80px] overflow-y-auto">
+                    <div className="p-3 bg-white dark:bg-slate-950/80 border border-slate-200/80 dark:border-white/5 rounded-xl text-xs font-mono leading-relaxed select-all text-slate-700 dark:text-slate-300 max-h-[80px] overflow-y-auto shadow-inner">
                       {result.negativePrompt}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400 italic pt-0.5">
+                      <span>💡 Tips Midjourney:</span>
+                      <code className="bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 rounded text-[9.5px] font-mono font-bold text-slate-600 dark:text-slate-300">
+                        --no {result.negativePrompt.replace(/^Avoid\s*:?\s*/i, '').slice(0, 35)}...
+                      </code>
                     </div>
                   </div>
                 )}
