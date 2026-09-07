@@ -14,6 +14,7 @@ import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
 import { testFtpConnection, uploadToFtp } from './server/ftpService.ts';
+import { embedJpegMetadata, embedPngMetadata, embedSvgMetadata, embedEpsMetadata, ADOBE_CATEGORY_NAMES, cleanKeywordArray } from './src/utils/microstockEmbedder.ts';
 import fluentFfmpeg from 'fluent-ffmpeg';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
@@ -1616,7 +1617,16 @@ app.get('/api/debug-uploads', (req, res) => {
     // ═══════════════════════════════════════════════════════════
     // EMBED METADATA ENGINE: Full Adobe Stock / IPTC / XMP-dc / Microstock Standard
     // ═══════════════════════════════════════════════════════════
-    async function embedMetadataForAdobe(filePath: string, metadata: { title: string; description?: string; keywords: string[] | string }) {
+    async function embedMetadataForAdobe(filePath: string, metadata: { 
+        title: string; 
+        description?: string; 
+        keywords: string[] | string;
+        adobeCategoryId?: number | string;
+        shutterstockCategory1?: string;
+        shutterstockCategory2?: string;
+        dreamstimeCategory?: string;
+        miriCanvasCategory?: string;
+    }) {
         const rawKeywords = Array.isArray(metadata.keywords)
             ? metadata.keywords
             : (typeof metadata.keywords === 'string' ? metadata.keywords.split(',') : []);
@@ -1630,61 +1640,138 @@ app.get('/api/debug-uploads', (req, res) => {
         const title = String(metadata.title || '').trim();
         const description = String(metadata.description || title).trim();
 
+        const catNum = Number(metadata.adobeCategoryId);
+        const adobeCatName = (!isNaN(catNum) && ADOBE_CATEGORY_NAMES[catNum]) ? ADOBE_CATEGORY_NAMES[catNum] : '';
+        const sstCat1 = metadata.shutterstockCategory1?.trim() || '';
+        const sstCat2 = metadata.shutterstockCategory2?.trim() || '';
+        const supplementalCats = [adobeCatName, sstCat1, sstCat2].filter(c => Boolean(c && c.length > 0));
+        const uniqueSuppCats = Array.from(new Set(supplementalCats));
+
         const ext = (path.extname(filePath) || '').toLowerCase();
         const isVideo = ['.mp4', '.mov', '.webm', '.m4v', '.avi'].includes(ext);
 
-        // 1. Native SVG XML Dublin Core Injection for SVG files
+        // 1. Native Vector File Metadata Injection (SVG, EPS, AI)
         if (ext === '.svg') {
             try {
-                let svgContent = fs.readFileSync(filePath, 'utf8');
-                const escapeXml = (unsafe: string) => unsafe.replace(/[<>&'"]/g, (c) => {
-                    switch (c) {
-                        case '<': return '&lt;';
-                        case '>': return '&gt;';
-                        case '&': return '&amp;';
-                        case '\'': return '&apos;';
-                        case '"': return '&quot;';
-                        default: return c;
-                    }
+                const svgContent = fs.readFileSync(filePath, 'utf8');
+                const updatedSvg = embedSvgMetadata(svgContent, {
+                    title,
+                    description,
+                    keywords: uniqueKeywords,
+                    adobeCategoryId: metadata.adobeCategoryId,
+                    shutterstockCategory1: sstCat1,
+                    shutterstockCategory2: sstCat2
                 });
-
-                const titleTag = `<title>${escapeXml(title)}</title>`;
-                const descTag = `<desc>${escapeXml(description)}</desc>`;
-                const keywordsXml = uniqueKeywords.map(k => `<rdf:li>${escapeXml(k)}</rdf:li>`).join('');
-                const metadataTag = `<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:title>${escapeXml(title)}</dc:title><dc:description>${escapeXml(description)}</dc:description><dc:subject><rdf:Bag>${keywordsXml}</rdf:Bag></dc:subject><dc:format>image/svg+xml</dc:format></rdf:Description></rdf:RDF></metadata>`;
-
-                svgContent = svgContent
-                    .replace(/<title[\s\S]*?<\/title>/gi, '')
-                    .replace(/<desc[\s\S]*?<\/desc>/gi, '')
-                    .replace(/<metadata[\s\S]*?<\/metadata>/gi, '');
-
-                if (/<svg[^>]*>/i.test(svgContent)) {
-                    svgContent = svgContent.replace(/(<svg[^>]*>)/i, `$1\n  ${titleTag}\n  ${descTag}\n  ${metadataTag}`);
-                    fs.writeFileSync(filePath, svgContent, 'utf8');
-                }
+                fs.writeFileSync(filePath, updatedSvg, 'utf8');
+                console.log(`[embedMetadataForAdobe] SVG Dublin Core embedded: ${filePath}`);
             } catch (svgErr) {
                 console.warn('[embedMetadataForAdobe] SVG injection note:', svgErr);
             }
         }
 
-        // 2. Native EPS / AI Header injection for PostScript vector files
         if (ext === '.eps' || ext === '.ai') {
             try {
-                let epsContent = fs.readFileSync(filePath, 'binary');
-                if (epsContent.includes('%!PS-Adobe')) {
-                    epsContent = epsContent.replace(/^%%Title:.*$/gm, '').replace(/^%%Keywords:.*$/gm, '');
-                    const dscTags = `%%Title: ${title.replace(/[\r\n]/g, ' ')}\n%%Keywords: ${keywordString.replace(/[\r\n]/g, ' ')}`;
-                    epsContent = epsContent.replace(/(%!PS-Adobe[^\r\n]*)/, `$1\n${dscTags}`);
-                    fs.writeFileSync(filePath, epsContent, 'binary');
-                }
+                const epsContent = fs.readFileSync(filePath, 'utf8');
+                const updatedEps = embedEpsMetadata(epsContent, {
+                    title,
+                    description,
+                    keywords: uniqueKeywords,
+                    adobeCategoryId: metadata.adobeCategoryId,
+                    shutterstockCategory1: sstCat1,
+                    shutterstockCategory2: sstCat2
+                });
+                fs.writeFileSync(filePath, updatedEps, 'utf8');
+                console.log(`[embedMetadataForAdobe] EPS/AI DSC & XMP embedded: ${filePath}`);
             } catch (epsErr) {
                 console.warn('[embedMetadataForAdobe] EPS injection note:', epsErr);
             }
         }
 
-        // 3. ExifTool Writing: Full Dublin Core XMP, IPTC Core, Photoshop, EXIF, QuickTime
+        // 2. Native Pure-JS Embedded Layers (JPEG & PNG)
+        if (ext === '.jpg' || ext === '.jpeg') {
+            try {
+                const inputBuf = fs.readFileSync(filePath);
+                const embeddedBuf = embedJpegMetadata(new Uint8Array(inputBuf), {
+                    title,
+                    description,
+                    keywords: uniqueKeywords,
+                    adobeCategoryId: metadata.adobeCategoryId,
+                    shutterstockCategory1: sstCat1,
+                    shutterstockCategory2: sstCat2
+                });
+                fs.writeFileSync(filePath, Buffer.from(embeddedBuf));
+                console.log(`[embedMetadataForAdobe] Native IPTC+XMP+EXIF embedded into JPEG: ${filePath}`);
+            } catch (jpegNativeErr) {
+                console.warn('[embedMetadataForAdobe] Native JPEG embed error:', jpegNativeErr);
+            }
+        }
+
+        if (ext === '.png') {
+            try {
+                const inputBuf = fs.readFileSync(filePath);
+                const embeddedBuf = embedPngMetadata(new Uint8Array(inputBuf), {
+                    title,
+                    description,
+                    keywords: uniqueKeywords,
+                    adobeCategoryId: metadata.adobeCategoryId,
+                    shutterstockCategory1: sstCat1,
+                    shutterstockCategory2: sstCat2
+                });
+                fs.writeFileSync(filePath, Buffer.from(embeddedBuf));
+                console.log(`[embedMetadataForAdobe] Native iTXt XMP embedded into PNG: ${filePath}`);
+            } catch (pngNativeErr) {
+                console.warn('[embedMetadataForAdobe] Native PNG embed error:', pngNativeErr);
+            }
+        }
+
+        // 3. Fast FFmpeg Stream-Copy Metadata Injection for Video files (MP4, MOV)
+        if (isVideo) {
+            try {
+                const tempVideoPath = `${filePath}_meta_temp${ext}`;
+                const ffArgs = [
+                    '-y',
+                    '-i', filePath,
+                    '-metadata', `title=${title}`,
+                    '-metadata', `description=${description}`,
+                    '-metadata', `comment=${description}`,
+                    '-metadata', `synopsis=${description}`,
+                    '-metadata', `artist=MetaZo Contributor`,
+                    '-metadata', `copyright=All rights reserved`,
+                    '-metadata:s:v:0', `handler_name=${title}`,
+                    '-movflags', 'use_metadata_tags',
+                    '-c', 'copy',
+                    tempVideoPath
+                ];
+                await new Promise<void>((resolve) => {
+                    const proc = spawn('ffmpeg', ffArgs, { stdio: ['ignore', 'ignore', 'ignore'] });
+                    const timer = setTimeout(() => {
+                        try { proc.kill(); } catch (_) {}
+                        resolve();
+                    }, 15000);
+                    proc.on('close', (code) => {
+                        clearTimeout(timer);
+                        if (code === 0 && fs.existsSync(tempVideoPath)) {
+                            try {
+                                fs.copyFileSync(tempVideoPath, filePath);
+                                fs.unlinkSync(tempVideoPath);
+                                console.log(`[embedMetadataForAdobe] FFmpeg stream-copy metadata written into video: ${filePath}`);
+                            } catch (_) {}
+                        }
+                        resolve();
+                    });
+                    proc.on('error', () => {
+                        clearTimeout(timer);
+                        resolve();
+                    });
+                });
+            } catch (videoErr) {
+                console.warn('[embedMetadataForAdobe] FFmpeg video embed note:', videoErr);
+            }
+        }
+
+        // 4. ExifTool Writing: Universal Dublin Core XMP, IPTC Core, Photoshop, EXIF (Enhancement)
         const metadataTags: any = {
-            // Dublin Core (XMP-dc) - Adobe Stock Primary Recognition
+            // Dublin Core (XMP-dc) - Primary Microstock Recognition (Adobe Stock, Freepik, Vecteezy)
             'XMP-dc:Title': title,
             'XMP-dc:Description': description,
             'XMP-dc:Subject': uniqueKeywords,
@@ -1693,7 +1780,7 @@ app.get('/api/debug-uploads', (req, res) => {
             'XMP:Subject': uniqueKeywords,
             'XMP:Headline': title,
 
-            // IPTC Core - Universal Microstock Standard (Shutterstock, 123RF, DepositPhotos, Freepik)
+            // IPTC Core - Universal Microstock Standard (Shutterstock, 123RF, DepositPhotos, Canva)
             'IPTC:ObjectName': title,
             'IPTC:Headline': title,
             'IPTC:Caption-Abstract': description,
@@ -1708,7 +1795,7 @@ app.get('/api/debug-uploads', (req, res) => {
             ObjectName: title,
             Description: description,
             'Caption-Abstract': description,
-            ImageDescription: title,
+            ImageDescription: description, // Correctly mapped to description (fixes previous title-overwrite bug)
             Subject: uniqueKeywords,
             Keywords: uniqueKeywords,
             XPTitle: title,
@@ -1717,6 +1804,16 @@ app.get('/api/debug-uploads', (req, res) => {
             XPSubject: title,
             Software: 'MetaZo AI Assistant'
         };
+
+        if (adobeCatName) {
+            metadataTags['IPTC:Category'] = adobeCatName.substring(0, 3);
+            metadataTags['XMP-photoshop:Category'] = adobeCatName;
+        }
+
+        if (uniqueSuppCats.length > 0) {
+            metadataTags['IPTC:SupplementalCategories'] = uniqueSuppCats;
+            metadataTags['XMP-photoshop:SupplementalCategories'] = uniqueSuppCats;
+        }
 
         if (isVideo) {
             metadataTags['QuickTime:Title'] = title;
@@ -1742,7 +1839,6 @@ app.get('/api/debug-uploads', (req, res) => {
                     '-charset', 'iptc=utf8',
                     '-charset', 'exif=utf8',
                     '-codedcharacterset=utf8',
-                    '-sep', ', ',
                     '-m'
                 ]),
                 new Promise((_, rej) => setTimeout(() => rej(new Error('ExifTool write timeout')), 25000))
@@ -1750,10 +1846,10 @@ app.get('/api/debug-uploads', (req, res) => {
             console.log(`[embedMetadataForAdobe] ExifTool successfully embedded metadata into: ${filePath}`);
             return filePath;
         } catch (exifErr: any) {
-            console.warn(`[embedMetadataForAdobe] ExifTool vendored error: ${exifErr?.message}. Trying CLI fallback...`);
+            // ExifTool vendored not present or errored; native pure-JS layers already embedded above!
         }
 
-        // 4. CLI ExifTool Fallback with spawn (avoids Windows command-line quoting issues)
+        // 5. CLI ExifTool Fallback (if installed in system PATH)
         return new Promise<string>((resolve) => {
             const args = [
                 '-overwrite_original',
@@ -1761,7 +1857,6 @@ app.get('/api/debug-uploads', (req, res) => {
                 '-charset', 'iptc=utf8',
                 '-charset', 'exif=utf8',
                 '-codedcharacterset=utf8',
-                '-sep', ', ',
                 `-XMP-dc:Title=${title}`,
                 `-XMP-dc:Description=${description}`,
                 `-XMP-dc:Subject=${keywordString}`,
@@ -1777,7 +1872,7 @@ app.get('/api/debug-uploads', (req, res) => {
                 `-ObjectName=${title}`,
                 `-Description=${description}`,
                 `-Caption-Abstract=${description}`,
-                `-ImageDescription=${title}`,
+                `-ImageDescription=${description}`,
                 `-Subject=${keywordString}`,
                 `-Keywords=${keywordString}`,
                 `-XPTitle=${title}`,
@@ -1785,6 +1880,10 @@ app.get('/api/debug-uploads', (req, res) => {
                 `-XPKeywords=${keywordString}`,
                 filePath
             ];
+
+            if (adobeCatName) {
+                args.push(`-IPTC:Category=${adobeCatName.substring(0, 3)}`, `-XMP-photoshop:Category=${adobeCatName}`);
+            }
 
             const child = spawn('exiftool', args, { stdio: ['ignore', 'pipe', 'pipe'] });
             let hasResolved = false;
@@ -1795,22 +1894,20 @@ app.get('/api/debug-uploads', (req, res) => {
                     try { child.kill(); } catch (_) {}
                     resolve(filePath);
                 }
-            }, 20000);
+            }, 10000);
 
             child.on('close', (code) => {
                 if (!hasResolved) {
                     hasResolved = true;
                     clearTimeout(timer);
-                    console.log(`[embedMetadataForAdobe] CLI ExifTool finished with code: ${code}`);
                     resolve(filePath);
                 }
             });
 
-            child.on('error', (err) => {
+            child.on('error', () => {
                 if (!hasResolved) {
                     hasResolved = true;
                     clearTimeout(timer);
-                    console.warn(`[embedMetadataForAdobe] CLI ExifTool error: ${err.message}`);
                     resolve(filePath);
                 }
             });
@@ -1856,9 +1953,15 @@ app.get('/api/debug-uploads', (req, res) => {
                 return res.status(400).json({ error: 'File tidak ditemukan. Unggah file langsung atau berikan fileUrl + pathKey (R2).' });
             }
 
-            // Step 2: Extract & Clean Title, Description, Keywords
+            // Step 2: Extract & Clean Title, Description, Keywords, Categories
             const title = String(req.body.title || '').trim();
             const description = String(req.body.description || title).trim();
+            const adobeCategoryId = req.body.adobeCategoryId || req.body.category_id || '';
+            const shutterstockCategory1 = req.body.shutterstockCategory1 || req.body.shutterstock_category_1 || '';
+            const shutterstockCategory2 = req.body.shutterstockCategory2 || req.body.shutterstock_category_2 || '';
+            const dreamstimeCategory = req.body.dreamstimeCategory || req.body.dreamstime_category || '';
+            const miriCanvasCategory = req.body.miriCanvasCategory || req.body.miricanvas_category || '';
+
             let keywords: string[] = [];
 
             if (req.body.keywords) {
@@ -1881,14 +1984,19 @@ app.get('/api/debug-uploads', (req, res) => {
                 .filter((k: string) => k.length > 0);
             const uniqueKeywords = Array.from(new Set(keywords));
 
-            console.log(`[Embed Metadata] Embedding: Title="${title}", Keywords=${uniqueKeywords.length}, File="${originalName}"`);
+            console.log(`[Embed Metadata] Embedding: Title="${title}", Keywords=${uniqueKeywords.length}, AdobeCat="${adobeCategoryId}", SST1="${shutterstockCategory1}", File="${originalName}"`);
 
-            // Step 3: Embed metadata into file using complete Adobe Stock / IPTC / XMP engine
+            // Step 3: Embed metadata into file using complete Universal Microstock Engine
             localOutputPath = localInputPath;
             await embedMetadataForAdobe(localOutputPath, {
                 title,
                 description,
-                keywords: uniqueKeywords
+                keywords: uniqueKeywords,
+                adobeCategoryId,
+                shutterstockCategory1,
+                shutterstockCategory2,
+                dreamstimeCategory,
+                miriCanvasCategory
             });
 
             // Step 4: Handle download response (R2 upload if pathKey provided, otherwise direct stream)
@@ -1901,7 +2009,7 @@ app.get('/api/debug-uploads', (req, res) => {
                     success: true,
                     downloadUrl: r2Url,
                     fileName: embeddedName,
-                    metadata: { title, description, keywords: uniqueKeywords }
+                    metadata: { title, description, keywords: uniqueKeywords, adobeCategoryId, shutterstockCategory1, shutterstockCategory2 }
                 });
             }
 

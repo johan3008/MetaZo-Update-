@@ -39,6 +39,7 @@ import { generateStockMetadata, generateBatchStockMetadata } from './services/ge
 import { copyToClipboard } from './src/utils';
 import UTIF from 'utif';
 import piexif from 'piexifjs';
+import { embedMicrostockMetadata, createZipBlob } from './src/utils/microstockEmbedder';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { 
@@ -2955,6 +2956,21 @@ const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [embedDownloading, setEmbedDownloading] = useState(false);
+  const [embedNamingMode, setEmbedNamingMode] = useState<'matching_csv' | 'seo_title'>('matching_csv');
+  const [embedProgress, setEmbedProgress] = useState<{ current: number; total: number } | null>(null);
+
+  const handleSelectAllPlatforms = (enableAll: boolean) => {
+    setExportAdobe(enableAll);
+    setExportShutterstock(enableAll);
+    setExportVecteezy(enableAll);
+    setExportCanva(enableAll);
+    setExportFreepik(enableAll);
+    setExportPond5(enableAll);
+    setExportDepositPhotos(enableAll);
+    setExportMiriCanvas(enableAll);
+    setExport123RF(enableAll);
+  };
+
   const autoDownloadCSVRef = useRef(false);
   const setAutoDownloadCSV = (val: boolean) => {
       setAutoDownloadCSVState(val);
@@ -3544,8 +3560,8 @@ const App: React.FC = () => {
                 adobeCategoryId: metadata.category_id,
                 shutterstockCategory1: metadata.shutterstock_category_1,
                 shutterstockCategory2: metadata.shutterstock_category_2,
-                            dreamstimeCategory: '',
-                            miriCanvasCategory: '',
+                dreamstimeCategory: metadata.dreamstime_category || '',
+                miriCanvasCategory: metadata.miricanvas_category || '',
                 categoryReason: metadata.category_reason,
                 yolo_detected_objects: metadata.yolo_detected_objects,
                 isGenerating: false,
@@ -3731,8 +3747,8 @@ const App: React.FC = () => {
                             adobeCategoryId: result.metadata.category_id,
                             shutterstockCategory1: result.metadata.shutterstock_category_1,
                             shutterstockCategory2: result.metadata.shutterstock_category_2,
-                            dreamstimeCategory: '',
-                            miriCanvasCategory: '',
+                            dreamstimeCategory: result.metadata.dreamstime_category || '',
+                            miriCanvasCategory: result.metadata.miricanvas_category || '',
                             categoryReason: result.metadata.category_reason,
                             yolo_detected_objects: result.metadata.yolo_detected_objects,
                             isGenerating: false,
@@ -4383,6 +4399,137 @@ const App: React.FC = () => {
     }
   };
 
+  const triggerBlobDownload = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+
+  const getEmbeddedBlobForItem = async (
+    item: FileItem,
+    namingMode: 'matching_csv' | 'seo_title' = embedNamingMode
+  ): Promise<{ blob: Blob; exportName: string } | null> => {
+    if (!item.file) return null;
+    const title = item.title?.trim() || item.description?.trim() || '';
+    const description = item.description?.trim() || title;
+    const keywords = item.keywords || [];
+
+    const origExt = (item.file.name.split('.').pop() || 'jpg').toLowerCase();
+    let exportName: string;
+    if (namingMode === 'seo_title') {
+      const baseNameRaw = title || item.customFileName?.trim() || item.file.name.replace(/\.[^/.]+$/, '');
+      const cleanName = baseNameRaw
+        .replace(/[\\/:*?"<>|]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim() || 'asset';
+      exportName = `${cleanName}.${origExt}`;
+    } else {
+      exportName = getExportFilename(item.customFileName || item.file.name, item.file);
+    }
+
+    const isVideo = ['mp4', 'mov', 'webm', 'm4v', 'avi'].includes(origExt);
+
+    // 1. High-speed client-side embedding for Images & Vectors (JPG, PNG, SVG, EPS)
+    if (!isVideo) {
+      try {
+        const embeddedBlob = await embedMicrostockMetadata(item.file, {
+          title,
+          description,
+          keywords,
+          adobeCategoryId: item.adobeCategoryId,
+          shutterstockCategory1: item.shutterstockCategory1,
+          shutterstockCategory2: item.shutterstockCategory2,
+          dreamstimeCategory: item.dreamstimeCategory,
+          miriCanvasCategory: item.miriCanvasCategory,
+          creator: 'MetaZo Contributor',
+          software: 'MetaZo Microstock AI Assistant'
+        });
+
+        if (embeddedBlob && embeddedBlob.size > 0) {
+          return { blob: embeddedBlob, exportName };
+        }
+      } catch (clientErr) {
+        console.warn('[Download Embedded] Client embed warning, trying server endpoint:', clientErr);
+      }
+    }
+
+    // 2. Server endpoint for Video or fallback
+    try {
+      const formData = new FormData();
+      formData.append('file', item.file, exportName);
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('keywords', JSON.stringify(keywords));
+      if (item.adobeCategoryId) formData.append('adobeCategoryId', String(item.adobeCategoryId));
+      if (item.shutterstockCategory1) formData.append('shutterstockCategory1', item.shutterstockCategory1);
+      if (item.shutterstockCategory2) formData.append('shutterstockCategory2', item.shutterstockCategory2);
+      if (item.dreamstimeCategory) formData.append('dreamstimeCategory', item.dreamstimeCategory);
+      if (item.miriCanvasCategory) formData.append('miriCanvasCategory', item.miriCanvasCategory);
+      if (commonAiOptions?.model) formData.append('model', commonAiOptions.model);
+
+      const reqHeaders = { ...getHeaders(commonAiOptions) };
+      delete reqHeaders['Content-Type'];
+
+      const resp = await fetch('/api/embed-metadata', {
+        method: 'POST',
+        headers: reqHeaders,
+        body: formData
+      });
+
+      if (resp.ok) {
+        const contentType = resp.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await resp.json();
+          if (data.downloadUrl) {
+            const urlResp = await fetch(data.downloadUrl);
+            if (urlResp.ok) {
+              const urlBlob = await urlResp.blob();
+              return { blob: urlBlob, exportName };
+            }
+          }
+        } else {
+          const blob = await resp.blob();
+          return { blob, exportName };
+        }
+      }
+    } catch (serverErr) {
+      console.warn('[Download Embedded] Server endpoint error:', serverErr);
+    }
+
+    // 3. Fallback: Raw file
+    return { blob: item.file, exportName };
+  };
+
+  const downloadSingleEmbeddedFile = async (
+    item: FileItem, 
+    namingMode: 'matching_csv' | 'seo_title' = embedNamingMode
+  ): Promise<boolean> => {
+    try {
+      const result = await getEmbeddedBlobForItem(item, namingMode);
+      if (result) {
+        triggerBlobDownload(result.blob, result.exportName);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[Download Single Embedded] Error:', err);
+      return false;
+    }
+  };
+
+  const handleDownloadSingleEmbedded = async (fileItem: FileItem) => {
+    try {
+      await downloadSingleEmbeddedFile(fileItem, embedNamingMode);
+    } catch (err) {
+      console.error('[Download Single Embedded] Error:', err);
+    }
+  };
+
   const handleDownloadEmbedded = async () => {
     const toolFiles = getFilesForTool(files, activeTool);
     const completedFiles = toolFiles.filter(f => (f.title || f.description) && f.file);
@@ -4392,181 +4539,56 @@ const App: React.FC = () => {
     }
 
     setEmbedDownloading(true);
+    setEmbedProgress({ current: 0, total: completedFiles.length });
+
     try {
+      // If only 1 file, download directly as single file without zip
+      if (completedFiles.length === 1) {
+        setEmbedProgress({ current: 1, total: 1 });
+        await downloadSingleEmbeddedFile(completedFiles[0], embedNamingMode);
+        return;
+      }
+
+      // If more than 1 file, embed all files and package them into a single ZIP
+      const zipEntries: { name: string; data: Uint8Array | Blob }[] = [];
+      const usedNames = new Set<string>();
+
       for (let i = 0; i < completedFiles.length; i++) {
+        setEmbedProgress({ current: i + 1, total: completedFiles.length });
         const item = completedFiles[i];
-        const title = item.title?.trim() || item.description?.trim() || '';
-        const description = item.description?.trim() || title;
-        const keywords = item.keywords || [];
+        const res = await getEmbeddedBlobForItem(item, embedNamingMode);
+        if (res) {
+          let uniqueName = res.exportName;
+          let counter = 1;
+          const dotIdx = uniqueName.lastIndexOf('.');
+          const base = dotIdx !== -1 ? uniqueName.slice(0, dotIdx) : uniqueName;
+          const ext = dotIdx !== -1 ? uniqueName.slice(dotIdx) : '';
 
-        // Build file export name directly from Metadata Title
-        const origExt = (item.file.name.split('.').pop() || 'jpg').toLowerCase();
-        const baseNameRaw = title || item.customFileName?.trim() || item.file.name.replace(/\.[^/.]+$/, '');
-        const cleanName = baseNameRaw
-          .replace(/[\\/:*?"<>|]/g, '')
-          .replace(/\s+/g, ' ')
-          .trim() || 'asset';
-        const exportName = `${cleanName}.${origExt}`;
+          while (usedNames.has(uniqueName.toLowerCase())) {
+            uniqueName = `${base}_${counter}${ext}`;
+            counter++;
+          }
+          usedNames.add(uniqueName.toLowerCase());
 
-        let downloaded = false;
-
-        try {
-          const formData = new FormData();
-          formData.append('file', item.file, exportName);
-          formData.append('title', title);
-          formData.append('description', description);
-          formData.append('keywords', JSON.stringify(keywords));
-          if (commonAiOptions?.model) formData.append('model', commonAiOptions.model);
-
-          const reqHeaders = { ...getHeaders(commonAiOptions) };
-          delete reqHeaders['Content-Type']; // CRITICAL: Allow browser to set boundary for multipart/form-data
-
-          const resp = await fetch('/api/embed-metadata', {
-            method: 'POST',
-            headers: reqHeaders,
-            body: formData
+          zipEntries.push({
+            name: uniqueName,
+            data: res.blob
           });
-
-          if (resp.ok) {
-            const contentType = resp.headers.get('content-type') || '';
-            if (contentType.includes('application/json')) {
-              const data = await resp.json();
-              if (data.downloadUrl) {
-                window.open(data.downloadUrl, '_blank');
-                downloaded = true;
-              }
-            } else {
-              const blob = await resp.blob();
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = exportName;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              setTimeout(() => URL.revokeObjectURL(url), 2000);
-              downloaded = true;
-            }
-          } else {
-            const errData = await resp.json().catch(() => ({}));
-            console.error('[Download Embedded] Server error:', errData);
-            throw new Error(errData.error || `Server status ${resp.status}`);
-          }
-        } catch (serverErr) {
-          console.warn('[Download Embedded] Server embed failed, trying client fallback:', serverErr);
         }
+      }
 
-        // Client-side fallback for JPEG files using piexifjs (with true UCS-2LE encoding for Windows Explorer)
-        if (!downloaded && (item.file.type === 'image/jpeg' || item.file.name.toLowerCase().endsWith('.jpg') || item.file.name.toLowerCase().endsWith('.jpeg'))) {
-          try {
-            const dataUri = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = reject;
-              reader.readAsDataURL(item.file);
-            });
-
-            let zeroth: any = {};
-            let exif: any = {};
-            let gps: any = {};
-            try {
-              const existing = piexif.load(dataUri);
-              zeroth = existing['0th'] || {};
-              exif = existing['Exif'] || {};
-              gps = existing['GPS'] || {};
-            } catch (_) {}
-
-            // Helper to encode string as 2-byte UCS-2LE (UTF-16LE with null terminator) to prevent Chinese/Japanese mojibake in Windows
-            const toUcs2Bytes = (str: string) => {
-              const bytes: number[] = [];
-              for (let i = 0; i < str.length; i++) {
-                const code = str.charCodeAt(i);
-                bytes.push(code & 0xFF, (code >> 8) & 0xFF);
-              }
-              bytes.push(0, 0);
-              return bytes;
-            };
-
-            zeroth[piexif.ImageIFD.ImageDescription] = description;
-            zeroth[piexif.ImageIFD.XPTitle] = toUcs2Bytes(title);
-            zeroth[piexif.ImageIFD.XPComment] = toUcs2Bytes(description);
-            zeroth[piexif.ImageIFD.XPKeywords] = toUcs2Bytes(keywords.join('; '));
-            zeroth[piexif.ImageIFD.Software] = "MetaZo AI Assistant";
-
-            const exifBytes = piexif.dump({ "0th": zeroth, "Exif": exif, "GPS": gps });
-            const newImageDataUri = piexif.insert(exifBytes, dataUri);
-
-            const byteString = atob(newImageDataUri.split(',')[1]);
-            const ab = new ArrayBuffer(byteString.length);
-            const ia = new Uint8Array(ab);
-            for (let b = 0; b < byteString.length; b++) {
-              ia[b] = byteString.charCodeAt(b);
-            }
-            const blob = new Blob([ab], { type: 'image/jpeg' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = exportName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 2000);
-            downloaded = true;
-          } catch (clientErr) {
-            console.error('[Download Embedded] Client fallback error:', clientErr);
-          }
-        }
-
-        // Client-side fallback for SVG files
-        if (!downloaded && (item.file.type === 'image/svg+xml' || item.file.name.toLowerCase().endsWith('.svg'))) {
-          try {
-            let svgText = await item.file.text();
-            const escapeXml = (unsafe: string) => unsafe.replace(/[<>&'"]/g, (c) => {
-              switch (c) {
-                case '<': return '&lt;';
-                case '>': return '&gt;';
-                case '&': return '&amp;';
-                case '\'': return '&apos;';
-                case '"': return '&quot;';
-                default: return c;
-              }
-            });
-            const titleTag = `<title>${escapeXml(title)}</title>`;
-            const descTag = `<desc>${escapeXml(description)}</desc>`;
-            const keywordsXml = keywords.map(k => `<rdf:li>${escapeXml(k)}</rdf:li>`).join('');
-            const metadataTag = `<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:title>${escapeXml(title)}</dc:title><dc:description>${escapeXml(description)}</dc:description><dc:subject><rdf:Bag>${keywordsXml}</rdf:Bag></dc:subject><dc:format>image/svg+xml</dc:format></rdf:Description></rdf:RDF></metadata>`;
-
-            svgText = svgText
-              .replace(/<title[\s\S]*?<\/title>/gi, '')
-              .replace(/<desc[\s\S]*?<\/desc>/gi, '')
-              .replace(/<metadata[\s\S]*?<\/metadata>/gi, '');
-
-            if (/<svg[^>]*>/i.test(svgText)) {
-              svgText = svgText.replace(/(<svg[^>]*>)/i, `$1\n  ${titleTag}\n  ${descTag}\n  ${metadataTag}`);
-              const blob = new Blob([svgText], { type: 'image/svg+xml' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = exportName;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              setTimeout(() => URL.revokeObjectURL(url), 2000);
-              downloaded = true;
-            }
-          } catch (svgErr) {
-            console.error('[Download Embedded] SVG client fallback error:', svgErr);
-          }
-        }
-
-        if (completedFiles.length > 1) {
-          await new Promise(r => setTimeout(r, 400));
-        }
+      if (zipEntries.length > 0) {
+        const dateStr = new Date().toISOString().split('T')[0];
+        const zipBlob = await createZipBlob(zipEntries);
+        const zipFilename = `MetaZo_Embedded_${activeTool.toUpperCase()}_${dateStr}.zip`;
+        triggerBlobDownload(zipBlob, zipFilename);
       }
     } catch (e) {
       console.error('[Download Embedded] Error:', e);
+      alert(uiLanguage === 'id' ? 'Gagal membuat file ZIP metadata.' : 'Failed to create embedded ZIP archive.');
     } finally {
       setEmbedDownloading(false);
+      setEmbedProgress(null);
     }
   };
 
@@ -5173,6 +5195,7 @@ const App: React.FC = () => {
                 progressInfo={progressInfo}
                 keywordCount={keywordCount}
                 aiOptions={commonAiOptions}
+                handleDownloadSingleEmbedded={handleDownloadSingleEmbedded}
               />
 
               {/* Section Row 3: Bulk Export Integration Panels */}
@@ -5205,7 +5228,12 @@ const App: React.FC = () => {
                     handleExport={handleExport} 
                     handleBackupJSON={handleBackupJSON}
                     handleDownloadEmbedded={handleDownloadEmbedded}
+                    completedCount={successfulFilesCount}
                     embedDownloading={embedDownloading}
+                    embedProgress={embedProgress}
+                    embedNamingMode={embedNamingMode}
+                    setEmbedNamingMode={setEmbedNamingMode}
+                    handleSelectAllPlatforms={handleSelectAllPlatforms}
                     t={t} 
                   />
                 )}
