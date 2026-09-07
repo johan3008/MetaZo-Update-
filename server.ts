@@ -1625,10 +1625,24 @@ app.get('/api/debug-uploads', (req, res) => {
             .flatMap(k => String(k).split(','))
             .map(k => String(k).trim().replace(/^["']|["']$/g, ''))
             .filter(k => k.length > 0);
-        const uniqueKeywords = Array.from(new Set(cleanKeywords));
+        // Preserve exact ranking order from MetadataGen and cap at 49 for Adobe Stock limits
+        const uniqueKeywords = Array.from(new Set(cleanKeywords)).slice(0, 49);
         const keywordString = uniqueKeywords.join(', ');
         const title = String(metadata.title || '').trim();
         const description = String(metadata.description || title).trim();
+        const categoryId = (metadata as any).adobeCategoryId ? String((metadata as any).adobeCategoryId).trim() : '';
+        const sstCategory1 = (metadata as any).shutterstockCategory1 ? String((metadata as any).shutterstockCategory1).trim() : '';
+        const sstCategory2 = (metadata as any).shutterstockCategory2 ? String((metadata as any).shutterstockCategory2).trim() : '';
+
+        // Shutterstock rule: Description must be at least 5 words long
+        let sstDesc = description;
+        if (sstDesc.split(/\s+/).filter(Boolean).length < 5) {
+            if (title.split(/\s+/).filter(Boolean).length >= 5) {
+                sstDesc = title;
+            } else {
+                sstDesc = `${title} - creative visual asset for commercial microstock and design`;
+            }
+        }
 
         const ext = (path.extname(filePath) || '').toLowerCase();
         const isVideo = ['.mp4', '.mov', '.webm', '.m4v', '.avi'].includes(ext);
@@ -1649,9 +1663,9 @@ app.get('/api/debug-uploads', (req, res) => {
                 });
 
                 const titleTag = `<title>${escapeXml(title)}</title>`;
-                const descTag = `<desc>${escapeXml(description)}</desc>`;
+                const descTag = `<desc>${escapeXml(sstDesc)}</desc>`;
                 const keywordsXml = uniqueKeywords.map(k => `<rdf:li>${escapeXml(k)}</rdf:li>`).join('');
-                const metadataTag = `<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:title>${escapeXml(title)}</dc:title><dc:description>${escapeXml(description)}</dc:description><dc:subject><rdf:Bag>${keywordsXml}</rdf:Bag></dc:subject><dc:format>image/svg+xml</dc:format></rdf:Description></rdf:RDF></metadata>`;
+                const metadataTag = `<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:title>${escapeXml(title)}</dc:title><dc:description>${escapeXml(sstDesc)}</dc:description><dc:subject><rdf:Bag>${keywordsXml}</rdf:Bag></dc:subject><dc:format>image/svg+xml</dc:format></rdf:Description></rdf:RDF></metadata>`;
 
                 svgContent = svgContent
                     .replace(/<title[\s\S]*?<\/title>/gi, '')
@@ -1684,52 +1698,73 @@ app.get('/api/debug-uploads', (req, res) => {
 
         // 3. ExifTool Writing: Full Dublin Core XMP, IPTC Core, Photoshop, EXIF, QuickTime
         const metadataTags: any = {
-            // Dublin Core (XMP-dc) - Adobe Stock Primary Recognition
+            // Dublin Core (XMP-dc) - Adobe Stock, Freepik, Vecteezy, Canva Primary Recognition
             'XMP-dc:Title': title,
-            'XMP-dc:Description': description,
+            'XMP-dc:Description': sstDesc,
             'XMP-dc:Subject': uniqueKeywords,
+            'XMP-dc:Creator': ['MetaZo Contributor'],
             'XMP:Title': title,
-            'XMP:Description': description,
+            'XMP:Description': sstDesc,
             'XMP:Subject': uniqueKeywords,
             'XMP:Headline': title,
 
-            // IPTC Core - Universal Microstock Standard (Shutterstock, 123RF, DepositPhotos, Freepik)
+            // IPTC Core - Universal Microstock Standard (Shutterstock, 123RF, DepositPhotos, Freepik, Getty/iStock)
             'IPTC:ObjectName': title,
             'IPTC:Headline': title,
-            'IPTC:Caption-Abstract': description,
+            'IPTC:Caption-Abstract': sstDesc,
             'IPTC:Keywords': uniqueKeywords,
             'IPTC:CodedCharacterSet': 'UTF8',
+            'IPTC:By-line': 'MetaZo Contributor',
+            'IPTC:Credit': 'MetaZo AI Stock Assistant',
+            'IPTC:Source': 'MetaZo',
 
-            // Photoshop & Standard Tags (Adobe Stock & Windows/Mac OS)
+            // Photoshop & Standard Tags (Adobe Stock, Windows/Mac OS, Microstocks)
             'XMP-photoshop:Headline': title,
-            'XMP-photoshop:Caption': description,
+            'XMP-photoshop:Caption': sstDesc,
+            'XMP-photoshop:Credit': 'MetaZo Contributor',
+            'XMP-photoshop:Source': 'MetaZo',
+            'XMP-xmpRights:Marked': true,
             Title: title,
             Headline: title,
             ObjectName: title,
-            Description: description,
-            'Caption-Abstract': description,
+            Description: sstDesc,
+            'Caption-Abstract': sstDesc,
             ImageDescription: title,
             Subject: uniqueKeywords,
             Keywords: uniqueKeywords,
             XPTitle: title,
-            XPComment: description,
+            XPComment: sstDesc,
             XPKeywords: uniqueKeywords.join('; '),
             XPSubject: title,
             Software: 'MetaZo AI Assistant'
         };
 
+        if (categoryId) {
+            metadataTags['IPTC:Category'] = categoryId;
+            metadataTags['XMP:Category'] = categoryId;
+            metadataTags['XMP-photoshop:Category'] = categoryId;
+        }
+
+        if (sstCategory1 || sstCategory2) {
+            const suppCats = [sstCategory1, sstCategory2].filter(Boolean);
+            metadataTags['IPTC:SupplementalCategories'] = suppCats;
+            metadataTags['XMP-shutterstock:Category1'] = sstCategory1;
+            if (sstCategory2) metadataTags['XMP-shutterstock:Category2'] = sstCategory2;
+        }
+
         if (isVideo) {
             metadataTags['QuickTime:Title'] = title;
-            metadataTags['QuickTime:Description'] = description;
+            metadataTags['QuickTime:Description'] = sstDesc;
             metadataTags['QuickTime:Keywords'] = uniqueKeywords;
+            metadataTags['QuickTime:Comment'] = sstDesc;
             metadataTags['ItemList:Title'] = title;
-            metadataTags['ItemList:Description'] = description;
+            metadataTags['ItemList:Description'] = sstDesc;
             metadataTags['ItemList:Keyword'] = uniqueKeywords;
-            metadataTags['UserData:Description'] = description;
+            metadataTags['UserData:Description'] = sstDesc;
             metadataTags['UserData:Keywords'] = uniqueKeywords;
             metadataTags['Keys:DisplayName'] = title;
             metadataTags['Keys:Title'] = title;
-            metadataTags['Keys:Description'] = description;
+            metadataTags['Keys:Description'] = sstDesc;
             metadataTags['Keys:Keywords'] = uniqueKeywords;
         }
 
@@ -1761,28 +1796,26 @@ app.get('/api/debug-uploads', (req, res) => {
                 '-charset', 'iptc=utf8',
                 '-charset', 'exif=utf8',
                 '-codedcharacterset=utf8',
-                '-sep', ', ',
                 `-XMP-dc:Title=${title}`,
                 `-XMP-dc:Description=${description}`,
-                `-XMP-dc:Subject=${keywordString}`,
                 `-XMP:Title=${title}`,
                 `-XMP:Description=${description}`,
-                `-XMP:Subject=${keywordString}`,
                 `-IPTC:ObjectName=${title}`,
                 `-IPTC:Headline=${title}`,
                 `-IPTC:Caption-Abstract=${description}`,
-                `-IPTC:Keywords=${keywordString}`,
                 `-Title=${title}`,
                 `-Headline=${title}`,
                 `-ObjectName=${title}`,
                 `-Description=${description}`,
                 `-Caption-Abstract=${description}`,
                 `-ImageDescription=${title}`,
-                `-Subject=${keywordString}`,
-                `-Keywords=${keywordString}`,
                 `-XPTitle=${title}`,
                 `-XPComment=${description}`,
                 `-XPKeywords=${keywordString}`,
+                ...uniqueKeywords.map(k => `-IPTC:Keywords=${k}`),
+                ...uniqueKeywords.map(k => `-XMP-dc:Subject=${k}`),
+                ...uniqueKeywords.map(k => `-Subject=${k}`),
+                ...uniqueKeywords.map(k => `-Keywords=${k}`),
                 filePath
             ];
 
@@ -1881,15 +1914,21 @@ app.get('/api/debug-uploads', (req, res) => {
                 .filter((k: string) => k.length > 0);
             const uniqueKeywords = Array.from(new Set(keywords));
 
-            console.log(`[Embed Metadata] Embedding: Title="${title}", Keywords=${uniqueKeywords.length}, File="${originalName}"`);
+            const adobeCategoryId = req.body.adobeCategoryId ? String(req.body.adobeCategoryId).trim() : undefined;
+            const shutterstockCategory1 = req.body.shutterstockCategory1 ? String(req.body.shutterstockCategory1).trim() : undefined;
+            const shutterstockCategory2 = req.body.shutterstockCategory2 ? String(req.body.shutterstockCategory2).trim() : undefined;
+            console.log(`[Embed Metadata] Embedding: Title="${title}", Keywords=${uniqueKeywords.length}, Category=${adobeCategoryId || '-'}, SST=${shutterstockCategory1 || '-'}/${shutterstockCategory2 || '-'}, File="${originalName}"`);
 
             // Step 3: Embed metadata into file using complete Adobe Stock / IPTC / XMP engine
             localOutputPath = localInputPath;
             await embedMetadataForAdobe(localOutputPath, {
                 title,
                 description,
-                keywords: uniqueKeywords
-            });
+                keywords: uniqueKeywords,
+                adobeCategoryId,
+                shutterstockCategory1,
+                shutterstockCategory2
+            } as any);
 
             // Step 4: Handle download response (R2 upload if pathKey provided, otherwise direct stream)
             const embeddedName = `embedded_${originalName}`;
