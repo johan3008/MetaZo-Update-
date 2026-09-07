@@ -194,8 +194,6 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
     const customBlackboxKey = req.headers['x-blackbox-key'];
     const customBluesmindsKey = req.headers['x-bluesminds-key'];
     const customAiveneKey = req.headers['x-aivene-key'];
-    const customFlorenceKey = req.headers['x-florence-key'];
-    const customFlorenceEndpoint = req.headers['x-florence-endpoint'];
     const provider = req.headers['x-ai-provider'] || 'gemini';
 
     const getKeys = (headerVal: any) => {
@@ -214,11 +212,7 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
         nvidia: { keys: getKeys(customNvidiaKey), activeIndex: 0 },
         blackbox: { keys: getKeys(customBlackboxKey), activeIndex: 0 },
         bluesminds: { keys: getKeys(customBluesmindsKey), activeIndex: 0 },
-        aivene: { keys: getKeys(customAiveneKey), activeIndex: 0 },
-        florence: { 
-            apiKey: typeof customFlorenceKey === 'string' ? customFlorenceKey.trim() : undefined,
-            endpoint: typeof customFlorenceEndpoint === 'string' ? customFlorenceEndpoint.trim() : undefined
-        }
+        aivene: { keys: getKeys(customAiveneKey), activeIndex: 0 }
     }, () => {
         next();
     });
@@ -1435,54 +1429,6 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
-    app.post('/api/test-florence-key', async (req, res) => {
-        try {
-            const { apiKey, endpoint } = req.body;
-            if (!apiKey && !endpoint) {
-                return res.status(400).json({ error: 'HuggingFace Token atau Florence Endpoint tidak boleh kosong.' });
-            }
-
-            // Test HF token or custom endpoint
-            if (endpoint) {
-                try {
-                    const testResp = await fetch(endpoint.trim(), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ping: true, test: true })
-                    });
-                    if (testResp.ok || testResp.status === 400 || testResp.status === 422) {
-                        return res.json({ success: true, message: 'Florence-2 Custom Endpoint terhubung dengan sukses!' });
-                    }
-                    return res.status(testResp.status).json({ error: `Florence-2 Endpoint merespon status ${testResp.status}` });
-                } catch (err: any) {
-                    return res.status(500).json({ error: `Gagal menghubungi Florence-2 Endpoint: ${err.message || err}` });
-                }
-            }
-
-            if (apiKey) {
-                const hfResp = await fetch('https://api-inference.huggingface.co/models/microsoft/Florence-2-large', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${apiKey.trim()}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ inputs: 'test' })
-                });
-                if (hfResp.ok || hfResp.status === 503 || hfResp.status === 400 || hfResp.status === 422) {
-                    return res.json({ success: true, message: 'Hugging Face API Token untuk Florence-2 valid!' });
-                }
-                if (hfResp.status === 401 || hfResp.status === 403) {
-                    return res.status(400).json({ error: 'Hugging Face Token tidak valid atau unauthorized.' });
-                }
-                const text = await hfResp.text();
-                return res.status(hfResp.status).json({ error: `Hugging Face API response (${hfResp.status}): ${text.slice(0, 150)}` });
-            }
-        } catch (e: any) {
-            console.warn('Test Florence API Key error exception:', e);
-            res.status(500).json({ error: e.message || 'Internal Server Error' });
-        }
-    });
-
     const getProviderName = (): string => {
         const store = apiKeyStorage.getStore();
         const provider = (store && store.provider) || 'gemini';
@@ -1625,24 +1571,10 @@ app.get('/api/debug-uploads', (req, res) => {
             .flatMap(k => String(k).split(','))
             .map(k => String(k).trim().replace(/^["']|["']$/g, ''))
             .filter(k => k.length > 0);
-        // Preserve exact ranking order from MetadataGen and cap at 49 for Adobe Stock limits
-        const uniqueKeywords = Array.from(new Set(cleanKeywords)).slice(0, 49);
+        const uniqueKeywords = Array.from(new Set(cleanKeywords));
         const keywordString = uniqueKeywords.join(', ');
         const title = String(metadata.title || '').trim();
         const description = String(metadata.description || title).trim();
-        const categoryId = (metadata as any).adobeCategoryId ? String((metadata as any).adobeCategoryId).trim() : '';
-        const sstCategory1 = (metadata as any).shutterstockCategory1 ? String((metadata as any).shutterstockCategory1).trim() : '';
-        const sstCategory2 = (metadata as any).shutterstockCategory2 ? String((metadata as any).shutterstockCategory2).trim() : '';
-
-        // Shutterstock rule: Description must be at least 5 words long
-        let sstDesc = description;
-        if (sstDesc.split(/\s+/).filter(Boolean).length < 5) {
-            if (title.split(/\s+/).filter(Boolean).length >= 5) {
-                sstDesc = title;
-            } else {
-                sstDesc = `${title} - creative visual asset for commercial microstock and design`;
-            }
-        }
 
         const ext = (path.extname(filePath) || '').toLowerCase();
         const isVideo = ['.mp4', '.mov', '.webm', '.m4v', '.avi'].includes(ext);
@@ -1663,9 +1595,9 @@ app.get('/api/debug-uploads', (req, res) => {
                 });
 
                 const titleTag = `<title>${escapeXml(title)}</title>`;
-                const descTag = `<desc>${escapeXml(sstDesc)}</desc>`;
+                const descTag = `<desc>${escapeXml(description)}</desc>`;
                 const keywordsXml = uniqueKeywords.map(k => `<rdf:li>${escapeXml(k)}</rdf:li>`).join('');
-                const metadataTag = `<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:title>${escapeXml(title)}</dc:title><dc:description>${escapeXml(sstDesc)}</dc:description><dc:subject><rdf:Bag>${keywordsXml}</rdf:Bag></dc:subject><dc:format>image/svg+xml</dc:format></rdf:Description></rdf:RDF></metadata>`;
+                const metadataTag = `<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:title>${escapeXml(title)}</dc:title><dc:description>${escapeXml(description)}</dc:description><dc:subject><rdf:Bag>${keywordsXml}</rdf:Bag></dc:subject><dc:format>image/svg+xml</dc:format></rdf:Description></rdf:RDF></metadata>`;
 
                 svgContent = svgContent
                     .replace(/<title[\s\S]*?<\/title>/gi, '')
@@ -1698,73 +1630,52 @@ app.get('/api/debug-uploads', (req, res) => {
 
         // 3. ExifTool Writing: Full Dublin Core XMP, IPTC Core, Photoshop, EXIF, QuickTime
         const metadataTags: any = {
-            // Dublin Core (XMP-dc) - Adobe Stock, Freepik, Vecteezy, Canva Primary Recognition
+            // Dublin Core (XMP-dc) - Adobe Stock Primary Recognition
             'XMP-dc:Title': title,
-            'XMP-dc:Description': sstDesc,
+            'XMP-dc:Description': description,
             'XMP-dc:Subject': uniqueKeywords,
-            'XMP-dc:Creator': ['MetaZo Contributor'],
             'XMP:Title': title,
-            'XMP:Description': sstDesc,
+            'XMP:Description': description,
             'XMP:Subject': uniqueKeywords,
             'XMP:Headline': title,
 
-            // IPTC Core - Universal Microstock Standard (Shutterstock, 123RF, DepositPhotos, Freepik, Getty/iStock)
+            // IPTC Core - Universal Microstock Standard (Shutterstock, 123RF, DepositPhotos, Freepik)
             'IPTC:ObjectName': title,
             'IPTC:Headline': title,
-            'IPTC:Caption-Abstract': sstDesc,
+            'IPTC:Caption-Abstract': description,
             'IPTC:Keywords': uniqueKeywords,
             'IPTC:CodedCharacterSet': 'UTF8',
-            'IPTC:By-line': 'MetaZo Contributor',
-            'IPTC:Credit': 'MetaZo AI Stock Assistant',
-            'IPTC:Source': 'MetaZo',
 
-            // Photoshop & Standard Tags (Adobe Stock, Windows/Mac OS, Microstocks)
+            // Photoshop & Standard Tags (Adobe Stock & Windows/Mac OS)
             'XMP-photoshop:Headline': title,
-            'XMP-photoshop:Caption': sstDesc,
-            'XMP-photoshop:Credit': 'MetaZo Contributor',
-            'XMP-photoshop:Source': 'MetaZo',
-            'XMP-xmpRights:Marked': true,
+            'XMP-photoshop:Caption': description,
             Title: title,
             Headline: title,
             ObjectName: title,
-            Description: sstDesc,
-            'Caption-Abstract': sstDesc,
+            Description: description,
+            'Caption-Abstract': description,
             ImageDescription: title,
             Subject: uniqueKeywords,
             Keywords: uniqueKeywords,
             XPTitle: title,
-            XPComment: sstDesc,
+            XPComment: description,
             XPKeywords: uniqueKeywords.join('; '),
             XPSubject: title,
             Software: 'MetaZo AI Assistant'
         };
 
-        if (categoryId) {
-            metadataTags['IPTC:Category'] = categoryId;
-            metadataTags['XMP:Category'] = categoryId;
-            metadataTags['XMP-photoshop:Category'] = categoryId;
-        }
-
-        if (sstCategory1 || sstCategory2) {
-            const suppCats = [sstCategory1, sstCategory2].filter(Boolean);
-            metadataTags['IPTC:SupplementalCategories'] = suppCats;
-            metadataTags['XMP-shutterstock:Category1'] = sstCategory1;
-            if (sstCategory2) metadataTags['XMP-shutterstock:Category2'] = sstCategory2;
-        }
-
         if (isVideo) {
             metadataTags['QuickTime:Title'] = title;
-            metadataTags['QuickTime:Description'] = sstDesc;
+            metadataTags['QuickTime:Description'] = description;
             metadataTags['QuickTime:Keywords'] = uniqueKeywords;
-            metadataTags['QuickTime:Comment'] = sstDesc;
             metadataTags['ItemList:Title'] = title;
-            metadataTags['ItemList:Description'] = sstDesc;
+            metadataTags['ItemList:Description'] = description;
             metadataTags['ItemList:Keyword'] = uniqueKeywords;
-            metadataTags['UserData:Description'] = sstDesc;
+            metadataTags['UserData:Description'] = description;
             metadataTags['UserData:Keywords'] = uniqueKeywords;
             metadataTags['Keys:DisplayName'] = title;
             metadataTags['Keys:Title'] = title;
-            metadataTags['Keys:Description'] = sstDesc;
+            metadataTags['Keys:Description'] = description;
             metadataTags['Keys:Keywords'] = uniqueKeywords;
         }
 
@@ -1796,26 +1707,28 @@ app.get('/api/debug-uploads', (req, res) => {
                 '-charset', 'iptc=utf8',
                 '-charset', 'exif=utf8',
                 '-codedcharacterset=utf8',
+                '-sep', ', ',
                 `-XMP-dc:Title=${title}`,
                 `-XMP-dc:Description=${description}`,
+                `-XMP-dc:Subject=${keywordString}`,
                 `-XMP:Title=${title}`,
                 `-XMP:Description=${description}`,
+                `-XMP:Subject=${keywordString}`,
                 `-IPTC:ObjectName=${title}`,
                 `-IPTC:Headline=${title}`,
                 `-IPTC:Caption-Abstract=${description}`,
+                `-IPTC:Keywords=${keywordString}`,
                 `-Title=${title}`,
                 `-Headline=${title}`,
                 `-ObjectName=${title}`,
                 `-Description=${description}`,
                 `-Caption-Abstract=${description}`,
                 `-ImageDescription=${title}`,
+                `-Subject=${keywordString}`,
+                `-Keywords=${keywordString}`,
                 `-XPTitle=${title}`,
                 `-XPComment=${description}`,
                 `-XPKeywords=${keywordString}`,
-                ...uniqueKeywords.map(k => `-IPTC:Keywords=${k}`),
-                ...uniqueKeywords.map(k => `-XMP-dc:Subject=${k}`),
-                ...uniqueKeywords.map(k => `-Subject=${k}`),
-                ...uniqueKeywords.map(k => `-Keywords=${k}`),
                 filePath
             ];
 
@@ -1914,21 +1827,15 @@ app.get('/api/debug-uploads', (req, res) => {
                 .filter((k: string) => k.length > 0);
             const uniqueKeywords = Array.from(new Set(keywords));
 
-            const adobeCategoryId = req.body.adobeCategoryId ? String(req.body.adobeCategoryId).trim() : undefined;
-            const shutterstockCategory1 = req.body.shutterstockCategory1 ? String(req.body.shutterstockCategory1).trim() : undefined;
-            const shutterstockCategory2 = req.body.shutterstockCategory2 ? String(req.body.shutterstockCategory2).trim() : undefined;
-            console.log(`[Embed Metadata] Embedding: Title="${title}", Keywords=${uniqueKeywords.length}, Category=${adobeCategoryId || '-'}, SST=${shutterstockCategory1 || '-'}/${shutterstockCategory2 || '-'}, File="${originalName}"`);
+            console.log(`[Embed Metadata] Embedding: Title="${title}", Keywords=${uniqueKeywords.length}, File="${originalName}"`);
 
             // Step 3: Embed metadata into file using complete Adobe Stock / IPTC / XMP engine
             localOutputPath = localInputPath;
             await embedMetadataForAdobe(localOutputPath, {
                 title,
                 description,
-                keywords: uniqueKeywords,
-                adobeCategoryId,
-                shutterstockCategory1,
-                shutterstockCategory2
-            } as any);
+                keywords: uniqueKeywords
+            });
 
             // Step 4: Handle download response (R2 upload if pathKey provided, otherwise direct stream)
             const embeddedName = `embedded_${originalName}`;
@@ -2009,8 +1916,7 @@ app.get('/api/debug-uploads', (req, res) => {
             if (!image) {
                 return res.status(400).json({ error: 'Missing image data' });
             }
-            const varCount = parseInt(variation, 10) || 5;
-            const data = await analyzeImageToPrompt(image, styleCategory || 'Default', varCount, model);
+            const data = await analyzeImageToPrompt(image, styleCategory || 'Default', variation || 5, model);
             res.json(data);
         } catch (e: any) {
             console.warn('Server analyze-image-to-prompt error:', e);
@@ -2024,8 +1930,7 @@ app.get('/api/debug-uploads', (req, res) => {
             if (!images || !Array.isArray(images) || images.length === 0) {
                 return res.status(400).json({ error: 'Missing or invalid images array' });
             }
-            const varCount = parseInt(variation, 10) || 5;
-            const data = await analyzeBatchImageToPrompt(images, styleCategory || 'Default', varCount, model);
+            const data = await analyzeBatchImageToPrompt(images, styleCategory || 'Default', variation || 5, model);
             res.json(data);
         } catch (e: any) {
             console.warn('Server analyze-batch-image-to-prompt error:', e);
