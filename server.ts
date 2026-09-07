@@ -1970,7 +1970,8 @@ app.get('/api/debug-uploads', (req, res) => {
             if (!image) {
                 return res.status(400).json({ error: 'Missing image data' });
             }
-            const data = await analyzeImageToPrompt(image, styleCategory || 'Default', variation || 5, model);
+            const varCount = parseInt(variation, 10) || 5;
+            const data = await analyzeImageToPrompt(image, styleCategory || 'Default', varCount, model);
             res.json(data);
         } catch (e: any) {
             console.warn('Server analyze-image-to-prompt error:', e);
@@ -1984,7 +1985,8 @@ app.get('/api/debug-uploads', (req, res) => {
             if (!images || !Array.isArray(images) || images.length === 0) {
                 return res.status(400).json({ error: 'Missing or invalid images array' });
             }
-            const data = await analyzeBatchImageToPrompt(images, styleCategory || 'Default', variation || 5, model);
+            const varCount = parseInt(variation, 10) || 5;
+            const data = await analyzeBatchImageToPrompt(images, styleCategory || 'Default', varCount, model);
             res.json(data);
         } catch (e: any) {
             console.warn('Server analyze-batch-image-to-prompt error:', e);
