@@ -4,8 +4,7 @@ import { getHeaders, getFormDataHeaders } from '../../services/geminiService';
 import { 
   Upload, ShieldCheck, CheckCircle, AlertCircle, Sparkles, Loader2, FileImage, 
   ChevronDown, ChevronUp, Trash2, Zap, Eye, EyeOff, XCircle, Info, Download, 
-  Copy, Check, Play, Pause, RefreshCw, Layers, Filter, CheckCircle2, Clock, ExternalLink,
-  ZoomIn, ZoomOut, Maximize2, Minimize2, ChevronLeft, ChevronRight, X, Scan, AlertTriangle
+  Copy, Check, Play, Pause, RefreshCw, Layers, Filter, CheckCircle2, Clock, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { FeatureGuideButton } from './FeatureGuideModal';
@@ -132,12 +131,6 @@ export const ImageQualityCheck: React.FC<{
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<Record<string, 'technical' | 'legal' | 'ai' | 'seo'>>({});
   const [copiedState, setCopiedState] = useState<Record<string, string>>({});
-  
-  // 🔍 State Lightbox / Enlarged Quality Inspector Modal
-  const [inspectorItemId, setInspectorItemId] = useState<string | null>(null);
-  const [inspectorZoom, setInspectorZoom] = useState<number>(1);
-  const [inspectorShowHeatmap, setInspectorShowHeatmap] = useState<boolean>(true);
-  const [inspectorIsAutoScanning, setInspectorIsAutoScanning] = useState<boolean>(false);
   
   const isStoppingRef = useRef(false);
   const queueRef = useRef<QCQueueItem[]>([]);
@@ -700,99 +693,6 @@ export const ImageQualityCheck: React.FC<{
     }
   };
 
-  // 🔍 Handler Inspeksi Perbesar & Auto-Audit Kualitas
-  const runAutoAuditSingle = async (targetId: string) => {
-    const targetItem = queueRef.current.find(it => it.id === targetId);
-    if (!targetItem) return;
-    if (!isLicensed && dailyGenCount >= getDailyLimit()) {
-      setError(`Batas Trial Terlampaui. Anda telah mencapai batas maksimal ${getDailyLimit()} kali audit hari ini.`);
-      if (setShowLimitModal) setShowLimitModal(true);
-      return;
-    }
-
-    setInspectorIsAutoScanning(true);
-    setCurrentProcessingId(targetId);
-    setQueue(prev => prev.map(it => it.id === targetId ? {
-      ...it,
-      status: 'processing',
-      error: null,
-      currentStep: 'Mempersiapkan auto-audit...'
-    } : it));
-
-    try {
-      const updateStep = (stepText: string) => {
-        setQueue(prev => prev.map(it => it.id === targetId ? { ...it, currentStep: stepText } : it));
-      };
-
-      const report = await analyzeSingleFile(targetItem, updateStep);
-
-      setQueue(prev => prev.map(it => it.id === targetId ? {
-        ...it,
-        status: 'done',
-        report,
-        error: null,
-        currentStep: undefined
-      } : it));
-
-      if (incrementDailyCount) {
-        incrementDailyCount(1);
-      }
-    } catch (err: any) {
-      console.error(`Auto QC Error for ${targetItem.name}:`, err);
-      setQueue(prev => prev.map(it => it.id === targetId ? {
-        ...it,
-        status: 'error',
-        error: err.message || 'Gagal memproses audit gambar.',
-        currentStep: undefined
-      } : it));
-    } finally {
-      setInspectorIsAutoScanning(false);
-      setCurrentProcessingId(null);
-    }
-  };
-
-  const openInspector = (itemId: string) => {
-    setInspectorItemId(itemId);
-    setInspectorZoom(1);
-    setInspectorShowHeatmap(true);
-    const it = queueRef.current.find(q => q.id === itemId);
-    if (it && (it.status === 'pending' || it.status === 'error' || !it.report)) {
-      runAutoAuditSingle(itemId);
-    }
-  };
-
-  const currentInspectorIndex = queue.findIndex(it => it.id === inspectorItemId);
-  const inspectorItem = currentInspectorIndex >= 0 ? queue[currentInspectorIndex] : null;
-  const canInspectorPrev = currentInspectorIndex > 0;
-  const canInspectorNext = currentInspectorIndex >= 0 && currentInspectorIndex < queue.length - 1;
-
-  const handlePrevInspector = () => {
-    if (canInspectorPrev) {
-      openInspector(queue[currentInspectorIndex - 1].id);
-    }
-  };
-
-  const handleNextInspector = () => {
-    if (canInspectorNext) {
-      openInspector(queue[currentInspectorIndex + 1].id);
-    }
-  };
-
-  useEffect(() => {
-    if (!inspectorItemId) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setInspectorItemId(null);
-      } else if (e.key === 'ArrowLeft') {
-        if (canInspectorPrev) handlePrevInspector();
-      } else if (e.key === 'ArrowRight') {
-        if (canInspectorNext) handleNextInspector();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [inspectorItemId, currentInspectorIndex, queue, canInspectorPrev, canInspectorNext]);
-
   async function handleFilesSelected(selectedFiles: FileList | File[]) {
     const fileArray = Array.from(selectedFiles);
     if (fileArray.length === 0) return;
@@ -1342,18 +1242,10 @@ export const ImageQualityCheck: React.FC<{
                         </div>
 
                         {/* Thumbnail Scanner View */}
-                        <div 
-                          onClick={() => openInspector(item.id)}
-                          className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-slate-950 mb-4 cursor-pointer group/thumb hover:ring-2 hover:ring-amber-500/50 transition-all"
-                          title="Klik untuk perbesar tampilan proses audit"
-                        >
+                        <div className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-slate-950 mb-4">
                           {item.previewUrl && (
                             <img src={item.previewUrl} alt="" className="w-full h-full object-cover opacity-60 filter blur-[1px]" />
                           )}
-                          <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5 opacity-90 group-hover/thumb:opacity-100 transition-all">
-                            <Maximize2 size={10} />
-                            <span>Perbesar Live Audit</span>
-                          </div>
                           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/20 to-transparent animate-[bounce_3s_ease-in-out_infinite]" />
                           <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm space-y-2 text-center">
                             <Sparkles size={24} className="text-amber-400 animate-bounce" />
@@ -1416,18 +1308,10 @@ export const ImageQualityCheck: React.FC<{
                           </button>
                         </div>
 
-                        <div 
-                          onClick={() => openInspector(item.id)}
-                          className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-slate-900 mb-4 opacity-75 group-hover:opacity-100 transition-all cursor-pointer group/thumb hover:ring-2 hover:ring-emerald-500/50"
-                          title="Klik untuk perbesar & mulai audit otomatis"
-                        >
+                        <div className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-slate-900 mb-4 opacity-75 group-hover:opacity-100 transition-opacity">
                           {item.previewUrl && (
-                            <img src={item.previewUrl} alt="" className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-500" />
+                            <img src={item.previewUrl} alt="" className="w-full h-full object-cover" />
                           )}
-                          <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 opacity-0 group-hover/thumb:opacity-100 transition-all">
-                            <Maximize2 size={10} />
-                            <span>Perbesar & Auto-Detect ⚡</span>
-                          </div>
                           <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-black text-white uppercase tracking-wider">
                             {(item.size / (1024 * 1024)).toFixed(2)} MB
                           </div>
@@ -1532,17 +1416,7 @@ export const ImageQualityCheck: React.FC<{
 
                     {/* Image Stage */}
                     {item.previewUrl && (
-                        <div 
-                          onClick={() => openInspector(item.id)}
-                          className="image-check-viewer relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-slate-900 shadow-inner group-hover:scale-[1.02] transition-transform duration-700 cursor-pointer group/thumb"
-                          title="Klik untuk perbesar & inspeksi detail masalah kualitas"
-                        >
-                          {/* Badge Klik Perbesar */}
-                          <div className="absolute top-3 left-3 z-20 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-black text-white uppercase tracking-wider flex items-center gap-1.5 opacity-80 group-hover/thumb:opacity-100 group-hover/thumb:bg-emerald-500 transition-all shadow-lg">
-                            <Maximize2 size={10} />
-                            <span>Perbesar & Deteksi</span>
-                          </div>
-
+                        <div className="image-check-viewer relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-slate-900 shadow-inner group-hover:scale-[1.02] transition-transform duration-700">
                           {isVideo ? (
                              <video 
                                src={`${item.previewUrl}#t=1`} 
@@ -1680,36 +1554,16 @@ export const ImageQualityCheck: React.FC<{
                     <div className="mt-6 flex-1 space-y-6">
                       {/* Detailed Feedback (Prominent if Fail) */}
                       {!isPassed && (
-                        <div className="bg-rose-500/5 border border-rose-500/15 p-4 rounded-2xl space-y-3">
-                           <div>
-                             <div className="flex items-center gap-2 mb-1.5">
-                               <Info size={12} className="text-rose-500" />
-                               <p className="text-[10px] font-black text-rose-500 uppercase tracking-tight">{t.qc_rejection_reason}</p>
-                             </div>
-                             <p className="text-[11px] font-bold text-rose-700 dark:text-rose-300 leading-relaxed italic">
-                               {r.detailed_feedback}
-                             </p>
+                        <div className="bg-rose-500/5 border border-rose-500/10 p-4 rounded-2xl">
+                           <div className="flex items-center gap-2 mb-2">
+                             <Info size={12} className="text-rose-500" />
+                             <p className="text-[10px] font-black text-rose-500 uppercase tracking-tight">{t.qc_rejection_reason}</p>
                            </div>
-
-                           {/* Rekomendasi Solusi & Tindakan Kurasi (Actionable Fix Advice) */}
-                           <div className="p-3 bg-white/70 dark:bg-slate-900/70 rounded-xl border border-rose-200/50 dark:border-rose-900/30">
-                             <div className="flex items-center gap-1.5 mb-1 text-amber-600 dark:text-amber-400">
-                               <Sparkles size={12} />
-                               <p className="text-[9.5px] font-black uppercase tracking-wider">
-                                 {t.language === 'Bahasa' ? 'Panduan Perbaikan Sebelum Re-upload' : 'Actionable Fix Before Re-upload'}
-                               </p>
-                             </div>
-                             <p className="text-[10px] text-slate-700 dark:text-slate-300 leading-relaxed">
-                               {r.detailed_feedback?.toLowerCase().includes('inpaint') || r.detailed_feedback?.toLowerCase().includes('fill') || r.detailed_feedback?.toLowerCase().includes('hapus')
-                                 ? r.detailed_feedback
-                                 : (t.language === 'Bahasa' 
-                                     ? 'Gunakan Generative Fill / Inpainting di Photoshop untuk merapikan area anomali, hilangkan teks semu / logo tersembunyi, lalu lakukan sedikit unsharp mask atau denoise jika perlu sebelum submit kembali.'
-                                     : 'Use Generative Fill / Inpainting in Photoshop to repair anomalous structures, eliminate gibberish text or residual logos, and apply moderate unsharp mask / denoise before resubmitting.')}
-                             </p>
-                           </div>
-
+                           <p className="text-[11px] font-bold text-rose-700 dark:text-rose-300 leading-relaxed italic">
+                             {r.detailed_feedback}
+                           </p>
                            {Array.isArray(r.technical_issues) && r.technical_issues.length > 0 && (
-                             <div className="pt-2 border-t border-rose-500/10 flex flex-wrap gap-1.5">
+                             <div className="mt-3 pt-3 border-t border-rose-500/10 flex flex-wrap gap-1.5">
                                {r.technical_issues.map((issue: string, idx: number) => (
                                  <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[9px] font-bold">
                                    ⚠️ {issue}
@@ -2167,462 +2021,6 @@ export const ImageQualityCheck: React.FC<{
               })}
             </div>
           )}
-
-          {/* ========================================================================= */}
-          {/* 🔍 MODAL LIGHTBOX / ENLARGED QUALITY INSPECTOR WITH AUTO-DETECTION ENGINE */}
-          {/* ========================================================================= */}
-          <AnimatePresence>
-            {inspectorItemId && inspectorItem && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-2xl flex flex-col justify-between overflow-hidden"
-              >
-                {/* 1. Header Bar */}
-                <div className="h-16 px-4 md:px-6 bg-slate-900/90 border-b border-white/10 flex items-center justify-between shrink-0 z-30">
-                  {/* Left: Close, File Info, Index */}
-                  <div className="flex items-center gap-3 min-w-0">
-                    <button
-                      onClick={() => setInspectorItemId(null)}
-                      className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all hover:scale-105 active:scale-95 cursor-pointer"
-                      title="Tutup Inspektor (Esc)"
-                    >
-                      <X size={18} />
-                    </button>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-black text-white truncate max-w-[180px] md:max-w-xs uppercase tracking-tight">
-                          {inspectorItem.name}
-                        </p>
-                        <span className="text-[9px] font-black px-2 py-0.5 rounded-md bg-white/10 text-slate-300 uppercase font-mono">
-                          {(inspectorItem.size / (1024 * 1024)).toFixed(2)} MB
-                        </span>
-                      </div>
-                      <p className="text-[9.5px] font-bold text-slate-400 mt-0.5">
-                        Aset {currentInspectorIndex + 1} dari {queue.length}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Center: Status Badge & Auto-Scan Indicator */}
-                  <div className="hidden md:flex items-center gap-2">
-                    {inspectorItem.status === 'processing' || inspectorIsAutoScanning ? (
-                      <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-black uppercase tracking-wider animate-pulse">
-                        <Loader2 size={13} className="animate-spin" />
-                        <span>{inspectorItem.currentStep || 'Sedang Menganalisis Kualitas Otomatis...'}</span>
-                      </div>
-                    ) : inspectorItem.status === 'done' && inspectorItem.report ? (
-                      <div className="flex items-center gap-2">
-                        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                          inspectorItem.report.recommendation === 'PASS' 
-                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
-                            : 'bg-rose-500/20 text-rose-400 border-rose-500/30'
-                        }`}>
-                          {inspectorItem.report.recommendation === 'PASS' ? <CheckCircle size={13} /> : <XCircle size={13} />}
-                          <span>{inspectorItem.report.recommendation === 'PASS' ? '✓ LAYAK JUAL (PASS)' : '✕ BUTUH PERBAIKAN (FAIL)'}</span>
-                        </div>
-                        <span className={`text-xs font-black px-2.5 py-1 rounded-full ${
-                          inspectorItem.report.recommendation === 'PASS' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
-                        }`}>
-                          {inspectorItem.report.overall_score}% SCORE
-                        </span>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => runAutoAuditSingle(inspectorItem.id)}
-                        className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/20 animate-pulse cursor-pointer"
-                      >
-                        <Zap size={12} />
-                        <span>Mulai Auto-Detect Kualitas Sekarang</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Right: Zoom Controls, Overlay, Re-Scan, Prev/Next */}
-                  <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-                    {/* Zoom Buttons */}
-                    <div className="flex items-center bg-black/40 border border-white/10 rounded-xl p-0.5">
-                      <button
-                        onClick={() => setInspectorZoom(z => Math.max(0.5, Number((z - 0.25).toFixed(2))))}
-                        className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-                        title="Zoom Out (-)"
-                      >
-                        <ZoomOut size={14} />
-                      </button>
-                      <button
-                        onClick={() => setInspectorZoom(1)}
-                        className="px-2 text-[10px] font-mono font-bold text-emerald-400 hover:underline cursor-pointer"
-                        title="Reset 100%"
-                      >
-                        {Math.round(inspectorZoom * 100)}%
-                      </button>
-                      <button
-                        onClick={() => setInspectorZoom(z => Math.min(3, Number((z + 0.25).toFixed(2))))}
-                        className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-                        title="Zoom In (+)"
-                      >
-                        <ZoomIn size={14} />
-                      </button>
-                    </div>
-
-                    {/* Toggle Visual Issue Overlay */}
-                    {inspectorItem.report?.heatmaps && inspectorItem.report.heatmaps.length > 0 && (
-                      <button
-                        onClick={() => setInspectorShowHeatmap(prev => !prev)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
-                          inspectorShowHeatmap 
-                            ? 'bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-500/20' 
-                            : 'bg-white/10 text-slate-300 border-white/10 hover:bg-white/20'
-                        }`}
-                        title="Tampilkan / Sembunyikan Overlay Cacat Visual & Bounding Box"
-                      >
-                        {inspectorShowHeatmap ? <EyeOff size={13} /> : <Eye size={13} />}
-                        <span className="hidden sm:inline">Overlay Isu</span>
-                      </button>
-                    )}
-
-                    {/* Re-Scan Button */}
-                    <button
-                      onClick={() => runAutoAuditSingle(inspectorItem.id)}
-                      disabled={inspectorItem.status === 'processing' || inspectorIsAutoScanning}
-                      className="p-2 text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 rounded-xl transition-all disabled:opacity-40 cursor-pointer"
-                      title="Audit Ulang Otomatis"
-                    >
-                      <RefreshCw size={14} className={inspectorItem.status === 'processing' || inspectorIsAutoScanning ? 'animate-spin' : ''} />
-                    </button>
-
-                    {/* Prev / Next Navigation */}
-                    <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-xl p-0.5">
-                      <button
-                        onClick={handlePrevInspector}
-                        disabled={!canInspectorPrev}
-                        className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
-                        title="Aset Sebelumnya (←)"
-                      >
-                        <ChevronLeft size={16} />
-                      </button>
-                      <button
-                        onClick={handleNextInspector}
-                        disabled={!canInspectorNext}
-                        className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition-colors disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
-                        title="Aset Selanjutnya (→)"
-                      >
-                        <ChevronRight size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Scrollable Body: Media Stage (Top) + Explanations Below */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
-                  {/* Top: Enlarged Media Stage */}
-                  <div className="relative w-full h-[52vh] min-h-[320px] bg-black flex items-center justify-center overflow-hidden border-b border-white/10 select-none">
-                    {/* Studio Grid Pattern */}
-                    <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-
-                    {/* Enlarged Image / Video Display Container with Zoom */}
-                    <div 
-                      className="relative max-w-full max-h-full flex items-center justify-center transition-transform duration-150 ease-out"
-                      style={{ transform: `scale(${inspectorZoom})` }}
-                    >
-                      {inspectorItem.file.type.startsWith('video/') || inspectorItem.name.match(/\.(mp4|mov|webm)$/i) ? (
-                        <video
-                          src={inspectorItem.previewUrl}
-                          controls
-                          autoPlay
-                          loop
-                          playsInline
-                          className="max-h-[48vh] max-w-[92vw] object-contain rounded-xl shadow-2xl"
-                        />
-                      ) : (
-                        <img
-                          src={inspectorItem.previewUrl}
-                          alt={inspectorItem.name}
-                          className="max-h-[48vh] max-w-[92vw] object-contain rounded-xl shadow-2xl"
-                          draggable={false}
-                        />
-                      )}
-
-                      {/* Heatmap & YOLO Bounding Box Overlay */}
-                      {inspectorShowHeatmap && inspectorItem.report?.heatmaps && (
-                        <div className="absolute inset-0 pointer-events-none">
-                          {inspectorItem.report.heatmaps.map((h: any, i: number) => {
-                            const colors = {
-                              noise: { bg: 'bg-rose-500', border: 'border-rose-500', text: 'text-rose-400', stroke: 'rgba(244,63,94,0.4)' },
-                              focus: { bg: 'bg-amber-500', border: 'border-amber-500', text: 'text-amber-400', stroke: 'rgba(245,158,11,0.4)' },
-                              lighting: { bg: 'bg-violet-500', border: 'border-violet-500', text: 'text-violet-400', stroke: 'rgba(139,92,246,0.4)' },
-                              ip_violation: { bg: 'bg-red-600', border: 'border-red-600', text: 'text-red-400', stroke: 'rgba(220,38,38,0.5)' },
-                              artifact: { bg: 'bg-orange-500', border: 'border-orange-500', text: 'text-orange-400', stroke: 'rgba(249,115,22,0.4)' },
-                              gen_ai_anomaly: { bg: 'bg-pink-500', border: 'border-pink-500', text: 'text-pink-400', stroke: 'rgba(236,72,153,0.4)' },
-                              composition: { bg: 'bg-blue-500', border: 'border-blue-500', text: 'text-blue-400', stroke: 'rgba(59,130,246,0.4)' },
-                              alpha_edge: { bg: 'bg-emerald-500', border: 'border-emerald-500', text: 'text-emerald-400', stroke: 'rgba(16,185,129,0.4)' },
-                              cut_off: { bg: 'bg-yellow-500', border: 'border-yellow-500', text: 'text-yellow-400', stroke: 'rgba(234,179,8,0.4)' }
-                            };
-                            const labels: Record<string, string> = {
-                              noise: 'Noise & Grain',
-                              focus: 'Focus / Blur',
-                              lighting: 'Lighting Defect',
-                              ip_violation: 'IP / Trademark',
-                              artifact: 'AI Artifact',
-                              gen_ai_anomaly: 'Anatomy / AI Anomaly',
-                              composition: 'Composition',
-                              alpha_edge: 'Alpha Edge / Halo',
-                              cut_off: 'Cut-off Subject'
-                            };
-                            const theme = colors[h.type as keyof typeof colors] || colors.artifact;
-                            const labelText = labels[h.type] || h.type;
-                            const boxW = h.box_w || (h.xmax && h.xmin ? h.xmax - h.xmin : 22);
-                            const boxH = h.box_h || (h.ymax && h.ymin ? h.ymax - h.ymin : 18);
-                            const leftPos = h.xmin !== undefined ? h.xmin : Math.max(2, Math.min(98 - boxW, h.x - boxW / 2));
-                            const topPos = h.ymin !== undefined ? h.ymin : Math.max(2, Math.min(98 - boxH, h.y - boxH / 2));
-
-                            return (
-                              <div
-                                key={`inspector-box-${i}`}
-                                className="absolute pointer-events-auto group/point"
-                                style={{
-                                  left: `${leftPos}%`,
-                                  top: `${topPos}%`,
-                                  width: `${boxW}%`,
-                                  height: `${boxH}%`
-                                }}
-                              >
-                                <div
-                                  className={`w-full h-full border-2 ${theme.border} rounded-lg shadow-xl relative transition-all duration-300 group-hover/point:shadow-2xl`}
-                                  style={{ backgroundColor: theme.stroke }}
-                                >
-                                  {/* Corner Accents */}
-                                  <div className={`absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 ${theme.border}`} />
-                                  <div className={`absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 ${theme.border}`} />
-                                  <div className={`absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 ${theme.border}`} />
-                                  <div className={`absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 ${theme.border}`} />
-
-                                  {/* Label Pin Badge */}
-                                  <div className={`absolute -top-6 left-0 px-2 py-0.5 rounded ${theme.bg} text-white font-black text-[8px] uppercase tracking-wider flex items-center gap-1 shadow-md whitespace-nowrap`}>
-                                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                                    <span>{labelText}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Live Laser Scanner Bar Animation when Auto-Scanning */}
-                    {(inspectorItem.status === 'processing' || inspectorIsAutoScanning) && (
-                      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between">
-                        <div className="w-full h-1 bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] animate-[bounce_2.5s_ease-in-out_infinite]" />
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/90 backdrop-blur-md rounded-2xl border border-emerald-500/40 text-white flex items-center gap-2.5 shadow-2xl">
-                          <Loader2 size={16} className="animate-spin text-emerald-400" />
-                          <div className="text-left">
-                            <p className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">
-                              Sistem Auto-Detect Kualitas Aktif
-                            </p>
-                            <p className="text-[9px] font-semibold text-slate-300">
-                              {inspectorItem.currentStep || 'Menganalisis piksel & standar kurasi microstock...'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Bottom: Explanations & Quality Issues Panel */}
-                  <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto w-full bg-slate-900/60 flex-1">
-                    {inspectorItem.report ? (
-                      (() => {
-                        const r = inspectorItem.report;
-                        const isPass = r.recommendation === 'PASS';
-                        const issues = r.technical_issues || [];
-                        const ffmpegData = r.ffmpeg || {
-                          resolution: "Original",
-                          color_space: "sRGB",
-                          brightness: { value: 50, status: "Normal" },
-                          contrast: { value: 65, status: "Good" },
-                          sharpness: { value: 80, status: "Sharp" },
-                          noise: { value: 5, status: "Clean" },
-                          file_size_kb: Math.round(inspectorItem.size / 1024)
-                        };
-
-                        return (
-                          <div className="space-y-6">
-                            {/* 1. Verdict & Score Card */}
-                            <div className={`p-6 rounded-3xl border flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl ${
-                              isPass 
-                                ? 'bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border-emerald-500/20' 
-                                : 'bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-transparent border-rose-500/20'
-                            }`}>
-                              <div className="flex items-center gap-5">
-                                <div className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center shrink-0 shadow-lg ${
-                                  isPass ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 'bg-rose-500 text-white shadow-rose-500/20'
-                                }`}>
-                                  <span className="text-2xl font-black leading-none">{r.overall_score}%</span>
-                                  <span className="text-[8px] font-black uppercase tracking-widest mt-1 opacity-80">SCORE</span>
-                                </div>
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider ${
-                                      isPass ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                                    }`}>
-                                      {isPass ? '✓ LAYAK JUAL (PASS)' : '✕ BUTUH PERBAIKAN (FAIL)'}
-                                    </span>
-                                    <span className="text-[10px] font-mono font-bold text-slate-400">
-                                      Standar Kurasi Adobe Stock & Shutterstock
-                                    </span>
-                                  </div>
-                                  <h3 className="text-base font-black uppercase text-white tracking-wide">
-                                    {isPass ? 'Aset Memenuhi Standar Komersial Microstock' : 'Ditemukan Isu Kualitas Yang Berisiko Ditolak Kurator'}
-                                  </h3>
-                                  <p className="text-xs font-semibold text-slate-300 leading-relaxed italic">
-                                    "{r.detailed_feedback || r.visual_scan_analysis || 'Aset telah dipindai forensik dan siap diekspor.'}"
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 2. Detected Quality Issues Section */}
-                            <div className="bg-slate-950/60 border border-white/10 rounded-3xl p-6 space-y-4 shadow-xl">
-                              <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                                <div className="flex items-center gap-2.5">
-                                  <AlertTriangle size={18} className={issues.length > 0 ? 'text-amber-400' : 'text-emerald-400'} />
-                                  <h4 className="text-xs font-black uppercase text-white tracking-wider">
-                                    Keterangan Masalah Kualitas Terdeteksi ({issues.length} Temuan)
-                                  </h4>
-                                </div>
-                                <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                                  issues.length === 0 
-                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                }`}>
-                                  {issues.length === 0 ? 'Bersih Dari Masalah' : `${issues.length} Isu Perlu Perhatian`}
-                                </span>
-                              </div>
-
-                              {issues.length > 0 ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  {issues.map((issue: string, idx: number) => (
-                                    <div 
-                                      key={idx} 
-                                      className="p-3.5 rounded-2xl bg-rose-500/5 border border-rose-500/20 flex items-start gap-3"
-                                    >
-                                      <div className="p-1.5 rounded-xl bg-rose-500/20 text-rose-400 shrink-0 mt-0.5">
-                                        <AlertCircle size={14} />
-                                      </div>
-                                      <div className="space-y-1">
-                                        <p className="text-xs font-black text-rose-300 leading-tight">
-                                          {issue}
-                                        </p>
-                                        <p className="text-[10px] font-medium text-slate-400 leading-relaxed">
-                                          Masalah ini berisiko ditolak oleh kurator microstock dengan alasan teknis (Technical Quality Refusal).
-                                        </p>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 flex items-center gap-3">
-                                  <CheckCircle2 size={20} className="text-emerald-400 shrink-0" />
-                                  <div>
-                                    <p className="text-xs font-black text-emerald-400">
-                                      Tidak Ditemukan Isu Kualitas Signifikan
-                                    </p>
-                                    <p className="text-[10px] font-medium text-slate-400 mt-0.5">
-                                      Aset memiliki ketajaman fokus, kestabilan pencahayaan, dan kebersihan piksel yang sangat baik sesuai kriteria kurasi microstock.
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* 3. Forensic Technical Metrics Grid */}
-                            <div className="bg-slate-950/60 border border-white/10 rounded-3xl p-6 space-y-4 shadow-xl">
-                              <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-                                <Scan size={18} className="text-violet-400" />
-                                <h4 className="text-xs font-black uppercase text-white tracking-wider">
-                                  Data Forensik Piksel &amp; Standar Teknis
-                                </h4>
-                              </div>
-
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                                {[
-                                  { label: 'Resolusi', val: ffmpegData.resolution || 'Original', color: 'text-blue-400' },
-                                  { label: 'Ketajaman', val: ffmpegData.sharpness?.status || 'Good', color: 'text-emerald-400' },
-                                  { label: 'Tingkat Noise', val: ffmpegData.noise?.status || 'Clean', color: 'text-rose-400' },
-                                  { label: 'Kecerahan', val: ffmpegData.brightness?.status || 'Balanced', color: 'text-amber-400' },
-                                  { label: 'Kontras', val: ffmpegData.contrast?.status || 'Normal', color: 'text-violet-400' },
-                                  { label: 'Status Legal', val: r.legal_status || 'Safe', color: r.legal_status?.includes('VIOLATION') ? 'text-rose-400' : 'text-emerald-400' }
-                                ].map((stat, sIdx) => (
-                                  <div key={sIdx} className="p-3 bg-white/5 rounded-2xl border border-white/5 space-y-1">
-                                    <span className="text-[8.5px] font-black uppercase tracking-wider text-slate-400 block">
-                                      {stat.label}
-                                    </span>
-                                    <span className={`text-xs font-black uppercase truncate block ${stat.color}`}>
-                                      {stat.val}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* 4. Visual Strengths & Practical Solutions */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              {/* Strengths */}
-                              <div className="p-5 rounded-3xl bg-emerald-500/5 border border-emerald-500/20 space-y-3">
-                                <div className="flex items-center gap-2">
-                                  <Sparkles size={16} className="text-emerald-400" />
-                                  <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider">
-                                    Kelebihan &amp; Potensi Pasar
-                                  </h4>
-                                </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {(r.strengths || ['Komposisi seimbang', 'Pencahayaan alami', 'Subjek utama jelas']).map((s: string, sIdx: number) => (
-                                    <span key={sIdx} className="px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px] font-bold">
-                                      ✓ {s}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Actionable Solutions */}
-                              <div className="p-5 rounded-3xl bg-violet-500/5 border border-violet-500/20 space-y-3">
-                                <div className="flex items-center gap-2">
-                                  <Zap size={16} className="text-violet-400" />
-                                  <h4 className="text-xs font-black uppercase text-violet-400 tracking-wider">
-                                    Rekomendasi Tindakan Perbaikan
-                                  </h4>
-                                </div>
-                                <p className="text-xs font-medium text-slate-300 leading-relaxed">
-                                  {isPass 
-                                    ? 'Aset sudah memenuhi standar pasar. Anda dapat langsung mengunggah ke Adobe Stock atau mengekspor metadata SEO.'
-                                    : 'Perbaiki isu di atas menggunakan aplikasi editor foto/video: terapkan AI denoiser untuk noise, tingkatkan unsharp mask pada subjek utama, atau hilangkan teks/logo berhak cipta.'}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      /* Still Scanning or Pending Screen */
-                      <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
-                        <div className="p-4 rounded-full bg-emerald-500/20 text-emerald-400">
-                          <Loader2 size={36} className="animate-spin" />
-                        </div>
-                        <h4 className="text-sm font-black uppercase text-white tracking-wider">
-                          Sistem Auto Sedang Memindai Kualitas...
-                        </h4>
-                        <p className="text-xs font-semibold text-slate-400 max-w-md">
-                          {inspectorItem.currentStep || 'Menganalisis piksel gambar, mendeteksi cacat fokus, noise, artifak AI, dan kesesuaian standar kurator microstock...'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       </div>
     </div>
