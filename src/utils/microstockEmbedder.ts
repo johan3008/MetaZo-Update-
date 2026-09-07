@@ -1,5 +1,21 @@
-import piexif from 'piexifjs';
-const piexifLib = (piexif as any)?.default || piexif;
+let piexifLib: any = undefined;
+function getPiexifLib(): any {
+  if (piexifLib !== undefined) return piexifLib;
+  try {
+    if (typeof window !== 'undefined' && (window as any).piexif) {
+      piexifLib = (window as any).piexif;
+      return piexifLib;
+    }
+  } catch (_) {}
+  try {
+    if (typeof require !== 'undefined') {
+      piexifLib = require('piexifjs');
+      return piexifLib;
+    }
+  } catch (_) {}
+  piexifLib = null;
+  return piexifLib;
+}
 
 export interface MicrostockMetadataInput {
   title: string;
@@ -363,6 +379,11 @@ export function embedJpegMetadata(jpegBytes: Uint8Array, metadata: MicrostockMet
     }
     const dataUri = 'data:image/jpeg;base64,' + btoa(binaryStr);
 
+    const piexifLib = getPiexifLib();
+    if (!piexifLib) {
+      return combined;
+    }
+
     let zeroth: any = {};
     let exif: any = {};
     let gps: any = {};
@@ -705,6 +726,49 @@ function buildQtXmpAtom(xmpText: string): Uint8Array {
   return buf;
 }
 
+function buildXtraTag(name: string, values: string[], type: number = 0x0008): Uint8Array {
+  const enc = new TextEncoder();
+  const nameBytes = enc.encode(name);
+  const valBuffers: Uint8Array[] = [];
+
+  for (const v of values) {
+    // Windows Media / Explorer string format: UTF-16LE null-terminated
+    const strBytes = new Uint8Array((v.length + 1) * 2);
+    for (let i = 0; i < v.length; i++) {
+      const code = v.charCodeAt(i);
+      strBytes[i * 2] = code & 0xff;
+      strBytes[i * 2 + 1] = (code >> 8) & 0xff;
+    }
+    const valSize = 4 + 2 + strBytes.length;
+    const vBuf = new Uint8Array(valSize);
+    writeU32BE(vBuf, valSize, 0);
+    writeU16BE(vBuf, type, 4);
+    vBuf.set(strBytes, 6);
+    valBuffers.push(vBuf);
+  }
+
+  const allVals = concatUint8Arrays(valBuffers);
+  const tagSize = 4 + 4 + nameBytes.length + 4 + allVals.length;
+  const tagBuf = new Uint8Array(tagSize);
+  writeU32BE(tagBuf, tagSize, 0);
+  writeU32BE(tagBuf, nameBytes.length, 4);
+  tagBuf.set(nameBytes, 8);
+  writeU32BE(tagBuf, values.length, 8 + nameBytes.length);
+  tagBuf.set(allVals, 8 + nameBytes.length + 4);
+  return tagBuf;
+}
+
+function buildXtraBox(tags: { name: string; values: string[]; type?: number }[]): Uint8Array {
+  const tagBuffers = tags.map(t => buildXtraTag(t.name, t.values, t.type || 0x0008));
+  const payload = concatUint8Arrays(tagBuffers);
+  const totalSize = 8 + payload.length;
+  const box = new Uint8Array(totalSize);
+  writeU32BE(box, totalSize, 0);
+  box[4] = 0x58; box[5] = 0x74; box[6] = 0x72; box[7] = 0x61; // 'Xtra'
+  box.set(payload, 8);
+  return box;
+}
+
 function buildComprehensiveUdta(
   title: string,
   description: string,
@@ -755,8 +819,21 @@ function buildComprehensiveUdta(
   metaBox.set(hdlr, 12);
   metaBox.set(ilstBox, 12 + hdlr.length);
 
+  // Dedicated Windows Media / Explorer 'Xtra' atom for Windows Explorer Property Handler:
+  // WM/Category -> System.Keywords (Windows Explorer 'Tags' field)
+  // WM/SubTitle -> System.Media.SubTitle (Windows Explorer 'Subtitle' field)
+  // WM/Genre -> System.Music.Genre
+  // Author -> System.Author
+  const xtraBox = buildXtraBox([
+    { name: 'WM/Category', values: keywordArr },
+    { name: 'WM/SubTitle', values: [title] },
+    { name: 'WM/Genre', values: [keywordArr.slice(0, 3).join(', ')] },
+    { name: 'Author', values: [creator] }
+  ]);
+
   const directAtoms = [
     metaBox,
+    xtraBox,
     buildQtTextAtom('\xa9nam', title),
     buildQtTextAtom('\xa9des', description),
     buildQtTextAtom('\xa9cmt', description),
