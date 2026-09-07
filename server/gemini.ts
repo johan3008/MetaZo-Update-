@@ -9,7 +9,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import https from "node:https";
 
-import { extractFlorenceVisualInsights, formatFlorenceContextForPrompt, FlorenceOptions, FlorenceInsights } from "./server/florenceService.ts";
+import { extractFlorenceVisualInsights, formatFlorenceContextForPrompt, FlorenceOptions, FlorenceInsights } from "./florenceService.ts";
 
 // Thread-safe dynamic API Key storage
 export const apiKeyStorage = new AsyncLocalStorage<any>();
