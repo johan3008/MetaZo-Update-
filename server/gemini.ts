@@ -9,7 +9,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import https from "node:https";
 
-import { extractFlorenceVisualInsights, formatFlorenceContextForPrompt, FlorenceOptions, FlorenceInsights } from "./florenceService.ts";
+import { extractFlorenceVisualInsights, formatFlorenceContextForPrompt, FlorenceOptions, FlorenceInsights } from "./server/florenceService.ts";
 
 // Thread-safe dynamic API Key storage
 export const apiKeyStorage = new AsyncLocalStorage<any>();
@@ -3787,6 +3787,7 @@ export const generateStockMetadata = async (
   console.log(`[JohMeta Pipeline] Stage 1: Running Provider 1 — Gemini Vision (Visual Facts Detection)...`);
   
   const mediaTypeContext = directives.mediaTypeContext;
+  const mediaContext = directives.mediaTypeContext;
 
   const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
@@ -5240,7 +5241,14 @@ export const generateOptimizedPrompt = async (options: {
     "Dark Horror Aesthetic": ' - Focus on extremely dark, eerie, unsettling, and atmospheric horror themes. MUST look like a photorealistic, real-world photograph or live-action movie still. Emphasize crushing pitch-black shadows, high-contrast chiaroscuro lighting with minimal illumination, macabre elements, muted or monochromatic color palettes with stark accents (like crimson red), thick fog/mist, decaying textures, and a profound sense of dread. AVOID: Digital painting, illustration, cartoonish styles, bright daylight, cheerful elements, or well-lit scenes. It must look breathtakingly real.',
     "Lego Style": ' - Focus on compositions entirely constructed from interlocking plastic building bricks (gaya mainan balok plastik). Emphasize sharp geometric brick shapes, visible circular studs on top of bricks, glossy plastic textures with subtle scratches, vibrant primary colors, and macro photography lighting (depth of field, studio lighting) to make it look like a miniature diorama or toy set. Do NOT use the word "Lego" in the prompt if possible, use "interlocking plastic bricks" or "brick toy style".',
     "Voxel Art": ' - Focus on 3D pixel art constructed from volumetric cubes (voxels). Emphasize a blocky, retro video game aesthetic similar to Minecraft, with low-resolution 3D geometry but modern high-quality lighting (raytracing, global illumination). Use sharp pixelated textures, crisp cube edges, and a rigid grid-based structure. CRITICAL: Do not use the word "Minecraft" or specific game IP; instead use "voxel art", "3D blocky pixel art", or "cubical world". AVOID: Realism, photorealistic rendering, real-world natural aesthetics, or smooth continuous surfaces.',
-    "Abstract": ' - Style Guide: Deconstruct the subject into a dynamic expression of energy, motion, and non-literal forms. Visual Characteristics: Explosive swirls of pigment, kinetic energy trails, thick impasto textures, layered translucent facets, and dramatic asymmetric compositions. Sub-styles to master: Abstract Expressionism (gestural strokes), Fluid Art (marble/ink swirls), Neon Abstract (glow trails), Geometric Abstraction (fractured shapes), Fractal Patterns (mathematical complexity), or Glitch Art (digital distortion). Prompt Structure: "Abstract, [Subject deconstructed into energy/forms] using [Selected sub-style] with [Specific textures: e.g., vibrant paint splatters, crystalline facets, fluid silk flows] and [Atmospheric lighting]. No clear primary subject—focus on the overall concept of motion and mood." AVOID: Photorealistic rendering, literal anatomy, recognizable objects, 3D raytracing, camera lens specs, and realistic world-building.',
+    "Abstract": ` - Style Guide: DYNAMIC KINETIC & CRYSTALLINE SHATTERED GEOMETRIC ABSTRACT STYLE.
+Visual Characteristics & Core Elements:
+1. Dynamic Motion & Kinetic Energy: Portray the subject "${subject}" in high-energy, freeze-frame athletic or kinetic action poses with explosive forward momentum, dynamic speed arcs, and speed streaks.
+2. Floating Shattered Geometric & Crystalline Glass Shards: Surround the subject and motion path with sharp, floating polygonal/triangular glass fragments, faceted crystalline prisms, and refractive geometric shards dispersing dynamically through the air.
+3. Glowing Neon Light Trails & Speed Ribbons: Incorporate luminous flowing neon light trails, speed streaks, and glowing energetic ribbons (in vibrant cyan, electric blue, magenta, neon amber, or radiant white) tracing the movement and trajectory of action.
+4. Dramatic High-Contrast Dark Arena/Stadium Lighting: Set against a moody dark arena, stadium track, or stage backdrop illuminated by powerful volumetric spotlights, intense rim lighting, and dramatic chiaroscuro contrast that makes the glowing elements and crystalline facets pop.
+5. Kinetic Particle Explosions & Debris: Include explosive particle bursts, glowing sparks, luminous embers, or ice spray/shattered debris erupting from contact, footwork, or pivot points.
+6. Aesthetic & Quality: Hyper-detailed, ultra-sharp focus on the subject in dynamic motion, 8k resolution, cinematic action freeze-frame composition, Octane/Unreal volumetric lighting aesthetic.`,
     "Corporate Technology Concept": ' - Focus on realistic photography and business themes combined with holographic UI overlays such as floating icons, glowing digital lights, and advanced tech elements. Emphasize a photorealistic corporate environment infused with futuristic, high-tech digital interfaces and data streams.',
     "Graphic Design": `You are an elite Commercial Art Director and Graphic Designer creating premium, high-selling commercial assets tailored for Adobe Stock, advertising campaigns, and professional marketing media.
 
@@ -5450,7 +5458,8 @@ Rules for the Generated Prompts:
       - 🧱 3D / CGI & RENDER (3D Render, 3D CGI, Lowpoly, Voxel Art, Isometric): Use ONLY 3D geometry, polygon meshes, PBR materials, global illumination, and ray-tracing. FORBIDDEN: "2D flat drawing", "vector path", "real physical photograph".
       - 🖌️ TRADITIONAL FINE ART (Oil Painting, Watercolor, HandDrawn Sketch, Paper Cut, Embroidery, Origami): Use ONLY tactile physical medium characteristics (brushstrokes, impasto pigments, paper grain, stitched thread, folded paper). FORBIDDEN: "digital 3D CGI", "DSLR camera lens", "vector shapes".
       - 🎮 STYLIZED & TOY (Anime/Manga, Disney Cartoon, Pixel Art, Lego Style, Claymation): Use ONLY the specific medium vocabulary (cel-shaded animation, 8-bit pixels, interlocking plastic brick studs, hand-molded clay). FORBIDDEN: "realistic photo", "photorealistic".
-      - UNDER NO CIRCUMSTANCES should any prompt drift into abstract geometric patterns or unrelated styles unless explicitly requested.
+      - 💎 DYNAMIC ABSTRACT & KINETIC ENERGY (Abstract): Emphasize dynamic freeze-frame action poses, floating shattered crystalline/geometric glass shards, glowing speed streaks and neon light ribbons, explosive particle bursts, and high-contrast dramatic stadium/arena lighting on dark backgrounds.
+      - UNDER NO CIRCUMSTANCES should any prompt drift into unrelated styles unless explicitly requested.
 0.2 COMMERCIAL PRIORITY: The subject must occupy at least 30% of the visual attention. The commercial concept must be immediately understandable.
 1. BASE SUBJECT TRANSLATION & LOCK: First, accurately translate the core subject "${subject}" into vivid English. You MUST LOCK onto this subject. Under no circumstances can you swap the main subject for something else.
 2. Return EXACTLY ${count} unique prompt variations as an array. Each must feature the LOCKED subject, be professionally composed for its native style domain (real photography or high-quality illustration/craft/CGI), use distinct compositions/lighting/medium details, and include "copy space" (negative space) for text placement.
@@ -5871,16 +5880,16 @@ CRITICAL DIRECTIVES:
       "vintage hand-painted portrait oil technique, rich pigments, weathered fine-art appeal"
     ],
     "Abstract": [
-      "Dynamic abstract light trails on dark background, energetic flowing waves, vivid neon accents, sharp geometric glass shards",
-      "High-contrast abstract energy, glowing sphere amidst swirling light ribbons, mysterious dark void, futuristic abstract art",
-      "Radiant abstract light pulses, ethereal dark atmosphere, vibrant accent streaks, complex motion and light play",
-      "Abstract digital light art, deep dark void background, sharp crystalline motion, vibrant glowing focal point",
-      "Energetic abstract composition, fluid white light waves, sharp angular glass fragments, intense vibrant spotlight, dark noir atmosphere",
-      "Vibrant fluid liquid art, colorful swirling thick pigments, high viscosity motion, chaotic yet harmonious abstract flow",
-      "Futuristic geometric abstract, complex interlocking angular shapes, metallic textures, neon grid lines, cinematic dark theme",
-      "Abstract particle simulation, dense glowing dots in motion, dark deep void, energetic dispersal, cinematic moody lighting",
-      "Holographic gradient abstract, iridescent flowing curves, light refraction, mysterious ethereal textures, dark background",
-      "Complex abstract fractal geometry, infinite intricate patterns, glowing edges, dark contrast lighting, futuristic artistic design"
+      "Dynamic action freeze-frame shot of the subject in explosive motion, surrounded by floating shattered crystal glass shards, vibrant glowing cyan and electric blue speed trails, kinetic particle sparks, dark stadium arena background with volumetric floodlights, high-contrast rim lighting, 8k, Octane render",
+      "Futuristic kinetic composition of the subject sprinting with explosive momentum, encased in floating geometric polygonal prism shards, glowing orange and cyan neon light streaks, dark high-tech track with luminous ground lines, hyper-detailed, 8k",
+      "Dynamic athletic subject mid-motion, explosive burst of shattered crystalline glass fragments and glowing sparks, swirling vibrant neon energy ribbons, dramatic dark arena with overhead spotlight, sharp focus, cinematic lighting",
+      "Dynamic high-speed action shot of the subject, floating faceted geometric prism shards refracting light, glowing electric speed lines, kinetic ice debris and glowing ember particles, dramatic dark stadium, volumetric rim lighting, 8k",
+      "Artistic kinetic jump in mid-air, flowing neon ribbon trails forming geometric abstract rings, floating shattered glass polygons, dark stage with warm overhead spotlight, intense high-contrast rim light, hyper-detailed, 8k",
+      "Explosive kinetic energy composition with the subject, surrounded by floating translucent crystal shards and refractive geometric prisms, glowing magenta and electric blue light trails, dark moody backdrop with cinematic spotlights, 8k",
+      "High-speed freeze-frame of the subject in dynamic motion, shattered glass fragments dispersing through the air, vibrant glowing neon light arcs, kinetic spark explosion at contact points, dark arena with dramatic rim lighting, 8k",
+      "Futuristic cybernetic subject bursting with kinetic energy, glowing cyan and amber speed streaks, floating sharp geometric crystals, dark futuristic stadium with glowing track markings, ultra-sharp detail, 8k",
+      "Dynamic abstract kinetic artwork of the subject, swirling glowing neon light trails intertwined with faceted polygonal glass prisms, explosive particle dispersal, deep dark background with intense volumetric spotlights, 8k",
+      "Cinematic dynamic action shot of the subject, explosive burst of floating shattered glass shards, glowing light ribbons tracing the motion trajectory, high contrast rim lighting against a dark arena, hyper-detailed, 8k Octane render"
     ],
     "Vintage Photography": [
       "authentic vintage analog photograph, film grain texture, classic 1970s warm color grading, nostalgic light leaks",
@@ -7908,69 +7917,40 @@ Language: ${targetLanguageName}. Return pure JSON.`;
   }
 }
 
-/* ===== FIXED: generateMotionCode restored as standalone function conforming to Remotion Docs ===== */
+/* ===== FIXED: generateMotionCode restored as standalone function ===== */
 export async function generateMotionCode(userPrompt: string, options?: { currentCode?: string; fps?: number; durationSeconds?: number; width?: number; height?: number; history?: Array<{role: string; content: string}>; model?: string }) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
   const model = options?.model;
 
-  const systemInstruction = `You are a world-class Remotion 4.x and React Motion Graphics developer.
-Your task is to generate a high-end, production-ready Remotion video animation component according to official Remotion documentation (https://www.remotion.dev/docs).
-
-REMOTION RULES & BEST PRACTICES:
-1. EXPORT: The root component MUST be named 'MotionComposition' and exported (e.g. 'export default function MotionComposition()' or 'export const MotionComposition = () => { ... }').
-2. HOOKS & PRIMITIVES:
-   - Import and use from 'remotion':
-     - 'AbsoluteFill': Full-frame layout container.
-     - 'Sequence': Time-shifting container for scene/layer choreography (use 'from' and 'durationInFrames').
-     - 'useCurrentFrame()': Current frame number (starts at 0 inside Sequences).
-     - 'useVideoConfig()': Video config ({ fps, durationInFrames, width, height }).
-     - 'interpolate(frame, inputRange, outputRange, { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ... })': Smooth numerical transformations.
-     - 'interpolateColors(frame, inputRange, colorRange)': Smooth CSS color transitions.
-     - 'spring({ frame, fps, config: { damping: 12, mass: 0.5, stiffness: 100 } })': Physics-based spring animations.
-     - 'random(seed)': Deterministic pseudorandom values.
-   - Import React: 'import React, { useMemo } from "react";'
-3. DETERMINISTIC ANIMATION:
-   - All animations must be pure mathematical functions of 'frame' and 'spring'/'interpolate'.
-   - NEVER use CSS @keyframes, CSS animations, setInterval, setTimeout, Date.now(), or Math.random() inside the render cycle.
-4. STYLING:
-   - Use clean inline styles ('style={{ ... }}') or inline SVG graphics.
-   - Design modern, cinematic visuals: rich linear/radial gradients, glassmorphism ('backdropFilter', translucent backgrounds), glowing drop-shadows, sleek typography, badges, cards, and smooth spring-in / fade-in / slide choreography.
-5. SELF-CONTAINED:
-   - The code must be 100% self-contained, valid, and runnable JSX without external asset dependencies or missing packages.
-
-Return a JSON object with:
-- 'title': Short descriptive title of the motion graphic
-- 'summary': 1-2 sentence description of the visual effects and choreography
-- 'code': Either:
-  1. If current code is a JSON Schema (starts with '{' and contains 'scenes'), return an updated valid JSON string with scenes and elements.
-  2. Or complete, runnable JSX Remotion code exporting MotionComposition.`;
+  const systemInstruction = `You are an expert Remotion developer. Your task is to generate a self-contained React component that composes a stunning, modern motion graphics animation. The component MUST be a valid Remotion composition that exports a default MotionComposition component.
+RULES: Use @remotion packages appropriately. The animation should be smooth, professional, and visually impressive. Use React hooks as needed. Use useCurrentFrame() and useVideoConfig() from remotion. Export as: export default MotionComposition. Keep the code self-contained and production-ready. Return ONLY valid, runnable JSX/TSX code.`;
 
   const { width = 1920, height = 1080, fps = 30, durationSeconds = 5 } = options || {};
   const durationInFrames = fps * durationSeconds;
 
   const contextParts: string[] = [];
-  contextParts.push(`Composition Parameters: ${width}x${height}px, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s duration).`);
-  if (options?.currentCode?.trim()) contextParts.push(`Current Code to iterate/fix:\n\`\`\`jsx\n${options.currentCode}\n\`\`\``);
+  contextParts.push(`Canvas: ${width}x${height}, ${fps}fps, ${durationInFrames} frames (${durationSeconds}s).`);
+  if (options?.currentCode?.trim()) contextParts.push(`Existing code:\n\`\`\`jsx\n${options.currentCode}\n\`\`\``);
   if (options?.history?.length) {
     const h = options.history.slice(-6);
-    contextParts.push(`Conversation History:\n${h.map(m => `${m.role}: ${m.content}`).join('\n')}`);
+    contextParts.push(`History:\n${h.map(m => `${m.role}: ${m.content}`).join('\n')}`);
   }
-  contextParts.push(`User Request: "${userPrompt}"`);
+  contextParts.push(`Request: "${userPrompt}"`);
   const fullContents = contextParts.join('\n\n');
 
   const responseSchema = { type: Type.OBJECT, properties: { title: { type: Type.STRING }, summary: { type: Type.STRING }, code: { type: Type.STRING } }, required: ["title", "summary", "code"] };
 
   let responseText = "";
   if (NON_GEMINI_PROVIDERS.has(provider)) {
-    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.85 }, model });
+    const res = await callOpenAICompatibleWithRetry({ systemInstruction, contents: fullContents, responseMimeType: "application/json", responseSchema, config: { temperature: 0.9 }, model });
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-2.5-pro', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.85 }, 2);
+      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-2.5-pro', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.85 }, 1);
+      const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);
       responseText = res.text || "{}";
     }
   }
@@ -7978,14 +7958,7 @@ Return a JSON object with:
   const parsed = JSON.parse(extractJSON(responseText));
   if (typeof parsed.code === 'string') {
     parsed.code = parsed.code.replace(/^```(jsx|javascript|js|tsx)?\s*/i, '').replace(/```\s*$/i, '').trim();
-    const isJsonProject = parsed.code.trim().startsWith('{') && (parsed.code.includes('"scenes"') || parsed.code.includes('"background"'));
-    if (!isJsonProject && !/MotionComposition/.test(parsed.code)) {
-      if (/export\s+default\s+function\s+([A-Za-z0-9_]+)/.test(parsed.code)) {
-        parsed.code = parsed.code.replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/, 'export default function MotionComposition');
-      } else {
-        parsed.code += '\nexport default MotionComposition;';
-      }
-    }
+    if (!/MotionComposition/.test(parsed.code)) throw new Error('AI response did not include a MotionComposition export.');
   } else throw new Error('AI response missing code field.');
   return { title: parsed.title || 'Untitled Motion', summary: parsed.summary || '', code: parsed.code as string };
 }
@@ -8177,38 +8150,34 @@ export async function generateCinematicPrompt(topic: string): Promise<string> {
 }
 
 export const ABSTRACT_STYLE_INSTRUCTION = `
-You are a Master Abstract Artist and Creative Director specializing in deconstructive, non-literal visual art, fluid dynamics, and expressive modern compositions.
+You are a Master Creative Director and AI Prompt Designer specializing in Dynamic Kinetic Abstract Art, Crystalline Shattered Geometry, and High-Contrast Cinematic Energy.
 
 When generating or refining prompts for the "Abstract" style, you MUST strictly follow these rules:
 
-1. CORE CONCEPT & DECONSTRUCTION
-   - Deconstruct the user's input subject into dynamic expressions of motion, kinetic energy, emotion, and non-literal forms.
-   - Shift focus away from recognizable real-world subjects toward atmospheric mood, fluid rhythm, and spatial energy.
+1. DYNAMIC KINETIC MOTION & ACTION FREEZE-FRAME
+   - Portray the subject in high-speed, dynamic athletic or kinetic action poses with explosive forward momentum, dynamic speed arcs, and freeze-frame action moments.
+   - Maintain the subject as the recognizable energetic hero interacting seamlessly with abstract forces.
 
-2. VISUAL CHARACTERISTICS & TEXTURES
-   - Incorporate vivid tactile textures: explosive pigment swirls, kinetic motion trails, thick impasto brushwork, layered translucent facets, or fluid marble inks.
-   - Enforce dramatic asymmetric compositions and balance of organic versus structured forms.
+2. FLOATING SHATTERED CRYSTAL & GEOMETRIC GLASS SHARDS
+   - Seamlessly surround the subject and motion path with sharp, floating polygonal glass shards, faceted crystalline prisms, and transparent geometric fragments dispersing dynamically through the air.
+   - The shards refract and reflect the scene's vibrant light sources with sharp, crystalline edges.
 
-3. EMBEDDED ABSTRACT MOVEMENTS & TECHNIQUES
-   - Automatically blend or select appropriate abstract movements based on the topic context:
-     * Abstract Expressionism: Bold gestural strokes and raw emotional marks.
-     * Fluid / Marble Art: Smooth liquid ink flows, acrylic pouring, and swirling colors.
-     * Neon & Kinetic: Glowing light trails, luminescent energy vectors, and vibrant neon pulses.
-     * Geometric & Cubist: Fractured geometric facets, intersecting translucent planes, and mathematical precision.
-     * Glitch Art & Distortion: Digital signal degradation, scanline distortions, and chromatic shifting.
+3. GLOWING NEON LIGHT TRAILS & SPEED STREAKS
+   - Trace the motion trajectory with vibrant glowing neon light trails, electric speed streaks, and luminescent flowing ribbons (such as electric cyan, neon orange, magenta, glowing amber, or radiant white).
 
-4. MANDATORY PROMPT STRUCTURE
-   - Formulate the output prompt using this structural pattern:
-     "Abstract, [subject deconstructed into energy/form] using [selected abstract style/movement] with [specific textures, e.g., vibrant paint splatters, crystalline facets, or liquid silk flow] and [atmospheric lighting]."
+4. DRAMATIC HIGH-CONTRAST ARENA / STADIUM LIGHTING
+   - Set the scene against a moody dark arena, stadium track, or stage backdrop with volumetric stadium floodlights, intense rim lighting, and dramatic chiaroscuro contrast that makes the glowing light trails and crystalline facets pop.
 
-5. STRICT PROHIBITIONS (STRICTLY AVOID)
-   - DO NOT generate photorealistic renders or literal human/object anatomy.
-   - DO NOT include camera lens specs (e.g., 50mm, f/1.8), raytracing parameters, or realistic world-building elements.
-   - DO NOT create static, flat, or featureless background fills.
+5. KINETIC PARTICLE BURST & DEBRIS EXPLOSIONS
+   - Include explosive bursts of glowing sparks, ice debris, crystalline dust, or luminous particles erupting from pivot, footwork, or impact points.
+
+6. MANDATORY PROMPT STRUCTURE
+   - Formulate prompts using rich, cinematic descriptors:
+     "Dynamic action freeze-frame of [Subject in motion], surrounded by floating shattered crystal glass shards, vibrant glowing [neon colors] speed trails, kinetic particle explosion, dramatic dark stadium/arena background with volumetric floodlights, high-contrast rim lighting, 8k resolution, Octane render."
 `;
 
 export async function generateAbstractPrompt(topic: string): Promise<string> {
-  const userQuery = `Generate a highly artistic abstract image prompt for the subject: "${topic}". \nFocus on deconstructing the subject into energy, motion, and non-literal forms. Incorporate vivid textures (impasto, fluid marble, geometric facets) and dynamic compositions. \nOutput ONLY the refined prompt text without intro or explanations.`;
+  const userQuery = `Generate a high-impact dynamic abstract image prompt for the subject: "${topic}". \nFocus on dynamic kinetic action, floating shattered crystal/geometric glass shards, vibrant glowing neon speed trails, explosive particle bursts, and dramatic high-contrast dark arena/stadium lighting. \nOutput ONLY the refined prompt text without intro or explanations.`;
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
