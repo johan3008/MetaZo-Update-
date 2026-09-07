@@ -29,11 +29,6 @@ interface ExportPanelProps {
   handleBackupJSON?: () => void;
   handleDownloadEmbedded?: () => void;
   embedDownloading?: boolean;
-  embedProgress?: { current: number; total: number } | null;
-  embedNamingMode?: 'matching_csv' | 'seo_title';
-  setEmbedNamingMode?: (mode: 'matching_csv' | 'seo_title') => void;
-  handleSelectAllPlatforms?: (enableAll: boolean) => void;
-  completedCount?: number;
   t: any;
 }
 
@@ -65,11 +60,6 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   handleBackupJSON,
   handleDownloadEmbedded,
   embedDownloading,
-  embedProgress,
-  embedNamingMode = 'matching_csv',
-  setEmbedNamingMode,
-  handleSelectAllPlatforms,
-  completedCount = 0,
   t
 }) => {
   const platforms = [
@@ -178,22 +168,9 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       {/* CARD BODY */}
       <div className="p-6 space-y-5">
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
-              Select Target Marketplaces
-            </label>
-            {handleSelectAllPlatforms && (
-              <button
-                type="button"
-                onClick={() => handleSelectAllPlatforms(selectedCount < platforms.length)}
-                className="text-[10px] font-black text-[#7c3aed] dark:text-violet-400 hover:text-violet-600 dark:hover:text-violet-300 transition-colors cursor-pointer flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-violet-500/10 hover:bg-violet-500/15"
-                title="Pilih dan sinkronkan semua platform microstock sekaligus"
-              >
-                <Sparkles size={11} className="text-[#7c3aed] dark:text-violet-400" />
-                <span>{selectedCount === platforms.length ? 'Deselect All' : 'Auto-Detect & Select All Platforms'}</span>
-              </button>
-            )}
-          </div>
+          <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-3">
+            Select Target Marketplaces
+          </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
             {platforms.map((plat) => (
               <label 
@@ -268,54 +245,6 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             </div>
           )}
 
-          {/* Download Embed Naming Option */}
-          <div className="p-3.5 bg-slate-50/80 dark:bg-black/20 border border-slate-200/50 dark:border-white/5 rounded-2xl space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
-                Embedded File Naming
-              </label>
-              <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                Auto-Detect Ready
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setEmbedNamingMode && setEmbedNamingMode('matching_csv')}
-                className={`py-2 px-2 text-[10px] uppercase font-extrabold rounded-[1.5rem] border transition-all text-center cursor-pointer ${
-                  embedNamingMode === 'matching_csv'
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20'
-                    : 'bg-white dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-                title="Nama file sesuai CSV export (nama file asli / custom). Direkomendasikan untuk sinkronisasi upload microstock."
-              >
-                Match CSV Name
-              </button>
-              <button
-                type="button"
-                onClick={() => setEmbedNamingMode && setEmbedNamingMode('seo_title')}
-                className={`py-2 px-2 text-[10px] uppercase font-extrabold rounded-[1.5rem] border transition-all text-center cursor-pointer ${
-                  embedNamingMode === 'seo_title'
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20'
-                    : 'bg-white dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-                title="Nama file menggunakan SEO Title yang dihasilkan AI"
-              >
-                SEO Title Name
-              </button>
-            </div>
-            <div className="flex items-center justify-between pt-1 border-t border-slate-200/40 dark:border-white/5">
-              <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500">Format Didukung:</span>
-              <div className="flex items-center gap-1 flex-wrap">
-                {['JPG', 'PNG', 'SVG', 'EPS', 'MP4', 'MOV'].map(fmt => (
-                  <span key={fmt} className="text-[8px] font-black px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-slate-300">
-                    {fmt}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
           {/* Master Auto-Download Toggle */}
           <div className="flex items-center justify-between p-3.5 bg-slate-50/80 dark:bg-black/20 border border-slate-200/50 dark:border-white/5 rounded-2xl">
             <div>
@@ -371,11 +300,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
               ) : (
                 <Download size={15} />
               )}
-              <span>
-                {embedDownloading
-                  ? (embedProgress ? `Embedding (${embedProgress.current}/${embedProgress.total})...` : 'Embedding Tags...')
-                  : (completedCount > 1 ? `Download Embedded (ZIP • ${completedCount})` : 'Download Embedded File')}
-              </span>
+              <span>{embedDownloading ? 'Embedding Tags...' : 'Download Embedded Files'}</span>
             </button>
           )}
 

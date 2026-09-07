@@ -593,7 +593,6 @@ interface ReviewQueueProps {
   progressInfo?: ProgressInfo | null;
   aiOptions?: any;
   keywordCount?: number | string;
-  handleDownloadSingleEmbedded?: (file: FileItem) => void;
 }
 
 const FileNameInput: React.FC<{
@@ -642,8 +641,7 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
   isLoading,
   progressInfo,
   aiOptions,
-  keywordCount,
-  handleDownloadSingleEmbedded
+  keywordCount
 }) => {
   const hasFiles = files.length > 0;
   const [isFixingBatch, setIsFixingBatch] = React.useState(false);
@@ -958,15 +956,6 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                       title="Salin semua metadata file ini (Judul + Deskripsi + Keywords)"
                     >
                       <Copy size={12} />
-                    </button>
-                  )}
-                  {file.title && handleDownloadSingleEmbedded && (
-                    <button
-                      onClick={() => handleDownloadSingleEmbedded(file)}
-                      className="p-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-2xl transition-all border border-emerald-200 dark:border-emerald-800/40 focus:outline-none cursor-pointer"
-                      title="Download file ini dengan metadata ter-embed (IPTC + XMP + EXIF)"
-                    >
-                      <Download size={12} />
                     </button>
                   )}
                   {handleRegenerateFile && (
