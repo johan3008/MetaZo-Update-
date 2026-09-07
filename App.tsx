@@ -2125,6 +2125,10 @@ const App: React.FC = () => {
   // Login promo modal removed per user request
 
   const handleSetActiveTool = (tool: ToolType) => {
+    if (tool === ToolType.MOTION_GEN) {
+      setComingSoonFeature('motion_gen');
+      return;
+    }
     setActiveTool(tool);
     const path = toolToPath[tool] || '/Dashboard';
     const isIframe = typeof window !== 'undefined' && window.self !== window.top;
@@ -4412,9 +4416,6 @@ const App: React.FC = () => {
           formData.append('title', title);
           formData.append('description', description);
           formData.append('keywords', JSON.stringify(keywords));
-          if (item.adobeCategoryId) formData.append('adobeCategoryId', String(item.adobeCategoryId));
-          if (item.shutterstockCategory1) formData.append('shutterstockCategory1', String(item.shutterstockCategory1));
-          if (item.shutterstockCategory2) formData.append('shutterstockCategory2', String(item.shutterstockCategory2));
           if (commonAiOptions?.model) formData.append('model', commonAiOptions.model);
 
           const reqHeaders = { ...getHeaders(commonAiOptions) };
@@ -4455,7 +4456,7 @@ const App: React.FC = () => {
           console.warn('[Download Embedded] Server embed failed, trying client fallback:', serverErr);
         }
 
-        // Client-side fallback for JPEG files using piexifjs + native IPTC APP13 injection (Adobe Stock compliant)
+        // Client-side fallback for JPEG files using piexifjs (with true UCS-2LE encoding for Windows Explorer)
         if (!downloaded && (item.file.type === 'image/jpeg' || item.file.name.toLowerCase().endsWith('.jpg') || item.file.name.toLowerCase().endsWith('.jpeg'))) {
           try {
             const dataUri = await new Promise<string>((resolve, reject) => {
@@ -4475,11 +4476,11 @@ const App: React.FC = () => {
               gps = existing['GPS'] || {};
             } catch (_) {}
 
-            // Helper to encode string as 2-byte UCS-2LE (UTF-16LE with null terminator) for Windows Explorer
+            // Helper to encode string as 2-byte UCS-2LE (UTF-16LE with null terminator) to prevent Chinese/Japanese mojibake in Windows
             const toUcs2Bytes = (str: string) => {
               const bytes: number[] = [];
-              for (let k = 0; k < str.length; k++) {
-                const code = str.charCodeAt(k);
+              for (let i = 0; i < str.length; i++) {
+                const code = str.charCodeAt(i);
                 bytes.push(code & 0xFF, (code >> 8) & 0xFF);
               }
               bytes.push(0, 0);
@@ -4501,69 +4502,7 @@ const App: React.FC = () => {
             for (let b = 0; b < byteString.length; b++) {
               ia[b] = byteString.charCodeAt(b);
             }
-
-            // Inject Adobe Stock-compliant standard IPTC APP13 segment into JPEG
-            let finalBytes: Uint8Array = ia;
-            try {
-              const enc = new TextEncoder();
-              const iptcDatasets: number[] = [];
-              const appendTag = (rec: number, ds: number, data: Uint8Array) => {
-                iptcDatasets.push(0x1C, rec, ds, (data.length >> 8) & 0xFF, data.length & 0xFF);
-                for (let j = 0; j < data.length; j++) iptcDatasets.push(data[j]);
-              };
-              // Record 1 (UTF-8: \x1b%G)
-              appendTag(1, 90, new Uint8Array([0x1B, 0x25, 0x47]));
-              // Record 2 Version 4
-              appendTag(2, 0, new Uint8Array([0x00, 0x04]));
-              if (title) appendTag(2, 5, enc.encode(title.slice(0, 256)));
-              if (description) appendTag(2, 120, enc.encode(description.slice(0, 2000)));
-              const cleanKwList = Array.from(new Set(keywords)).slice(0, 49);
-              for (const kw of cleanKwList) {
-                const kTrim = String(kw).trim();
-                if (kTrim) appendTag(2, 25, enc.encode(kTrim.slice(0, 64)));
-              }
-              const iptcBytes = new Uint8Array(iptcDatasets);
-              const pad = (iptcBytes.length % 2 !== 0) ? 1 : 0;
-              const bimLen = 4 + 2 + 2 + 4 + iptcBytes.length + pad;
-              const bimBuffer = new Uint8Array(bimLen);
-              let offset = 0;
-              bimBuffer[offset++] = 0x38; bimBuffer[offset++] = 0x42; bimBuffer[offset++] = 0x49; bimBuffer[offset++] = 0x4D; // 8BIM
-              bimBuffer[offset++] = 0x04; bimBuffer[offset++] = 0x04; // IPTC-NAA
-              bimBuffer[offset++] = 0x00; bimBuffer[offset++] = 0x00; // name
-              bimBuffer[offset++] = (iptcBytes.length >> 24) & 0xFF;
-              bimBuffer[offset++] = (iptcBytes.length >> 16) & 0xFF;
-              bimBuffer[offset++] = (iptcBytes.length >> 8) & 0xFF;
-              bimBuffer[offset++] = iptcBytes.length & 0xFF;
-              bimBuffer.set(iptcBytes, offset);
-              offset += iptcBytes.length;
-              if (pad) bimBuffer[offset++] = 0x00;
-
-              const psHeader = enc.encode("Photoshop 3.0\0");
-              const payloadLen = 2 + psHeader.length + bimBuffer.length;
-              const app13 = new Uint8Array(2 + payloadLen);
-              app13[0] = 0xFF; app13[1] = 0xED;
-              app13[2] = (payloadLen >> 8) & 0xFF;
-              app13[3] = payloadLen & 0xFF;
-              app13.set(psHeader, 4);
-              app13.set(bimBuffer, 4 + psHeader.length);
-
-              if (ia[0] === 0xFF && ia[1] === 0xD8) {
-                let insertIdx = 2;
-                if (ia[insertIdx] === 0xFF && (ia[insertIdx + 1] === 0xE0 || ia[insertIdx + 1] === 0xE1)) {
-                  const len = (ia[insertIdx + 2] << 8) | ia[insertIdx + 3];
-                  insertIdx += 2 + len;
-                }
-                const combined = new Uint8Array(ia.length + app13.length);
-                combined.set(ia.subarray(0, insertIdx), 0);
-                combined.set(app13, insertIdx);
-                combined.set(ia.subarray(insertIdx), insertIdx + app13.length);
-                finalBytes = combined;
-              }
-            } catch (iptcErr) {
-              console.warn('[Download Embedded] Client IPTC segment assembly note:', iptcErr);
-            }
-
-            const blob = new Blob([finalBytes as any], { type: 'image/jpeg' });
+            const blob = new Blob([ab], { type: 'image/jpeg' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -4576,11 +4515,6 @@ const App: React.FC = () => {
           } catch (clientErr) {
             console.error('[Download Embedded] Client fallback error:', clientErr);
           }
-        }
-
-        // Throttle multiple file downloads slightly to prevent browser pop-up blocker
-        if (i < completedFiles.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 600));
         }
 
         // Client-side fallback for SVG files
@@ -5119,7 +5053,7 @@ const App: React.FC = () => {
                 filesWithErrorCount={filesWithErrorCount} 
               />
 
-              {/* ⚠️ R2 WARNING BANNER — muncul jika R2 belum dikonfigurasi */}
+              {/* âš ï¸ R2 WARNING BANNER â€” muncul jika R2 belum dikonfigurasi */}
               {[ToolType.VECTOR, ToolType.VIDEO, ToolType.IMAGE, ToolType.MUTE_VIDEO].includes(activeTool) && r2Status === false && (
                 <div className="flex items-start gap-3 px-4 py-3 rounded-2xl border border-amber-400/40 bg-amber-400/10 text-amber-700 dark:text-amber-300 animate-in fade-in slide-in-from-top-2 duration-300">
                   <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -5147,9 +5081,9 @@ const App: React.FC = () => {
                   </div>
                   <button
                     onClick={() => setR2Status(null)}
-                    className="ml-auto shrink-0 opacity-50 hover:opacity-100 transition-opacity text-lg leading-none cursor-pointer"
+                    className="ml-auto shrink-0 opacity-50 hover:opacity-100 transition-opacity text-lg leading-none"
                     title="Tutup"
-                  >×</button>
+                  >Ã—</button>
                 </div>
               )}
 
@@ -5589,12 +5523,15 @@ const App: React.FC = () => {
                       className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
                     >
                       <option value="auto">{t.settings_gemini_model_auto}</option>
-                      <option value="gemini-3.1-flash-lite">Gemini 3.5 Flash-Lite / 3.1 Lite (Smart Grounded - Super Cepat)</option>
-                      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Resmi Google AI)</option>
-                      <option value="gemini-2.5-pro">Gemini 2.5 Pro (Detail Tingkat Tinggi)</option>
+                      <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+                      <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+                      <option value="gemini-3.1-flash-lite">Gemini 3.5 Flash-Lite / 3.1 Lite (Primary Default)</option>
+                      <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+                      <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+                      <option value="gemini-3-flash">Gemini 3 Flash</option>
                       <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
                       <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                      <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B (Ultra Hemat)</option>
+                      <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option>
                       <option value="gemma-4-31b-it">Gemma 4 31B IT (Free RPD 1.5K)</option>
                     </select>
                   </div>
