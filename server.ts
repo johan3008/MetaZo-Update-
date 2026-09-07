@@ -14,7 +14,7 @@ import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
 import { testFtpConnection, uploadToFtp } from './server/ftpService.ts';
-import { embedJpegMetadata, embedPngMetadata, embedSvgMetadata, embedEpsMetadata, ADOBE_CATEGORY_NAMES, cleanKeywordArray } from './src/utils/microstockEmbedder.ts';
+import { embedJpegMetadata, embedPngMetadata, embedSvgMetadata, embedEpsMetadata, embedEpsMetadataBytes, embedMp4MetadataBytes, ADOBE_CATEGORY_NAMES, cleanKeywordArray } from './src/utils/microstockEmbedder.ts';
 import fluentFfmpeg from 'fluent-ffmpeg';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
@@ -29,12 +29,14 @@ try {
 } catch(e) {}
 
 let ffmpeg: any;
+let resolvedFfmpegPath = 'ffmpeg';
 try {
     const ffmpegLib = fluentFfmpeg || _require('fluent-ffmpeg');
     ffmpeg = typeof ffmpegLib === 'function' ? ffmpegLib : (ffmpegLib.default || ffmpegLib);
     try {
         const ffmpegInstaller = _require('@ffmpeg-installer/ffmpeg');
         if (ffmpegInstaller && ffmpegInstaller.path) {
+            resolvedFfmpegPath = ffmpegInstaller.path;
             ffmpeg.setFfmpegPath(ffmpegInstaller.path);
         }
     } catch (err) {
@@ -1671,8 +1673,8 @@ app.get('/api/debug-uploads', (req, res) => {
 
         if (ext === '.eps' || ext === '.ai') {
             try {
-                const epsContent = fs.readFileSync(filePath, 'utf8');
-                const updatedEps = embedEpsMetadata(epsContent, {
+                const inputBuf = fs.readFileSync(filePath);
+                const embeddedBytes = embedEpsMetadataBytes(new Uint8Array(inputBuf), {
                     title,
                     description,
                     keywords: uniqueKeywords,
@@ -1680,8 +1682,8 @@ app.get('/api/debug-uploads', (req, res) => {
                     shutterstockCategory1: sstCat1,
                     shutterstockCategory2: sstCat2
                 });
-                fs.writeFileSync(filePath, updatedEps, 'utf8');
-                console.log(`[embedMetadataForAdobe] EPS/AI DSC & XMP embedded: ${filePath}`);
+                fs.writeFileSync(filePath, Buffer.from(embeddedBytes));
+                console.log(`[embedMetadataForAdobe] EPS/AI binary-safe DSC & XMP embedded: ${filePath} (+${embeddedBytes.length - inputBuf.length} bytes)`);
             } catch (epsErr) {
                 console.warn('[embedMetadataForAdobe] EPS injection note:', epsErr);
             }
@@ -1735,6 +1737,8 @@ app.get('/api/debug-uploads', (req, res) => {
                     '-metadata', `description=${description}`,
                     '-metadata', `comment=${description}`,
                     '-metadata', `synopsis=${description}`,
+                    '-metadata', `keywords=${keywordString}`,
+                    '-metadata:g', `keywords=${keywordString}`,
                     '-metadata', `artist=MetaZo Contributor`,
                     '-metadata', `copyright=All rights reserved`,
                     '-metadata:s:v:0', `handler_name=${title}`,
@@ -1743,11 +1747,11 @@ app.get('/api/debug-uploads', (req, res) => {
                     tempVideoPath
                 ];
                 await new Promise<void>((resolve) => {
-                    const proc = spawn('ffmpeg', ffArgs, { stdio: ['ignore', 'ignore', 'ignore'] });
+                    const proc = spawn(resolvedFfmpegPath, ffArgs, { stdio: ['ignore', 'ignore', 'ignore'] });
                     const timer = setTimeout(() => {
                         try { proc.kill(); } catch (_) {}
                         resolve();
-                    }, 15000);
+                    }, 20000);
                     proc.on('close', (code) => {
                         clearTimeout(timer);
                         if (code === 0 && fs.existsSync(tempVideoPath)) {
@@ -1766,6 +1770,25 @@ app.get('/api/debug-uploads', (req, res) => {
                 });
             } catch (videoErr) {
                 console.warn('[embedMetadataForAdobe] FFmpeg video embed note:', videoErr);
+            }
+
+            // Also embed ISOBMFF XMP container box directly into MP4/MOV bytes
+            try {
+                const videoBuf = fs.readFileSync(filePath);
+                const xmpEmbedded = embedMp4MetadataBytes(new Uint8Array(videoBuf), {
+                    title,
+                    description,
+                    keywords: uniqueKeywords,
+                    adobeCategoryId: metadata.adobeCategoryId,
+                    shutterstockCategory1: sstCat1,
+                    shutterstockCategory2: sstCat2
+                });
+                if (xmpEmbedded && xmpEmbedded.length > 0) {
+                    fs.writeFileSync(filePath, Buffer.from(xmpEmbedded));
+                    console.log(`[embedMetadataForAdobe] Native ISOBMFF XMP embedded into video: ${filePath}`);
+                }
+            } catch (vidXmpErr) {
+                console.warn('[embedMetadataForAdobe] Native video XMP injection note:', vidXmpErr);
             }
         }
 

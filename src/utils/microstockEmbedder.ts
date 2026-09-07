@@ -80,7 +80,7 @@ export const cleanKeywordArray = (raw: string[] | string): string[] => {
 /**
  * Builds standard Adobe Stock / Universal Dublin Core XMP packet
  */
-export function buildXmpPacket(metadata: MicrostockMetadataInput): string {
+export function buildXmpPacket(metadata: MicrostockMetadataInput, mimeType: string = 'image/jpeg'): string {
   const title = String(metadata.title || '').trim();
   const description = String(metadata.description || title).trim();
   const keywords = cleanKeywordArray(metadata.keywords);
@@ -113,7 +113,7 @@ export function buildXmpPacket(metadata: MicrostockMetadataInput): string {
       xmlns:Iptc4xmpCore="http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/"
       xmlns:xmp="http://ns.adobe.com/xap/1.0/"
       xmlns:xmpRights="http://ns.adobe.com/xap/1.0/rights/">
-      <dc:format>image/jpeg</dc:format>
+      <dc:format>${escapeXml(mimeType)}</dc:format>
       <dc:title>
         <rdf:Alt>
           <rdf:li xml:lang="x-default">${escapeXml(title)}</rdf:li>
@@ -516,8 +516,8 @@ export function embedSvgMetadata(svgString: string, metadata: MicrostockMetadata
 
   const titleTag = `<title>${escapeXml(title)}</title>`;
   const descTag = `<desc>${escapeXml(description)}</desc>`;
-  const keywordsXml = keywords.map(k => `<rdf:li>${escapeXml(k)}</rdf:li>`).join('');
-  const metadataTag = `<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:title>${escapeXml(title)}</dc:title><dc:description>${escapeXml(description)}</dc:description><dc:subject><rdf:Bag>${keywordsXml}</rdf:Bag></dc:subject><dc:format>image/svg+xml</dc:format></rdf:Description></rdf:RDF></metadata>`;
+  const xmpPacket = buildXmpPacket(metadata, 'image/svg+xml');
+  const metadataTag = `<metadata>\n    ${xmpPacket}\n  </metadata>`;
 
   let cleaned = svgString
     .replace(/<title[\s\S]*?<\/title>/gi, '')
@@ -531,31 +531,208 @@ export function embedSvgMetadata(svgString: string, metadata: MicrostockMetadata
 }
 
 /**
- * Embeds metadata into EPS / AI PostScript file
+ * Binary-safe EPS / AI PostScript metadata embedder.
+ * Preserves binary DOS EPS 30-byte header (0xC5D0D3C6) and binary TIFF/WMF
+ * preview forks without converting binary data through UTF-8 strings.
+ * This completely eliminates EPS file size explosion and graphics corruption!
  */
-export function embedEpsMetadata(epsString: string, metadata: MicrostockMetadataInput): string {
+export function embedEpsMetadataBytes(
+  inputBytes: Uint8Array,
+  metadata: MicrostockMetadataInput
+): Uint8Array {
   const title = String(metadata.title || '').trim();
   const description = String(metadata.description || title).trim();
   const keywords = cleanKeywordArray(metadata.keywords);
   const keywordStr = keywords.join(', ');
 
-  let content = epsString;
-  if (content.includes('%!PS-Adobe')) {
-    content = content
-      .replace(/^%%Title:.*$/gm, '')
-      .replace(/^%%Subject:.*$/gm, '')
-      .replace(/^%%Keywords:.*$/gm, '');
+  // Check for 30-byte DOS EPS header: 0xC5 0xD0 0xD3 0xC6
+  const isDosEps =
+    inputBytes.length >= 30 &&
+    inputBytes[0] === 0xC5 &&
+    inputBytes[1] === 0xD0 &&
+    inputBytes[2] === 0xD3 &&
+    inputBytes[3] === 0xC6;
 
-    const xmpBlock = `%XRXbegin\n${buildXmpPacket(metadata)}\n%XRXend`;
-    const dscTags = `%%Title: ${title.replace(/[\r\n]/g, ' ')}\n%%Subject: ${description.replace(/[\r\n]/g, ' ')}\n%%Keywords: ${keywordStr.replace(/[\r\n]/g, ' ')}\n${xmpBlock}`;
+  let psStart = 0;
+  let psLength = inputBytes.length;
+  let wmfStart = 0;
+  let tiffStart = 0;
 
-    return content.replace(/(%!PS-Adobe[^\r\n]*)/, `$1\n${dscTags}`);
+  if (isDosEps) {
+    const view = new DataView(inputBytes.buffer, inputBytes.byteOffset, inputBytes.byteLength);
+    psStart = view.getUint32(4, true);
+    psLength = view.getUint32(8, true);
+    wmfStart = view.getUint32(12, true);
+    tiffStart = view.getUint32(20, true);
   }
-  return content;
+
+  // Find PostScript signature "%!PS-Adobe" within the PS section
+  const searchLimit = Math.min(inputBytes.length, psStart + 4096);
+  const psAdobeBytes = [0x25, 0x21, 0x50, 0x53, 0x2D, 0x41, 0x64, 0x6F, 0x62, 0x65]; // "%!PS-Adobe"
+  let sigIndex = -1;
+
+  for (let i = psStart; i <= searchLimit - psAdobeBytes.length; i++) {
+    let match = true;
+    for (let j = 0; j < psAdobeBytes.length; j++) {
+      if (inputBytes[i + j] !== psAdobeBytes[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      sigIndex = i;
+      break;
+    }
+  }
+
+  if (sigIndex === -1) {
+    return inputBytes;
+  }
+
+  // Find the end of the line for %!PS-Adobe... (look for \n or \r\n)
+  let lineEnd = sigIndex;
+  while (lineEnd < inputBytes.length && inputBytes[lineEnd] !== 0x0A && inputBytes[lineEnd] !== 0x0D) {
+    lineEnd++;
+  }
+  if (lineEnd < inputBytes.length && inputBytes[lineEnd] === 0x0D && inputBytes[lineEnd + 1] === 0x0A) {
+    lineEnd += 2;
+  } else if (lineEnd < inputBytes.length) {
+    lineEnd += 1;
+  }
+
+  const cleanT = title.replace(/[\r\n]/g, ' ');
+  const cleanD = description.replace(/[\r\n]/g, ' ');
+  const cleanK = keywordStr.replace(/[\r\n]/g, ' ');
+
+  const xmpPacket = buildXmpPacket(metadata, 'application/postscript');
+  const dscBlock = `\n%%Title: ${cleanT}\n%%Subject: ${cleanD}\n%%Keywords: ${cleanK}\n%XRXbegin\n${xmpPacket}\n%XRXend\n`;
+  const dscBytes = new TextEncoder().encode(dscBlock);
+  const delta = dscBytes.length;
+
+  const result = new Uint8Array(inputBytes.length + delta);
+
+  if (isDosEps) {
+    result.set(inputBytes.subarray(0, 30), 0);
+    const newView = new DataView(result.buffer, result.byteOffset, 30);
+    newView.setUint32(8, psLength + delta, true);
+    if (wmfStart > psStart) {
+      newView.setUint32(12, wmfStart + delta, true);
+    }
+    if (tiffStart > psStart) {
+      newView.setUint32(20, tiffStart + delta, true);
+    }
+
+    result.set(inputBytes.subarray(30, lineEnd), 30);
+    result.set(dscBytes, lineEnd);
+    result.set(inputBytes.subarray(lineEnd), lineEnd + delta);
+  } else {
+    result.set(inputBytes.subarray(0, lineEnd), 0);
+    result.set(dscBytes, lineEnd);
+    result.set(inputBytes.subarray(lineEnd), lineEnd + delta);
+  }
+
+  return result;
 }
 
 /**
- * Universal browser-side file metadata embedding dispatcher
+ * String backward-compatibility wrapper for EPS metadata embedding
+ */
+export function embedEpsMetadata(epsString: string, metadata: MicrostockMetadataInput): string {
+  const enc = new TextEncoder();
+  const bytes = enc.encode(epsString);
+  const updatedBytes = embedEpsMetadataBytes(bytes, metadata);
+  return new TextDecoder('latin1').decode(updatedBytes);
+}
+
+const XMP_ISOBMFF_UUID = new Uint8Array([
+  0xbe, 0x7a, 0xcf, 0xcb, 0x97, 0xa9, 0x42, 0xe8, 0x9c, 0x71, 0x99, 0x94, 0x91, 0xe3, 0xaf, 0xac
+]);
+
+/**
+ * Universal ISOBMFF (MP4, MOV, M4V) XMP Metadata Injector.
+ * Injects Adobe XMP UUID box (BE7ACFCB-97A9-42E8-9C71-999491E3AFAC) into the
+ * video container. Recognized natively by Adobe Premiere, After Effects, Bridge,
+ * Adobe Stock, Shutterstock, and ExifTool.
+ */
+export function embedMp4MetadataBytes(
+  inputBytes: Uint8Array,
+  metadata: MicrostockMetadataInput
+): Uint8Array {
+  if (inputBytes.length < 8) return inputBytes;
+
+  const mimeType = 'video/mp4';
+  const xmpPacket = buildXmpPacket(metadata, mimeType);
+  const xmpBytes = new TextEncoder().encode(xmpPacket);
+
+  // Build the ISOBMFF 'uuid' box (24 bytes header + XMP payload)
+  const boxLength = 24 + xmpBytes.length;
+  const box = new Uint8Array(boxLength);
+  const boxView = new DataView(box.buffer);
+  boxView.setUint32(0, boxLength, false); // 32-bit Big-Endian length
+  // 'uuid'
+  box[4] = 0x75;
+  box[5] = 0x75;
+  box[6] = 0x69;
+  box[7] = 0x64;
+  // 16-byte Adobe XMP UUID
+  box.set(XMP_ISOBMFF_UUID, 8);
+  // Payload
+  box.set(xmpBytes, 24);
+
+  // Check if an existing XMP uuid box already exists in top-level atoms
+  const view = new DataView(inputBytes.buffer, inputBytes.byteOffset, inputBytes.byteLength);
+  let offset = 0;
+  let existingBoxStart = -1;
+  let existingBoxEnd = -1;
+
+  while (offset + 8 <= inputBytes.length) {
+    const atomSize = view.getUint32(offset, false);
+    if (atomSize < 8) break;
+
+    // Check if box type is 'uuid'
+    if (
+      inputBytes[offset + 4] === 0x75 &&
+      inputBytes[offset + 5] === 0x75 &&
+      inputBytes[offset + 6] === 0x69 &&
+      inputBytes[offset + 7] === 0x64 &&
+      atomSize >= 24
+    ) {
+      let isXmpUuid = true;
+      for (let i = 0; i < 16; i++) {
+        if (inputBytes[offset + 8 + i] !== XMP_ISOBMFF_UUID[i]) {
+          isXmpUuid = false;
+          break;
+        }
+      }
+      if (isXmpUuid) {
+        existingBoxStart = offset;
+        existingBoxEnd = offset + atomSize;
+        break;
+      }
+    }
+    offset += atomSize;
+  }
+
+  if (existingBoxStart >= 0 && existingBoxEnd > existingBoxStart) {
+    // Replace existing XMP box
+    const totalLen = existingBoxStart + box.length + (inputBytes.length - existingBoxEnd);
+    const result = new Uint8Array(totalLen);
+    result.set(inputBytes.subarray(0, existingBoxStart), 0);
+    result.set(box, existingBoxStart);
+    result.set(inputBytes.subarray(existingBoxEnd), existingBoxStart + box.length);
+    return result;
+  } else {
+    // Append uuid box to end of container (standard top-level container box)
+    const result = new Uint8Array(inputBytes.length + box.length);
+    result.set(inputBytes, 0);
+    result.set(box, inputBytes.length);
+    return result;
+  }
+}
+
+/**
+ * Universal browser-side file metadata embedding dispatcher.
+ * Supports JPEG, PNG, SVG, EPS, AI, MP4, MOV, WEBM, M4V.
  */
 export async function embedMicrostockMetadata(
   file: File,
@@ -583,9 +760,16 @@ export async function embedMicrostockMetadata(
   }
 
   if (ext === 'eps' || ext === 'ai') {
-    const text = await file.text();
-    const updatedEps = embedEpsMetadata(text, metadata);
-    return new Blob([updatedEps], { type: 'application/postscript' });
+    const arrayBuffer = await file.arrayBuffer();
+    const embeddedBytes = embedEpsMetadataBytes(new Uint8Array(arrayBuffer), metadata);
+    return new Blob([embeddedBytes], { type: 'application/postscript' });
+  }
+
+  if (ext === 'mp4' || ext === 'mov' || ext === 'm4v' || ext === 'webm' || file.type.startsWith('video/')) {
+    const arrayBuffer = await file.arrayBuffer();
+    const embeddedBytes = embedMp4MetadataBytes(new Uint8Array(arrayBuffer), metadata);
+    const mimeType = ext === 'mov' ? 'video/quicktime' : (ext === 'webm' ? 'video/webm' : 'video/mp4');
+    return new Blob([embeddedBytes], { type: mimeType });
   }
 
   return file;

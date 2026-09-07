@@ -4432,30 +4432,26 @@ const App: React.FC = () => {
       exportName = getExportFilename(item.customFileName || item.file.name, item.file);
     }
 
-    const isVideo = ['mp4', 'mov', 'webm', 'm4v', 'avi'].includes(origExt);
+    // 1. High-speed client-side embedding for Images, Vectors & Videos (JPG, PNG, SVG, EPS, MP4, MOV, WEBM)
+    try {
+      const embeddedBlob = await embedMicrostockMetadata(item.file, {
+        title,
+        description,
+        keywords,
+        adobeCategoryId: item.adobeCategoryId,
+        shutterstockCategory1: item.shutterstockCategory1,
+        shutterstockCategory2: item.shutterstockCategory2,
+        dreamstimeCategory: item.dreamstimeCategory,
+        miriCanvasCategory: item.miriCanvasCategory,
+        creator: 'MetaZo Contributor',
+        software: 'MetaZo Microstock AI Assistant'
+      });
 
-    // 1. High-speed client-side embedding for Images & Vectors (JPG, PNG, SVG, EPS)
-    if (!isVideo) {
-      try {
-        const embeddedBlob = await embedMicrostockMetadata(item.file, {
-          title,
-          description,
-          keywords,
-          adobeCategoryId: item.adobeCategoryId,
-          shutterstockCategory1: item.shutterstockCategory1,
-          shutterstockCategory2: item.shutterstockCategory2,
-          dreamstimeCategory: item.dreamstimeCategory,
-          miriCanvasCategory: item.miriCanvasCategory,
-          creator: 'MetaZo Contributor',
-          software: 'MetaZo Microstock AI Assistant'
-        });
-
-        if (embeddedBlob && embeddedBlob.size > 0) {
-          return { blob: embeddedBlob, exportName };
-        }
-      } catch (clientErr) {
-        console.warn('[Download Embedded] Client embed warning, trying server endpoint:', clientErr);
+      if (embeddedBlob && embeddedBlob.size > 0 && embeddedBlob !== item.file) {
+        return { blob: embeddedBlob, exportName };
       }
+    } catch (clientErr) {
+      console.warn('[Download Embedded] Client embed warning, trying server endpoint:', clientErr);
     }
 
     // 2. Server endpoint for Video or fallback
