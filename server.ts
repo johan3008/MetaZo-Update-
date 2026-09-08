@@ -1678,12 +1678,12 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-metadata', async (req, res) => {
         try {
-            const { frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata } = req.body;
+            const { frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata, seasonalBooster, seasonalMonth } = req.body;
             if (!frames || !Array.isArray(frames)) {
                 return res.status(400).json({ error: 'Missing or invalid frames' });
             }
             const temperatureVal = temperature !== undefined ? parseFloat(String(temperature)) : undefined;
-            const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata);
+            const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata, seasonalBooster, seasonalMonth);
             res.json(metadata);
         } catch (e: any) {
             console.warn('Server generate-metadata error:', e);
@@ -1697,12 +1697,12 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-batch-metadata', async (req, res) => {
         try {
-            const { items, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance } = req.body;
+            const { items, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, seasonalBooster, seasonalMonth } = req.body;
             if (!items || !Array.isArray(items)) {
                 return res.status(400).json({ error: 'Missing or invalid items' });
             }
             const temperatureVal = temperature !== undefined ? parseFloat(String(temperature)) : undefined;
-            const batchMetadata = await generateBatchStockMetadata(items, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance);
+            const batchMetadata = await generateBatchStockMetadata(items, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, seasonalBooster, seasonalMonth);
             res.json(batchMetadata);
         } catch (e: any) {
             console.warn('Server generate-batch-metadata error:', e);
@@ -2646,11 +2646,11 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/smart-suggest-keywords', async (req, res) => {
         try {
-            const { title, description, existingKeywords, requestCount, model } = req.body;
+            const { title, description, existingKeywords, requestCount, model, seasonalBooster, seasonalMonth } = req.body;
             if (!title) {
                 return res.status(400).json({ error: 'Missing title field or asset context' });
             }
-            const data = await suggestKeywords(title, description || '', existingKeywords || [], requestCount, model);
+            const data = await suggestKeywords(title, description || '', existingKeywords || [], requestCount, model, seasonalBooster, seasonalMonth);
             res.json({ keywords: data });
         } catch (e: any) {
             console.warn('Server smart-suggest-keywords error:', e);

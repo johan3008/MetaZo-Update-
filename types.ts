@@ -196,6 +196,19 @@ export interface ContentGapItem {
   competitionNotes: string;
 }
 
-
-
-
+export interface ServiceOptions {
+  provider?: string;
+  model?: string;
+  geminiKeys?: string | string[];
+  groqKeys?: string | string[];
+  mistralKeys?: string | string[];
+  openaiKeys?: string | string[];
+  openrouterKeys?: string | string[];
+  nvidiaKeys?: string | string[];
+  blackboxKeys?: string | string[];
+  bluesmindsKeys?: string | string[];
+  aiveneKeys?: string | string[];
+  zaiKeys?: string | string[];
+  seasonalBooster?: boolean;
+  seasonalMonth?: string;
+}

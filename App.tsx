@@ -1336,6 +1336,34 @@ const App: React.FC = () => {
     }
   });
 
+  const [seasonalBooster, setSeasonalBooster] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('mz_seasonal_booster') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
+  const [seasonalMonth, setSeasonalMonth] = useState<string>(() => {
+    try {
+      return localStorage.getItem('mz_seasonal_month') || 'auto';
+    } catch {
+      return 'auto';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('mz_seasonal_booster', String(seasonalBooster));
+    } catch {}
+  }, [seasonalBooster]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('mz_seasonal_month', seasonalMonth);
+    } catch {}
+  }, [seasonalMonth]);
+
   useEffect(() => {
     try {
       localStorage.setItem('mz_is_generative_ai', String(isGenerativeAI));
@@ -3590,7 +3618,9 @@ const App: React.FC = () => {
                 blackboxKeys: blackboxKeysList,
                 bluesmindsKeys: bluesmindsKeysList,
                 aiveneKeys: aiveneKeysList,
-                zaiKeys: zaiKeysList
+                zaiKeys: zaiKeysList,
+                seasonalBooster: isMzLicensed ? seasonalBooster : false,
+                seasonalMonth: isMzLicensed ? seasonalMonth : undefined
               };
               const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance, exifMetadata);
               
@@ -3786,7 +3816,9 @@ const App: React.FC = () => {
                   blackboxKeys: blackboxKeysList,
                   bluesmindsKeys: bluesmindsKeysList,
                   aiveneKeys: aiveneKeysList,
-                  zaiKeys: zaiKeysList
+                  zaiKeys: zaiKeysList,
+                  seasonalBooster: isMzLicensed ? seasonalBooster : false,
+                  seasonalMonth: isMzLicensed ? seasonalMonth : undefined
                 };
                 const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance);
 
@@ -4876,7 +4908,9 @@ const App: React.FC = () => {
     bluesmindsKeys: bluesmindsKeysList,
     aiveneKeys: aiveneKeysList,
     zaiKeys: zaiKeysList,
-    model: globalModelParam
+    model: globalModelParam,
+    seasonalBooster: isMzLicensed ? seasonalBooster : false,
+    seasonalMonth: isMzLicensed ? seasonalMonth : undefined
   };
 
   return (
@@ -5346,6 +5380,12 @@ const App: React.FC = () => {
                   setAiCreativity={setAiCreativity}
                   aiModelPerformance={aiModelPerformance}
                   setAiModelPerformance={setAiModelPerformance}
+                  seasonalBooster={seasonalBooster}
+                  setSeasonalBooster={setSeasonalBooster}
+                  seasonalMonth={seasonalMonth}
+                  setSeasonalMonth={setSeasonalMonth}
+                  isLicensed={isMzLicensed}
+                  setShowActivationModal={setShowActivationModal}
                   isLoading={isLoading} 
                   progressInfo={progressInfo} 
                   isPaused={isPaused} 
