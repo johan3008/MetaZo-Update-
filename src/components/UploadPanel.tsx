@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, ImageIcon, Film, FileCode, ArrowRight } from 'lucide-react';
+import { Trash2, ImageIcon, Film, FileCode, ArrowRight, Sparkles } from 'lucide-react';
 import { HelpIcon } from './HelpIcon';
 import { ToolType, FileItem } from '../../types';
 
@@ -15,6 +15,16 @@ interface UploadPanelProps {
   mobileTab: 'upload' | 'ai' | 'review';
   setMobileTab: (tab: 'upload' | 'ai' | 'review') => void;
   t: any;
+  isGenerativeAI?: boolean;
+  setIsGenerativeAI?: (val: boolean) => void;
+  aiModelSource?: string;
+  setAiModelSource?: (val: string) => void;
+  seasonalBooster?: boolean;
+  setSeasonalBooster?: (val: boolean) => void;
+  seasonalMonth?: string;
+  setSeasonalMonth?: (m: string) => void;
+  isLicensed?: boolean;
+  setShowActivationModal?: (show: boolean) => void;
 }
 
 export const UploadPanel: React.FC<UploadPanelProps> = ({
@@ -28,13 +38,50 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
   updateFiles,
   mobileTab,
   setMobileTab,
-  t
+  t,
+  isGenerativeAI = false,
+  setIsGenerativeAI,
+  aiModelSource = 'Midjourney',
+  setAiModelSource,
+  seasonalBooster = true,
+  setSeasonalBooster,
+  seasonalMonth = 'auto',
+  setSeasonalMonth,
+  isLicensed = false,
+  setShowActivationModal
 }) => {
   const hasFiles = files.length > 0;
 
   const triggerFileInput = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
+    }
+  };
+
+  const handleToggleGenerativeAI = () => {
+    if (!isLicensed) {
+      setShowActivationModal?.(true);
+      return;
+    }
+    if (setIsGenerativeAI) {
+      const nextVal = !isGenerativeAI;
+      setIsGenerativeAI(nextVal);
+      if (updateFiles) {
+        updateFiles(prev => prev.map(f => ({ ...f, isGenerativeAI: nextVal })));
+      }
+    }
+  };
+
+  const handleSelectModelSource = (modelName: string) => {
+    if (!isLicensed) {
+      setShowActivationModal?.(true);
+      return;
+    }
+    if (setAiModelSource) {
+      setAiModelSource(modelName);
+      if (updateFiles) {
+        updateFiles(prev => prev.map(f => ({ ...f, aiModelSource: modelName })));
+      }
     }
   };
 
@@ -85,7 +132,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
               : activeTool === ToolType.IMAGE ? 'border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-black/20 hover:bg-violet-50/50 dark:hover:bg-violet-900/10 hover:border-violet-400/50 hover:shadow-xl' 
               : activeTool === ToolType.VIDEO ? 'border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-black/20 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 hover:border-purple-400/50 hover:shadow-xl'
               : 'border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-black/20 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 hover:border-emerald-400/50 hover:shadow-xl'
-          } rounded-[2rem] p-6 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center min-h-[260px] relative group overflow-hidden`}
+          } rounded-[2rem] p-6 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center min-h-[220px] relative group overflow-hidden`}
           onClick={triggerFileInput}
         >
           {/* Background Ambient Glow */}
@@ -121,7 +168,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
         </div>
 
         {hasFiles && (
-          <div className="mt-5 flex items-center justify-between p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-md shadow-black/5 animate-in fade-in duration-300">
+          <div className="mt-4 flex items-center justify-between p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-md shadow-black/5 animate-in fade-in duration-300">
             <span className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-wider">
               {files.length} {t.files_selected}
             </span>
@@ -151,6 +198,237 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
             </div>
           </div>
         )}
+
+        {/* Generative AI Compliance & Seasonal Booster (di bawah Unggah Aset) */}
+        <div className="mt-4 space-y-3">
+          {/* Generative AI Compliance Mode (PRO Feature) */}
+          <div className={`p-3.5 rounded-2xl border transition-all space-y-2.5 ${
+            !isLicensed
+              ? 'bg-slate-50/60 dark:bg-slate-900/40 border-dashed border-amber-500/30'
+              : isGenerativeAI
+                ? 'bg-violet-500/10 border-violet-500/30 dark:bg-violet-950/20 dark:border-violet-500/30 shadow-xs'
+                : 'bg-slate-50/80 dark:bg-black/20 border-slate-200/50 dark:border-white/5'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {isLicensed ? (
+                  <Sparkles size={14} className={isGenerativeAI ? 'text-violet-600 dark:text-violet-400 animate-pulse' : 'text-slate-400'} />
+                ) : (
+                  <span className="text-base select-none">🔒</span>
+                )}
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-xs font-extrabold text-slate-800 dark:text-slate-200 uppercase tracking-wider block">
+                      Generative AI Compliance
+                    </label>
+                    <span className={`text-[8px] px-1.5 py-0.2 rounded font-black uppercase ${
+                      isLicensed 
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs' 
+                        : 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                    }`}>
+                      {isLicensed ? 'PRO' : 'PRO ONLY'}
+                    </span>
+                    {isLicensed && (
+                      <span className={`text-[8px] font-black px-1.5 py-0.2 rounded uppercase ${
+                        isGenerativeAI ? 'bg-violet-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                      }`}>
+                        {isGenerativeAI ? 'ACTIVE' : 'OFF'}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold block">
+                    Tag as AI Asset (Adobe Stock, Freepik CSV & IPTC XMP)
+                  </span>
+                </div>
+              </div>
+
+              {/* Switch Toggle or Upgrade Button */}
+              {isLicensed ? (
+                <button 
+                  type="button"
+                  onClick={handleToggleGenerativeAI}
+                  className={`w-11 h-6 rounded-full p-0.5 transition-colors relative flex items-center cursor-pointer ${
+                    isGenerativeAI ? 'bg-[#7c3aed]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                  title={isGenerativeAI ? 'Nonaktifkan AI Compliance' : 'Aktifkan AI Compliance'}
+                >
+                  <div 
+                    className={`w-5 h-5 rounded-full bg-white transition-all shadow-sm transform ${
+                      isGenerativeAI ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowActivationModal?.(true)}
+                  className="px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                  title="Buka akses PRO untuk mengaktifkan"
+                >
+                  <span>🔒</span> Upgrade
+                </button>
+              )}
+            </div>
+
+            {!isLicensed ? (
+              <div 
+                onClick={() => setShowActivationModal?.(true)}
+                className="p-2.5 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 rounded-xl flex items-center justify-between cursor-pointer hover:bg-amber-500/20 transition-all group"
+              >
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs">⭐</span>
+                  <p className="text-[10px] font-bold text-amber-800 dark:text-amber-300">
+                    Khusus Pengguna PRO: Penandaan resmi kepatuhan aset AI (Adobe Stock, Freepik CSV & XMP)!
+                  </p>
+                </div>
+                <span className="text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 group-hover:underline flex items-center gap-0.5 shrink-0">
+                  Aktivasi PRO &rarr;
+                </span>
+              </div>
+            ) : isGenerativeAI ? (
+              <div className="pt-2 border-t border-violet-200/40 dark:border-violet-800/30 space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    AI Generator / Model Source:
+                  </label>
+                  <span className="text-[8px] font-bold text-violet-600 dark:text-violet-400">
+                    Auto-fills Freepik CSV & XMP
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+                  {['Midjourney', 'Flux.1', 'Stable Diffusion', 'DALL-E 3', 'Firefly', 'Recraft'].map((modelName) => (
+                    <button
+                      key={modelName}
+                      type="button"
+                      onClick={() => handleSelectModelSource(modelName)}
+                      className={`py-1 px-1.5 text-[9px] font-extrabold rounded-xl border transition-all text-center truncate cursor-pointer ${
+                        aiModelSource === modelName
+                          ? 'bg-[#7c3aed] text-white border-[#7c3aed] shadow-xs'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-violet-400'
+                      }`}
+                    >
+                      {modelName}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {/* TRENDING & SEASONAL KEYWORD BOOSTER (KALENDER KOMERSIAL) */}
+          <div className={`p-3.5 rounded-2xl border transition-all relative overflow-hidden ${
+            isLicensed 
+              ? 'bg-gradient-to-br from-violet-500/5 via-amber-500/5 to-purple-500/5 dark:from-violet-950/20 dark:via-slate-900/40 dark:to-purple-950/20 border-violet-500/20 dark:border-violet-500/10' 
+              : 'bg-slate-50/60 dark:bg-slate-900/40 border-dashed border-amber-500/30'
+          } space-y-2.5`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="text-base select-none">{isLicensed ? '🗓️' : '🔒'}</span>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                      Seasonal & Commercial Booster
+                    </span>
+                    <span className={`text-[8px] px-1.5 py-0.2 rounded font-black uppercase ${
+                      isLicensed 
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs' 
+                        : 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                    }`}>
+                      {isLicensed ? 'PRO' : 'PRO ONLY'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">
+                    Suntik otomatis event/momen musiman buyer global (jendela 1-2 bulan)
+                  </p>
+                </div>
+              </div>
+
+              {/* Switch Toggle or Upgrade Button */}
+              {isLicensed ? (
+                <button
+                  type="button"
+                  onClick={() => setSeasonalBooster && setSeasonalBooster(!seasonalBooster)}
+                  className={`w-11 h-6 rounded-full p-0.5 transition-colors relative flex items-center cursor-pointer ${
+                    seasonalBooster ? 'bg-[#7c3aed]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                  title={seasonalBooster ? 'Nonaktifkan Seasonal Booster' : 'Aktifkan Seasonal Booster'}
+                >
+                  <span
+                    className={`w-5 h-5 rounded-full bg-white transition-all shadow-sm transform ${
+                      seasonalBooster ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowActivationModal?.(true)}
+                  className="px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                  title="Buka akses PRO untuk mengaktifkan"
+                >
+                  <span>🔒</span> Upgrade
+                </button>
+              )}
+            </div>
+
+            {!isLicensed ? (
+              <div 
+                onClick={() => setShowActivationModal?.(true)}
+                className="p-2.5 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 rounded-xl flex items-center justify-between cursor-pointer hover:bg-amber-500/20 transition-all group"
+              >
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs">⭐</span>
+                  <p className="text-[10px] font-bold text-amber-800 dark:text-amber-300">
+                    Khusus Pengguna PRO: Buka potensi penjualan momen hari raya & event dunia!
+                  </p>
+                </div>
+                <span className="text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 group-hover:underline flex items-center gap-0.5 shrink-0">
+                  Aktivasi PRO &rarr;
+                </span>
+              </div>
+            ) : seasonalBooster ? (
+              <div className="space-y-2 pt-2 border-t border-violet-500/10">
+                <div className="flex items-center justify-between">
+                  <label className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    Target Bulan Komersial
+                  </label>
+                  <span className="text-[8px] font-black text-violet-600 dark:text-violet-400">
+                    {seasonalMonth === 'auto' ? '⚡ Auto Detect (Bulan Ini + 1-2 bln)' : '🎯 Manual Month'}
+                  </span>
+                </div>
+
+                <select
+                  value={seasonalMonth}
+                  onChange={(e) => setSeasonalMonth && setSeasonalMonth(e.target.value)}
+                  className="w-full h-9 px-3 bg-white dark:bg-slate-900 border border-violet-200 dark:border-violet-900/50 rounded-xl text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 font-semibold"
+                >
+                  <option value="auto">⚡ Auto Detect (Bulan Saat Ini & Buyer Window)</option>
+                  <option value="january">Januari (New Year, Winter, Back to Work)</option>
+                  <option value="february">Februari (Valentine, Lunar New Year, Ramadan prep)</option>
+                  <option value="march">Maret (Women's Day, Ramadan, St. Patrick, Spring)</option>
+                  <option value="april">April (Easter, Earth Day, Spring Festival)</option>
+                  <option value="may">Mei (Mother's Day, Eid al-Fitr / Adha, Graduation)</option>
+                  <option value="june">Juni (Father's Day, Summer, Pride Month)</option>
+                  <option value="july">Juli (Independence Day, Summer Vacation, Back to School prep)</option>
+                  <option value="august">Agustus (Back to School, Harvest Season)</option>
+                  <option value="september">September (Autumn / Fall, Labor Day, Halloween prep)</option>
+                  <option value="october">Oktober (Halloween, Thanksgiving prep, Autumn)</option>
+                  <option value="november">November (Thanksgiving, Black Friday, Cyber Monday, Christmas prep)</option>
+                  <option value="december">Desember (Christmas, New Year Eve, Winter Season)</option>
+                </select>
+
+                <div className="p-2 bg-white/70 dark:bg-black/30 rounded-xl border border-violet-500/10 text-[9.5px] text-slate-600 dark:text-slate-300 font-medium">
+                  <span className="font-extrabold text-violet-600 dark:text-violet-400">💡 Contoh: </span>
+                  {seasonalMonth === 'november' || (seasonalMonth === 'auto' && [9, 10, 11].includes(new Date().getMonth()))
+                    ? 'Gambar keluarga/makanan otomatis disarankan tag: Thanksgiving, Black Friday, Christmas holiday, New Year celebration.'
+                    : seasonalMonth === 'december' || (seasonalMonth === 'auto' && new Date().getMonth() === 11)
+                    ? 'Gambar liburan/keluarga otomatis disarankan tag: Christmas, New Year celebration, Winter holiday, Holiday party.'
+                    : 'AI otomatis mendeteksi kecocokan tema visual aset dengan momen musiman pembeli mikrostock global.'}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
 
         {/* Mobile Page Switcher Hook */}
         {hasFiles && (

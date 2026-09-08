@@ -3644,11 +3644,11 @@ const App: React.FC = () => {
                 miriCanvasCategory: metadata.miricanvas_category || '',
                 categoryReason: metadata.category_reason,
                 yolo_detected_objects: metadata.yolo_detected_objects,
-                isGenerativeAI: f.isGenerativeAI ?? isGenerativeAI,
+                isGenerativeAI: isMzLicensed ? (f.isGenerativeAI ?? isGenerativeAI) : false,
                 aiModelSource: f.aiModelSource || aiModelSource,
                 fictionalPeopleProperty: f.fictionalPeopleProperty !== undefined 
                   ? f.fictionalPeopleProperty 
-                  : ((f.isGenerativeAI ?? isGenerativeAI) ? shouldBeFictional : false),
+                  : ((isMzLicensed && (f.isGenerativeAI ?? isGenerativeAI)) ? shouldBeFictional : false),
                 isGenerating: false,
                 error: null
               } : f));
@@ -3846,11 +3846,11 @@ const App: React.FC = () => {
                             miriCanvasCategory: result.metadata.miricanvas_category || '',
                             categoryReason: result.metadata.category_reason,
                             yolo_detected_objects: result.metadata.yolo_detected_objects,
-                            isGenerativeAI: f.isGenerativeAI ?? isGenerativeAI,
+                            isGenerativeAI: isMzLicensed ? (f.isGenerativeAI ?? isGenerativeAI) : false,
                             aiModelSource: f.aiModelSource || aiModelSource,
                             fictionalPeopleProperty: f.fictionalPeopleProperty !== undefined
                               ? f.fictionalPeopleProperty
-                              : ((f.isGenerativeAI ?? isGenerativeAI) ? shouldBeFictional : false),
+                              : ((isMzLicensed && (f.isGenerativeAI ?? isGenerativeAI)) ? shouldBeFictional : false),
                             isGenerating: false,
                             error: null
                         };
@@ -4313,12 +4313,12 @@ const App: React.FC = () => {
 
     if (exportAdobe) {
       // Adobe Stock CSV Format: Filename,Title,Keywords,Category[,Generative AI]
-      const hasAnyAi = toolFiles.some(f => (f.isGenerativeAI ?? isGenerativeAI));
+      const hasAnyAi = isMzLicensed && toolFiles.some(f => (f.isGenerativeAI ?? isGenerativeAI));
       const headers = hasAnyAi 
         ? ['Filename', 'Title', 'Keywords', 'Category', 'Generative AI']
         : ['Filename', 'Title', 'Keywords', 'Category'];
       const rows = toolFiles.map(f => {
-          const isAi = f.isGenerativeAI ?? isGenerativeAI;
+          const isAi = isMzLicensed && (f.isGenerativeAI ?? isGenerativeAI);
           const baseCols = [
             escapeCsv(getExportFilename(f.customFileName || f.file.name, f.file)), 
             escapeCsv(f.title || ''), 
@@ -4428,7 +4428,7 @@ const App: React.FC = () => {
       // Freepik CSV Format: File name;Title;Keywords;Prompt;Model
       const headers = ['File name', 'Title', 'Keywords', 'Prompt', 'Model'];
       const rows = toolFiles.map(f => {
-          const isAi = f.isGenerativeAI ?? isGenerativeAI;
+          const isAi = isMzLicensed && (f.isGenerativeAI ?? isGenerativeAI);
           const promptText = isAi ? (customPrompt || f.description || f.title || '') : '';
           const modelText = isAi ? (f.aiModelSource || aiModelSource || 'Midjourney') : '';
           return [
@@ -4564,7 +4564,7 @@ const App: React.FC = () => {
 
     const isVideo = ['mp4', 'mov', 'webm', 'm4v', 'avi'].includes(origExt);
 
-    const isItemAi = item.isGenerativeAI ?? isGenerativeAI;
+    const isItemAi = isMzLicensed && (item.isGenerativeAI ?? isGenerativeAI);
     const modelSource = item.aiModelSource || aiModelSource || 'Midjourney';
     const isFictional = item.fictionalPeopleProperty ?? (
       isItemAi ? detectFictionalPeopleProperty(title, keywords, item.adobeCategoryId, item.yolo_detected_objects).isFictionalEligible : false
@@ -5361,7 +5361,17 @@ const App: React.FC = () => {
                   updateFiles={updateFiles} 
                   mobileTab={mobileTab} 
                   setMobileTab={setMobileTab} 
-                  t={t} 
+                  t={t}
+                  isGenerativeAI={isGenerativeAI}
+                  setIsGenerativeAI={setIsGenerativeAI}
+                  aiModelSource={aiModelSource}
+                  setAiModelSource={setAiModelSource}
+                  seasonalBooster={seasonalBooster}
+                  setSeasonalBooster={setSeasonalBooster}
+                  seasonalMonth={seasonalMonth}
+                  setSeasonalMonth={setSeasonalMonth}
+                  isLicensed={isMzLicensed}
+                  setShowActivationModal={setShowActivationModal}
                 />
 
                 <AiConfigPanel 
@@ -5380,10 +5390,6 @@ const App: React.FC = () => {
                   setAiCreativity={setAiCreativity}
                   aiModelPerformance={aiModelPerformance}
                   setAiModelPerformance={setAiModelPerformance}
-                  seasonalBooster={seasonalBooster}
-                  setSeasonalBooster={setSeasonalBooster}
-                  seasonalMonth={seasonalMonth}
-                  setSeasonalMonth={setSeasonalMonth}
                   isLicensed={isMzLicensed}
                   setShowActivationModal={setShowActivationModal}
                   isLoading={isLoading} 
@@ -5421,7 +5427,7 @@ const App: React.FC = () => {
                 keywordCount={keywordCount}
                 aiOptions={commonAiOptions}
                 handleDownloadSingleEmbedded={handleDownloadSingleEmbedded}
-                isGenerativeAI={isGenerativeAI}
+                isGenerativeAI={isMzLicensed ? isGenerativeAI : false}
                 aiModelSource={aiModelSource}
               />
 
