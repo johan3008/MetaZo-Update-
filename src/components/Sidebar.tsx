@@ -324,6 +324,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {!sidebarCollapsed && <span>{t.sidebar_mute_video || "Mute Video Gen"}</span>}
             </a>
 
+            <a href={toolToPath[ToolType.VECTOR_EPS] || "/ConvertVectorGen"} onClick={(e) => handleNavClick(e, ToolType.VECTOR_EPS)}
+              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
+                activeTool === ToolType.VECTOR_EPS 
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white active:scale-95 border-l-4 border-emerald-500" 
+                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <div className="flex items-center space-x-3 truncate">
+                <Maximize2 size={16} className={activeTool === ToolType.VECTOR_EPS ? "text-emerald-400" : "text-slate-400"} />
+                {!sidebarCollapsed && <span className="truncate">{t.sidebar_convert_vector_gen || "Convert VectorGen"}</span>}
+              </div>
+              {!sidebarCollapsed && (
+                <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                  NEW
+                </span>
+              )}
+            </a>
+
             <a href={toolToPath[ToolType.BG_REMOVER]} onClick={(e) => handleNavClick(e, ToolType.BG_REMOVER)}
               className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-extrabold transition-all duration-200 ${
                 activeTool === ToolType.BG_REMOVER 

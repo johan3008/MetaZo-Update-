@@ -29,6 +29,58 @@ export interface MicrostockMetadataInput {
   creator?: string;
   copyright?: string;
   software?: string;
+  dateTaken?: string | Date | number;
+  subject?: string;
+  comment?: string;
+  rating?: number;
+}
+
+export function resolveDateTaken(input?: string | Date | number): Date {
+  if (!input) return new Date();
+  if (input instanceof Date && !isNaN(input.getTime())) return input;
+  if (typeof input === 'number' && !isNaN(input) && input > 0) return new Date(input);
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed) return new Date();
+    // Check EXIF date format "YYYY:MM:DD HH:MM:SS"
+    const exifMatch = trimmed.match(/^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+    if (exifMatch) {
+      const [, y, m, d, h, min, s] = exifMatch;
+      const parsed = new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min), Number(s));
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+    const parsed = new Date(trimmed);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
+}
+
+export function formatExifDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}:${pad(d.getMonth() + 1)}:${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+export function formatIsoDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const tzOffset = -d.getTimezoneOffset();
+  const sign = tzOffset >= 0 ? '+' : '-';
+  const absOffset = Math.abs(tzOffset);
+  const tzHours = pad(Math.floor(absOffset / 60));
+  const tzMinutes = pad(absOffset % 60);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${tzHours}:${tzMinutes}`;
+}
+
+export function formatIptcDate(d: Date): { date: string; time: string } {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const tzOffset = -d.getTimezoneOffset();
+  const sign = tzOffset >= 0 ? '+' : '-';
+  const absOffset = Math.abs(tzOffset);
+  const tzHours = pad(Math.floor(absOffset / 60));
+  const tzMinutes = pad(absOffset % 60);
+  return {
+    date: `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}${sign}${tzHours}${tzMinutes}`
+  };
 }
 
 // Adobe Stock Category Mapping (1-21)
@@ -98,11 +150,15 @@ export const cleanKeywordArray = (raw: string[] | string): string[] => {
  */
 export function buildXmpPacket(metadata: MicrostockMetadataInput, mimeType: string = 'image/jpeg'): string {
   const title = String(metadata.title || '').trim();
-  const description = String(metadata.description || title).trim();
+  const description = String(metadata.description || metadata.comment || title).trim();
+  const subject = String(metadata.subject || title).trim();
   const keywords = cleanKeywordArray(metadata.keywords);
   const creator = metadata.creator || 'MetaZo Contributor';
   const copyright = metadata.copyright || 'All rights reserved';
   const software = metadata.software || 'MetaZo Microstock AI Assistant';
+  const dateObj = resolveDateTaken(metadata.dateTaken);
+  const isoDate = formatIsoDate(dateObj);
+  const rating = metadata.rating ?? 5;
 
   const catNum = Number(metadata.adobeCategoryId);
   const adobeCatName = (!isNaN(catNum) && ADOBE_CATEGORY_NAMES[catNum]) ? ADOBE_CATEGORY_NAMES[catNum] : '';
@@ -150,8 +206,14 @@ ${keywordItems}
           <rdf:li>${escapeXml(creator)}</rdf:li>
         </rdf:Seq>
       </dc:creator>
-      <photoshop:Headline>${escapeXml(title)}</photoshop:Headline>
+      <dc:rights>
+        <rdf:Alt>
+          <rdf:li xml:lang="x-default">${escapeXml(copyright)}</rdf:li>
+        </rdf:Alt>
+      </dc:rights>
+      <photoshop:Headline>${escapeXml(subject)}</photoshop:Headline>
       <photoshop:Caption>${escapeXml(description)}</photoshop:Caption>
+      <photoshop:DateCreated>${escapeXml(isoDate)}</photoshop:DateCreated>
       ${adobeCatName ? `<photoshop:Category>${escapeXml(adobeCatName)}</photoshop:Category>` : ''}
       ${uniqueSuppCats.length > 0 ? `<photoshop:SupplementalCategories>
         <rdf:Bag>
@@ -160,7 +222,10 @@ ${suppCatItems}
       </photoshop:SupplementalCategories>` : ''}
       <photoshop:Credit>${escapeXml(creator)}</photoshop:Credit>
       <photoshop:Source>MetaZo AI Assistant</photoshop:Source>
-      <xmp:Rating>5</xmp:Rating>
+      <xmp:CreateDate>${escapeXml(isoDate)}</xmp:CreateDate>
+      <xmp:ModifyDate>${escapeXml(isoDate)}</xmp:ModifyDate>
+      <xmp:MetadataDate>${escapeXml(isoDate)}</xmp:MetadataDate>
+      <xmp:Rating>${rating}</xmp:Rating>
       <xmp:CreatorTool>${escapeXml(software)}</xmp:CreatorTool>
       <xmpRights:Marked>True</xmpRights:Marked>
       <xmpRights:UsageTerms>
@@ -180,10 +245,14 @@ ${suppCatItems}
  */
 export function buildIptcBuffer(metadata: MicrostockMetadataInput): Uint8Array {
   const title = String(metadata.title || '').trim();
-  const description = String(metadata.description || title).trim();
+  const description = String(metadata.description || metadata.comment || title).trim();
+  const subject = String(metadata.subject || title).trim();
   const keywords = cleanKeywordArray(metadata.keywords);
   const creator = metadata.creator || 'MetaZo Contributor';
   const copyright = metadata.copyright || 'All rights reserved';
+  const software = metadata.software || 'MetaZo Microstock AI Assistant';
+  const dateObj = resolveDateTaken(metadata.dateTaken);
+  const iptcDate = formatIptcDate(dateObj);
 
   const catNum = Number(metadata.adobeCategoryId);
   const adobeCatName = (!isNaN(catNum) && ADOBE_CATEGORY_NAMES[catNum]) ? ADOBE_CATEGORY_NAMES[catNum] : '';
@@ -215,11 +284,17 @@ export function buildIptcBuffer(metadata: MicrostockMetadataInput): Uint8Array {
   // 2:05 Object Name (Title)
   addTag(2, 5, title);
 
-  // 2:105 Headline
-  addTag(2, 105, title);
+  // 2:105 Headline (Subject)
+  addTag(2, 105, subject);
 
-  // 2:120 Caption-Abstract (Description)
+  // 2:120 Caption-Abstract (Description / Comment)
   addTag(2, 120, description);
+
+  // 2:55 Date Created (YYYYMMDD)
+  addTag(2, 55, iptcDate.date);
+
+  // 2:60 Time Created (HHMMSS±HHMM)
+  addTag(2, 60, iptcDate.time);
 
   // 2:15 Category (Adobe / Microstock primary category)
   if (adobeCatName) {
@@ -235,11 +310,23 @@ export function buildIptcBuffer(metadata: MicrostockMetadataInput): Uint8Array {
     addTag(2, 25, kw);
   }
 
-  // 2:80 Byline (Creator)
+  // 2:80 Byline (Creator / Author)
   addTag(2, 80, creator);
+
+  // 2:85 Byline Title
+  addTag(2, 85, 'Contributor');
+
+  // 2:110 Credit
+  addTag(2, 110, creator);
+
+  // 2:115 Source
+  addTag(2, 115, 'MetaZo AI Assistant');
 
   // 2:116 Copyright Notice
   addTag(2, 116, copyright);
+
+  // 2:65 Originating Program
+  addTag(2, 65, software.substring(0, 32));
 
   const totalLen = chunks.reduce((acc, c) => acc + c.length, 0);
   const out = new Uint8Array(totalLen);
@@ -395,15 +482,59 @@ export function embedJpegMetadata(jpegBytes: Uint8Array, metadata: MicrostockMet
     } catch (_) {}
 
     const title = metadata.title || '';
-    const description = metadata.description || title;
+    const description = metadata.description || metadata.comment || title;
+    const subject = metadata.subject || title;
+    const comment = metadata.comment || description;
     const keywords = cleanKeywordArray(metadata.keywords);
+    const creator = metadata.creator || 'MetaZo Contributor';
+    const copyright = metadata.copyright || 'All rights reserved';
+    const software = metadata.software || 'MetaZo Microstock AI Assistant';
+    const dateObj = resolveDateTaken(metadata.dateTaken);
+    const exifDateStr = formatExifDate(dateObj);
 
-    zeroth[piexifLib.ImageIFD.ImageDescription] = description;
-    zeroth[piexifLib.ImageIFD.XPTitle] = toUcs2Bytes(title);
-    zeroth[piexifLib.ImageIFD.XPComment] = toUcs2Bytes(description);
-    zeroth[piexifLib.ImageIFD.XPKeywords] = toUcs2Bytes(keywords.join('; '));
-    zeroth[piexifLib.ImageIFD.XPSubject] = toUcs2Bytes(title);
-    zeroth[piexifLib.ImageIFD.Software] = metadata.software || 'MetaZo AI Assistant';
+    const tagImageDescription = piexifLib.ImageIFD?.ImageDescription || 270;
+    const tagSoftware = piexifLib.ImageIFD?.Software || 305;
+    const tagDateTime = piexifLib.ImageIFD?.DateTime || 306;
+    const tagArtist = piexifLib.ImageIFD?.Artist || 315;
+    const tagCopyright = piexifLib.ImageIFD?.Copyright || 33432;
+    const tagRating = piexifLib.ImageIFD?.Rating || 18246;
+    const tagRatingPercent = piexifLib.ImageIFD?.RatingPercent || 18249;
+    const tagXPTitle = piexifLib.ImageIFD?.XPTitle || 40091;
+    const tagXPComment = piexifLib.ImageIFD?.XPComment || 40092;
+    const tagXPAuthor = piexifLib.ImageIFD?.XPAuthor || 40093;
+    const tagXPKeywords = piexifLib.ImageIFD?.XPKeywords || 40094;
+    const tagXPSubject = piexifLib.ImageIFD?.XPSubject || 40095;
+
+    const tagExifVersion = piexifLib.ExifIFD?.ExifVersion || 36864;
+    const tagDateTimeOriginal = piexifLib.ExifIFD?.DateTimeOriginal || 36867;
+    const tagDateTimeDigitized = piexifLib.ExifIFD?.DateTimeDigitized || 36868;
+    const tagUserComment = piexifLib.ExifIFD?.UserComment || 37510;
+
+    zeroth[tagImageDescription] = description;
+    zeroth[tagXPTitle] = toUcs2Bytes(title);
+    zeroth[tagXPSubject] = toUcs2Bytes(subject);
+    zeroth[tagXPComment] = toUcs2Bytes(comment);
+    zeroth[tagXPKeywords] = toUcs2Bytes(keywords.join('; '));
+    zeroth[tagXPAuthor] = toUcs2Bytes(creator);
+    zeroth[tagArtist] = creator;
+    zeroth[tagSoftware] = software;
+    zeroth[tagCopyright] = copyright;
+    zeroth[tagRating] = metadata.rating ?? 5;
+    zeroth[tagRatingPercent] = 99;
+    zeroth[tagDateTime] = exifDateStr;
+
+    exif[tagDateTimeOriginal] = exifDateStr;
+    exif[tagDateTimeDigitized] = exifDateStr;
+    exif[tagExifVersion] = '0230';
+    try {
+      if (piexifLib.helper && typeof piexifLib.helper.dumpUserComment === 'function') {
+        exif[tagUserComment] = piexifLib.helper.dumpUserComment(comment);
+      } else {
+        exif[tagUserComment] = `ASCII\0\0\0${comment}`;
+      }
+    } catch (_) {
+      exif[tagUserComment] = `ASCII\0\0\0${comment}`;
+    }
 
     const exifBytes = piexifLib.dump({ '0th': zeroth, 'Exif': exif, 'GPS': gps });
     const newUri = piexifLib.insert(exifBytes, dataUri);
@@ -472,11 +603,19 @@ export function embedPngMetadata(pngBytes: Uint8Array, metadata: MicrostockMetad
 
   const encoder = new TextEncoder();
   const title = String(metadata.title || '').trim();
-  const description = String(metadata.description || title).trim();
+  const description = String(metadata.description || metadata.comment || title).trim();
+  const subject = String(metadata.subject || title).trim();
+  const comment = String(metadata.comment || description).trim();
   const keywords = cleanKeywordArray(metadata.keywords);
+  const creator = metadata.creator || 'MetaZo Contributor';
+  const copyright = metadata.copyright || 'All rights reserved';
+  const software = metadata.software || 'MetaZo Microstock AI Assistant';
+  const dateObj = resolveDateTaken(metadata.dateTaken);
+  const isoDate = formatIsoDate(dateObj);
+  const exifDateStr = formatExifDate(dateObj);
 
   // 1. Build iTXt XML:com.adobe.xmp chunk
-  const xmpPacket = buildXmpPacket(metadata);
+  const xmpPacket = buildXmpPacket(metadata, 'image/png');
   const keywordBytes = encoder.encode('XML:com.adobe.xmp\0');
   const xmpPayloadBytes = encoder.encode(xmpPacket);
   const itxtPrefix = new Uint8Array([0x00, 0x00, 0x00, 0x00]);
@@ -498,14 +637,82 @@ export function embedPngMetadata(pngBytes: Uint8Array, metadata: MicrostockMetad
 
   const textChunks = [
     makeTextChunk('Title', title),
+    makeTextChunk('Subject', subject),
     makeTextChunk('Description', description),
-    makeTextChunk('Comment', description),
+    makeTextChunk('Comment', comment),
     makeTextChunk('Keywords', keywords.join(', ')),
-    makeTextChunk('Author', metadata.creator || 'MetaZo Contributor'),
-    makeTextChunk('Software', metadata.software || 'MetaZo Microstock AI Assistant')
+    makeTextChunk('Author', creator),
+    makeTextChunk('Copyright', copyright),
+    makeTextChunk('Creation Time', isoDate),
+    makeTextChunk('Software', software),
+    makeTextChunk('Source', 'MetaZo AI Assistant')
   ];
 
-  // 3. Find end of IHDR chunk
+  // 3. Build optional eXIf chunk if piexif is available
+  let exifChunk: Uint8Array | null = null;
+  try {
+    const piexifLib = getPiexifLib();
+    if (piexifLib) {
+      const tagImageDescription = piexifLib.ImageIFD?.ImageDescription || 270;
+      const tagSoftware = piexifLib.ImageIFD?.Software || 305;
+      const tagDateTime = piexifLib.ImageIFD?.DateTime || 306;
+      const tagArtist = piexifLib.ImageIFD?.Artist || 315;
+      const tagCopyright = piexifLib.ImageIFD?.Copyright || 33432;
+      const tagRating = piexifLib.ImageIFD?.Rating || 18246;
+      const tagRatingPercent = piexifLib.ImageIFD?.RatingPercent || 18249;
+      const tagXPTitle = piexifLib.ImageIFD?.XPTitle || 40091;
+      const tagXPComment = piexifLib.ImageIFD?.XPComment || 40092;
+      const tagXPAuthor = piexifLib.ImageIFD?.XPAuthor || 40093;
+      const tagXPKeywords = piexifLib.ImageIFD?.XPKeywords || 40094;
+      const tagXPSubject = piexifLib.ImageIFD?.XPSubject || 40095;
+
+      const tagExifVersion = piexifLib.ExifIFD?.ExifVersion || 36864;
+      const tagDateTimeOriginal = piexifLib.ExifIFD?.DateTimeOriginal || 36867;
+      const tagDateTimeDigitized = piexifLib.ExifIFD?.DateTimeDigitized || 36868;
+      const tagUserComment = piexifLib.ExifIFD?.UserComment || 37510;
+
+      const zeroth: any = {};
+      const exif: any = {};
+
+      zeroth[tagImageDescription] = description;
+      zeroth[tagXPTitle] = toUcs2Bytes(title);
+      zeroth[tagXPSubject] = toUcs2Bytes(subject);
+      zeroth[tagXPComment] = toUcs2Bytes(comment);
+      zeroth[tagXPKeywords] = toUcs2Bytes(keywords.join('; '));
+      zeroth[tagXPAuthor] = toUcs2Bytes(creator);
+      zeroth[tagArtist] = creator;
+      zeroth[tagSoftware] = software;
+      zeroth[tagCopyright] = copyright;
+      zeroth[tagRating] = metadata.rating ?? 5;
+      zeroth[tagRatingPercent] = 99;
+      zeroth[tagDateTime] = exifDateStr;
+
+      exif[tagDateTimeOriginal] = exifDateStr;
+      exif[tagDateTimeDigitized] = exifDateStr;
+      exif[tagExifVersion] = '0230';
+      try {
+        if (piexifLib.helper && typeof piexifLib.helper.dumpUserComment === 'function') {
+          exif[tagUserComment] = piexifLib.helper.dumpUserComment(comment);
+        } else {
+          exif[tagUserComment] = `ASCII\0\0\0${comment}`;
+        }
+      } catch (_) {
+        exif[tagUserComment] = `ASCII\0\0\0${comment}`;
+      }
+
+      const dumped = piexifLib.dump({ '0th': zeroth, 'Exif': exif, 'GPS': {} });
+      if (dumped && dumped.length > 6) {
+        const rawTiff = dumped.startsWith('Exif\0\0') ? dumped.substring(6) : dumped;
+        const exifBuf = new Uint8Array(rawTiff.length);
+        for (let i = 0; i < rawTiff.length; i++) {
+          exifBuf[i] = rawTiff.charCodeAt(i);
+        }
+        exifChunk = buildPngChunk('eXIf', exifBuf);
+      }
+    }
+  } catch (_) {}
+
+  // 4. Find end of IHDR chunk
   const ihdrView = new DataView(pngBytes.buffer, pngBytes.byteOffset, pngBytes.byteLength);
   const ihdrLen = ihdrView.getUint32(8);
   const insertPos = 8 + 12 + ihdrLen;
@@ -513,14 +720,18 @@ export function embedPngMetadata(pngBytes: Uint8Array, metadata: MicrostockMetad
   const before = pngBytes.subarray(0, insertPos);
   const after = pngBytes.subarray(insertPos);
 
-  const extraChunksLen = itxtChunk.length + textChunks.reduce((a, c) => a + c.length, 0);
+  const extraChunks: Uint8Array[] = [itxtChunk, ...textChunks];
+  if (exifChunk) {
+    extraChunks.push(exifChunk);
+  }
+
+  const extraChunksLen = extraChunks.reduce((a, c) => a + c.length, 0);
   const result = new Uint8Array(before.length + extraChunksLen + after.length);
 
   let w = 0;
   result.set(before, w); w += before.length;
-  result.set(itxtChunk, w); w += itxtChunk.length;
-  for (const tc of textChunks) {
-    result.set(tc, w); w += tc.length;
+  for (const ec of extraChunks) {
+    result.set(ec, w); w += ec.length;
   }
   result.set(after, w);
 
@@ -532,7 +743,8 @@ export function embedPngMetadata(pngBytes: Uint8Array, metadata: MicrostockMetad
  */
 export function embedSvgMetadata(svgString: string, metadata: MicrostockMetadataInput): string {
   const title = String(metadata.title || '').trim();
-  const description = String(metadata.description || title).trim();
+  const description = String(metadata.description || metadata.comment || title).trim();
+  const subject = String(metadata.subject || title).trim();
   const keywords = cleanKeywordArray(metadata.keywords);
 
   const titleTag = `<title>${escapeXml(title)}</title>`;
@@ -562,9 +774,14 @@ export function embedEpsMetadataBytes(
   metadata: MicrostockMetadataInput
 ): Uint8Array {
   const title = String(metadata.title || '').trim();
-  const description = String(metadata.description || title).trim();
+  const description = String(metadata.description || metadata.comment || title).trim();
+  const subject = String(metadata.subject || title).trim();
+  const creator = metadata.creator || 'MetaZo Contributor';
+  const copyright = metadata.copyright || 'All rights reserved';
   const keywords = cleanKeywordArray(metadata.keywords);
   const keywordStr = keywords.join(', ');
+  const dateObj = resolveDateTaken(metadata.dateTaken);
+  const isoDate = formatIsoDate(dateObj);
 
   // Check for 30-byte DOS EPS header: 0xC5 0xD0 0xD3 0xC6
   const isDosEps =
@@ -622,11 +839,14 @@ export function embedEpsMetadataBytes(
   }
 
   const cleanT = title.replace(/[\r\n]/g, ' ');
+  const cleanS = subject.replace(/[\r\n]/g, ' ');
   const cleanD = description.replace(/[\r\n]/g, ' ');
   const cleanK = keywordStr.replace(/[\r\n]/g, ' ');
+  const cleanC = creator.replace(/[\r\n]/g, ' ');
+  const cleanCopy = copyright.replace(/[\r\n]/g, ' ');
 
   const xmpPacket = buildXmpPacket(metadata, 'application/postscript');
-  const dscBlock = `\n%%Title: ${cleanT}\n%%Subject: ${cleanD}\n%%Keywords: ${cleanK}\n%XRXbegin\n${xmpPacket}\n%XRXend\n`;
+  const dscBlock = `\n%%Title: ${cleanT}\n%%Creator: ${cleanC}\n%%Subject: ${cleanS}\n%%Keywords: ${cleanK}\n%%Copyright: ${cleanCopy}\n%%CreationDate: ${isoDate}\n%XRXbegin\n${xmpPacket}\n%XRXend\n`;
   const dscBytes = new TextEncoder().encode(dscBlock);
   const delta = dscBytes.length;
 
@@ -663,6 +883,117 @@ export function embedEpsMetadata(epsString: string, metadata: MicrostockMetadata
   const bytes = enc.encode(epsString);
   const updatedBytes = embedEpsMetadataBytes(bytes, metadata);
   return new TextDecoder('latin1').decode(updatedBytes);
+}
+
+/**
+ * Binary-safe Adobe Illustrator (.ai) metadata embedder.
+ * Supports both:
+ * 1. PostScript-based AI files (Illustrator v8 and earlier, or EPS-compatible PostScript)
+ * 2. PDF-based AI files (Illustrator v9 through modern CC/2026)
+ *
+ * For PDF-based AI files, it locates the uncompressed XMP packet (<x:xmpmeta>...</x:xmpmeta>)
+ * and performs in-place replacement with whitespace padding up to <?xpacket end="w"?>.
+ * This guarantees 100% preservation of file size and xref byte offsets, preventing any
+ * Illustrator "Damaged file" warnings!
+ */
+export function embedAiMetadataBytes(
+  inputBytes: Uint8Array,
+  metadata: MicrostockMetadataInput
+): Uint8Array {
+  // 1. Check for PostScript-based AI / DOS EPS header (0xC5D0D3C6) or %!PS
+  const isDosEps =
+    inputBytes.length >= 30 &&
+    inputBytes[0] === 0xC5 &&
+    inputBytes[1] === 0xD0 &&
+    inputBytes[2] === 0xD3 &&
+    inputBytes[3] === 0xC6;
+
+  const isPsHeader =
+    inputBytes.length >= 4 &&
+    inputBytes[0] === 0x25 && // '%'
+    inputBytes[1] === 0x21;   // '!'
+
+  if (isDosEps || isPsHeader) {
+    return embedEpsMetadataBytes(inputBytes, metadata);
+  }
+
+  // 2. For PDF-based AI files (%PDF-): Search for existing XMP packet <?xpacket begin ... <?xpacket end
+  const beginPattern = new TextEncoder().encode('<?xpacket begin=');
+  const endPattern = new TextEncoder().encode('<?xpacket end=');
+
+  let packetStart = -1;
+  for (let i = 0; i <= inputBytes.length - beginPattern.length; i++) {
+    let match = true;
+    for (let j = 0; j < beginPattern.length; j++) {
+      if (inputBytes[i + j] !== beginPattern[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      packetStart = i;
+      break;
+    }
+  }
+
+  if (packetStart !== -1) {
+    let packetEnd = -1;
+    for (let i = packetStart; i <= inputBytes.length - endPattern.length; i++) {
+      let match = true;
+      for (let j = 0; j < endPattern.length; j++) {
+        if (inputBytes[i + j] !== endPattern[j]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        // Find closing '?>'
+        let closeIdx = i + endPattern.length;
+        while (closeIdx < inputBytes.length - 1 && !(inputBytes[closeIdx] === 0x3F && inputBytes[closeIdx + 1] === 0x3E)) {
+          closeIdx++;
+        }
+        if (closeIdx < inputBytes.length - 1) {
+          packetEnd = closeIdx + 2;
+        }
+        break;
+      }
+    }
+
+    if (packetEnd !== -1 && packetEnd > packetStart) {
+      const existingLen = packetEnd - packetStart;
+      const xmpString = buildXmpPacket(metadata, 'application/pdf');
+      const endMarkerRegex = /<\?xpacket\s+end=["'][wr]["']\?>\s*$/i;
+      const xmpCore = xmpString.replace(endMarkerRegex, '').trimEnd();
+      const endTrailer = '\n<?xpacket end="w"?>';
+      const coreBytes = new TextEncoder().encode(xmpCore);
+      const endTrailerBytes = new TextEncoder().encode(endTrailer);
+
+      const requiredLen = coreBytes.length + endTrailerBytes.length;
+
+      if (requiredLen <= existingLen) {
+        // In-place replacement with whitespace padding to preserve exact offsets
+        const paddingLen = existingLen - requiredLen;
+        const result = new Uint8Array(inputBytes.length);
+        result.set(inputBytes);
+
+        // Overwrite packetStart to packetEnd
+        result.set(coreBytes, packetStart);
+        if (paddingLen > 0) {
+          result.fill(0x20, packetStart + coreBytes.length, packetStart + coreBytes.length + paddingLen);
+        }
+        result.set(endTrailerBytes, packetStart + coreBytes.length + paddingLen);
+        return result;
+      }
+    }
+  }
+
+  // Fallback to EPS embedder if PostScript was nested or deeper
+  const epsAttempt = embedEpsMetadataBytes(inputBytes, metadata);
+  if (epsAttempt.length !== inputBytes.length) {
+    return epsAttempt;
+  }
+
+  return inputBytes;
 }
 
 function writeU32BE(buf: Uint8Array, val: number, offset: number) {
@@ -774,22 +1105,28 @@ function buildComprehensiveUdta(
   xmpText: string = ''
 ): Uint8Array {
   const title = String(metadata.title || '').trim();
-  const description = String(metadata.description || title).trim();
+  const description = String(metadata.description || metadata.comment || title).trim();
+  const subject = String(metadata.subject || title).trim();
+  const comment = String(metadata.comment || description).trim();
   const creator = metadata.creator || 'MetaZo Contributor';
   const copyright = metadata.copyright || 'All rights reserved';
   const software = metadata.software || 'MetaZo Microstock AI Assistant';
   const keywordArr = cleanKeywordArray(metadata.keywords);
   const keywordStr = keywordArr.join('; ');
+  const dateObj = resolveDateTaken(metadata.dateTaken);
+  const isoDate = formatIsoDate(dateObj);
+  const dateShort = isoDate.substring(0, 10);
 
   const ilstItems = [
     buildIlstItem('\xa9nam', title),
     buildIlstItem('desc', description),
     buildIlstItem('\xa9des', description),
-    buildIlstItem('\xa9cmt', description),
+    buildIlstItem('\xa9cmt', comment),
     buildIlstItem('keyw', keywordStr),
     buildIlstItem('\xa9gen', keywordStr),
     buildIlstItem('\xa9art', creator),
     buildIlstItem('aART', creator),
+    buildIlstItem('\xa9day', dateShort),
     buildIlstItem('\xa9too', software),
     buildIlstItem('cprt', copyright)
   ];
@@ -830,7 +1167,7 @@ function buildComprehensiveUdta(
   // WM/ToolName -> System.ApplicationName (Program Name)
   const xtraBox = buildXtraBox([
     { name: 'WM/Category', values: keywordArr },
-    { name: 'WM/SubTitle', values: [title] },
+    { name: 'WM/SubTitle', values: [subject] },
     { name: 'WM/Genre', values: [keywordArr.slice(0, 5).join(', ')] },
     { name: 'Author', values: [creator] },
     { name: 'WM/Author', values: [creator] },
@@ -841,7 +1178,9 @@ function buildComprehensiveUdta(
     { name: 'WM/EncodedBy', values: [creator] },
     { name: 'Copyright', values: [copyright] },
     { name: 'WM/Copyright', values: [copyright] },
-    { name: 'WM/ToolName', values: [software] }
+    { name: 'WM/ToolName', values: [software] },
+    { name: 'WM/Year', values: [String(dateObj.getFullYear())] },
+    { name: 'WM/EncodingTime', values: [isoDate] }
   ]);
 
   const directAtoms = [
@@ -849,9 +1188,10 @@ function buildComprehensiveUdta(
     xtraBox,
     buildQtTextAtom('\xa9nam', title),
     buildQtTextAtom('\xa9des', description),
-    buildQtTextAtom('\xa9cmt', description),
+    buildQtTextAtom('\xa9cmt', comment),
     buildQtTextAtom('\xa9gen', keywordStr),
     buildQtTextAtom('\xa9art', creator),
+    buildQtTextAtom('\xa9day', dateShort),
     buildQtTextAtom('cprt', copyright)
   ];
 
@@ -1084,10 +1424,16 @@ export async function embedMicrostockMetadata(
     return new Blob([updatedSvg], { type: 'image/svg+xml' });
   }
 
-  if (ext === 'eps' || ext === 'ai') {
+  if (ext === 'eps') {
     const arrayBuffer = await file.arrayBuffer();
     const embeddedBytes = embedEpsMetadataBytes(new Uint8Array(arrayBuffer), metadata);
     return new Blob([embeddedBytes], { type: 'application/postscript' });
+  }
+
+  if (ext === 'ai') {
+    const arrayBuffer = await file.arrayBuffer();
+    const embeddedBytes = embedAiMetadataBytes(new Uint8Array(arrayBuffer), metadata);
+    return new Blob([embeddedBytes], { type: 'application/illustrator' });
   }
 
   if (ext === 'mp4' || ext === 'mov' || ext === 'm4v' || ext === 'webm' || file.type.startsWith('video/')) {

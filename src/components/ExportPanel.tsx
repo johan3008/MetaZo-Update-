@@ -307,7 +307,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             <div className="flex items-center justify-between pt-1 border-t border-slate-200/40 dark:border-white/5">
               <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500">Format Didukung:</span>
               <div className="flex items-center gap-1 flex-wrap">
-                {['JPG', 'PNG', 'SVG', 'EPS', 'MP4', 'MOV'].map(fmt => (
+                {['JPG', 'PNG', 'SVG', 'EPS', 'AI', 'MP4', 'MOV'].map(fmt => (
                   <span key={fmt} className="text-[8px] font-black px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-slate-300">
                     {fmt}
                   </span>
