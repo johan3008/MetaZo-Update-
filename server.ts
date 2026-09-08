@@ -14,7 +14,7 @@ import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
 import { testFtpConnection, uploadToFtp } from './server/ftpService.ts';
-import { embedJpegMetadata, embedPngMetadata, embedSvgMetadata, embedEpsMetadata, embedEpsMetadataBytes, embedMp4MetadataBytes, ADOBE_CATEGORY_NAMES, cleanKeywordArray } from './src/utils/microstockEmbedder.ts';
+import { embedJpegMetadata, embedPngMetadata, embedSvgMetadata, embedEpsMetadata, embedEpsMetadataBytes, embedAiMetadataBytes, embedMp4MetadataBytes, ADOBE_CATEGORY_NAMES, cleanKeywordArray, resolveDateTaken, formatExifDate, formatIsoDate, formatIptcDate } from './src/utils/microstockEmbedder.ts';
 import fluentFfmpeg from 'fluent-ffmpeg';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
@@ -1726,6 +1726,11 @@ app.get('/api/debug-uploads', (req, res) => {
         shutterstockCategory2?: string;
         dreamstimeCategory?: string;
         miriCanvasCategory?: string;
+        dateTaken?: string | Date | number;
+        subject?: string;
+        comment?: string;
+        creator?: string;
+        copyright?: string;
     }) {
         const rawKeywords = Array.isArray(metadata.keywords)
             ? metadata.keywords
@@ -1738,7 +1743,16 @@ app.get('/api/debug-uploads', (req, res) => {
         const uniqueKeywords = Array.from(new Set(cleanKeywords));
         const keywordString = uniqueKeywords.join(', ');
         const title = String(metadata.title || '').trim();
-        const description = String(metadata.description || title).trim();
+        const description = String(metadata.description || metadata.comment || title).trim();
+        const subject = String(metadata.subject || title).trim();
+        const comment = String(metadata.comment || description).trim();
+        const creator = String(metadata.creator || 'MetaZo Contributor').trim();
+        const copyright = String(metadata.copyright || 'All rights reserved').trim();
+        const software = 'MetaZo AI Assistant';
+        const dateObj = resolveDateTaken(metadata.dateTaken);
+        const exifDateStr = formatExifDate(dateObj);
+        const isoDate = formatIsoDate(dateObj);
+        const iptcDate = formatIptcDate(dateObj);
 
         const catNum = Number(metadata.adobeCategoryId);
         const adobeCatName = (!isNaN(catNum) && ADOBE_CATEGORY_NAMES[catNum]) ? ADOBE_CATEGORY_NAMES[catNum] : '';
@@ -1750,18 +1764,28 @@ app.get('/api/debug-uploads', (req, res) => {
         const ext = (path.extname(filePath) || '').toLowerCase();
         const isVideo = ['.mp4', '.mov', '.webm', '.m4v', '.avi'].includes(ext);
 
+        const embedInput = {
+            title,
+            description,
+            subject,
+            comment,
+            keywords: uniqueKeywords,
+            adobeCategoryId: metadata.adobeCategoryId,
+            shutterstockCategory1: sstCat1,
+            shutterstockCategory2: sstCat2,
+            dreamstimeCategory: metadata.dreamstimeCategory,
+            miriCanvasCategory: metadata.miriCanvasCategory,
+            creator,
+            copyright,
+            software,
+            dateTaken: dateObj
+        };
+
         // 1. Native Vector File Metadata Injection (SVG, EPS, AI)
         if (ext === '.svg') {
             try {
                 const svgContent = fs.readFileSync(filePath, 'utf8');
-                const updatedSvg = embedSvgMetadata(svgContent, {
-                    title,
-                    description,
-                    keywords: uniqueKeywords,
-                    adobeCategoryId: metadata.adobeCategoryId,
-                    shutterstockCategory1: sstCat1,
-                    shutterstockCategory2: sstCat2
-                });
+                const updatedSvg = embedSvgMetadata(svgContent, embedInput);
                 fs.writeFileSync(filePath, updatedSvg, 'utf8');
                 console.log(`[embedMetadataForAdobe] SVG Dublin Core embedded: ${filePath}`);
             } catch (svgErr) {
@@ -1769,21 +1793,25 @@ app.get('/api/debug-uploads', (req, res) => {
             }
         }
 
-        if (ext === '.eps' || ext === '.ai') {
+        if (ext === '.eps') {
             try {
                 const inputBuf = fs.readFileSync(filePath);
-                const embeddedBytes = embedEpsMetadataBytes(new Uint8Array(inputBuf), {
-                    title,
-                    description,
-                    keywords: uniqueKeywords,
-                    adobeCategoryId: metadata.adobeCategoryId,
-                    shutterstockCategory1: sstCat1,
-                    shutterstockCategory2: sstCat2
-                });
+                const embeddedBytes = embedEpsMetadataBytes(new Uint8Array(inputBuf), embedInput);
                 fs.writeFileSync(filePath, Buffer.from(embeddedBytes));
-                console.log(`[embedMetadataForAdobe] EPS/AI binary-safe DSC & XMP embedded: ${filePath} (+${embeddedBytes.length - inputBuf.length} bytes)`);
+                console.log(`[embedMetadataForAdobe] EPS binary-safe DSC & XMP embedded: ${filePath} (+${embeddedBytes.length - inputBuf.length} bytes)`);
             } catch (epsErr) {
                 console.warn('[embedMetadataForAdobe] EPS injection note:', epsErr);
+            }
+        }
+
+        if (ext === '.ai') {
+            try {
+                const inputBuf = fs.readFileSync(filePath);
+                const embeddedBytes = embedAiMetadataBytes(new Uint8Array(inputBuf), embedInput);
+                fs.writeFileSync(filePath, Buffer.from(embeddedBytes));
+                console.log(`[embedMetadataForAdobe] AI binary-safe DSC & XMP embedded: ${filePath} (+${embeddedBytes.length - inputBuf.length} bytes)`);
+            } catch (aiErr) {
+                console.warn('[embedMetadataForAdobe] AI injection note:', aiErr);
             }
         }
 
@@ -1791,14 +1819,7 @@ app.get('/api/debug-uploads', (req, res) => {
         if (ext === '.jpg' || ext === '.jpeg') {
             try {
                 const inputBuf = fs.readFileSync(filePath);
-                const embeddedBuf = embedJpegMetadata(new Uint8Array(inputBuf), {
-                    title,
-                    description,
-                    keywords: uniqueKeywords,
-                    adobeCategoryId: metadata.adobeCategoryId,
-                    shutterstockCategory1: sstCat1,
-                    shutterstockCategory2: sstCat2
-                });
+                const embeddedBuf = embedJpegMetadata(new Uint8Array(inputBuf), embedInput);
                 fs.writeFileSync(filePath, Buffer.from(embeddedBuf));
                 console.log(`[embedMetadataForAdobe] Native IPTC+XMP+EXIF embedded into JPEG: ${filePath}`);
             } catch (jpegNativeErr) {
@@ -1809,14 +1830,7 @@ app.get('/api/debug-uploads', (req, res) => {
         if (ext === '.png') {
             try {
                 const inputBuf = fs.readFileSync(filePath);
-                const embeddedBuf = embedPngMetadata(new Uint8Array(inputBuf), {
-                    title,
-                    description,
-                    keywords: uniqueKeywords,
-                    adobeCategoryId: metadata.adobeCategoryId,
-                    shutterstockCategory1: sstCat1,
-                    shutterstockCategory2: sstCat2
-                });
+                const embeddedBuf = embedPngMetadata(new Uint8Array(inputBuf), embedInput);
                 fs.writeFileSync(filePath, Buffer.from(embeddedBuf));
                 console.log(`[embedMetadataForAdobe] Native iTXt XMP embedded into PNG: ${filePath}`);
             } catch (pngNativeErr) {
@@ -1832,24 +1846,30 @@ app.get('/api/debug-uploads', (req, res) => {
                     '-y',
                     '-i', filePath,
                     '-metadata', `title=${title}`,
-                    '-metadata', `comment=${description}`,
+                    '-metadata', `comment=${comment}`,
                     '-metadata', `description=${description}`,
-                    '-metadata', `synopsis=${title}`,
+                    '-metadata', `synopsis=${subject}`,
                     '-metadata', `show=${title}`,
                     '-metadata', `genre=${keywordString}`,
                     '-metadata', `grouping=${keywordString}`,
                     '-metadata', `keywords=${keywordString}`,
-                    '-metadata', `artist=MetaZo Contributor`,
-                    '-metadata', `album_artist=MetaZo Contributor`,
-                    '-metadata', `author=MetaZo Contributor`,
-                    '-metadata', `composer=MetaZo Contributor`,
-                    '-metadata', `copyright=All rights reserved`,
+                    '-metadata', `artist=${creator}`,
+                    '-metadata', `album_artist=${creator}`,
+                    '-metadata', `author=${creator}`,
+                    '-metadata', `composer=${creator}`,
+                    '-metadata', `copyright=${copyright}`,
+                    '-metadata', `date=${isoDate.substring(0, 10)}`,
+                    '-metadata', `creation_time=${isoDate}`,
+                    '-metadata', `year=${dateObj.getFullYear()}`,
                     '-metadata:g', `title=${title}`,
-                    '-metadata:g', `comment=${description}`,
+                    '-metadata:g', `comment=${comment}`,
                     '-metadata:g', `description=${description}`,
                     '-metadata:g', `keywords=${keywordString}`,
                     '-metadata:g', `genre=${keywordString}`,
-                    '-metadata:g', `artist=MetaZo Contributor`,
+                    '-metadata:g', `artist=${creator}`,
+                    '-metadata:g', `date=${isoDate.substring(0, 10)}`,
+                    '-metadata:g', `creation_time=${isoDate}`,
+                    '-metadata:g', `year=${dateObj.getFullYear()}`,
                     '-metadata:s:v:0', `handler_name=${title}`,
                     '-c', 'copy',
                     tempVideoPath
@@ -1883,14 +1903,7 @@ app.get('/api/debug-uploads', (req, res) => {
             // Also embed ISOBMFF XMP container box directly into MP4/MOV bytes
             try {
                 const videoBuf = fs.readFileSync(filePath);
-                const xmpEmbedded = embedMp4MetadataBytes(new Uint8Array(videoBuf), {
-                    title,
-                    description,
-                    keywords: uniqueKeywords,
-                    adobeCategoryId: metadata.adobeCategoryId,
-                    shutterstockCategory1: sstCat1,
-                    shutterstockCategory2: sstCat2
-                });
+                const xmpEmbedded = embedMp4MetadataBytes(new Uint8Array(videoBuf), embedInput);
                 if (xmpEmbedded && xmpEmbedded.length > 0) {
                     fs.writeFileSync(filePath, Buffer.from(xmpEmbedded));
                     console.log(`[embedMetadataForAdobe] Native ISOBMFF XMP embedded into video: ${filePath}`);
@@ -1906,34 +1919,64 @@ app.get('/api/debug-uploads', (req, res) => {
             'XMP-dc:Title': title,
             'XMP-dc:Description': description,
             'XMP-dc:Subject': uniqueKeywords,
+            'XMP-dc:Creator': creator,
+            'XMP-dc:Rights': copyright,
             'XMP:Title': title,
             'XMP:Description': description,
             'XMP:Subject': uniqueKeywords,
-            'XMP:Headline': title,
+            'XMP:Headline': subject,
+            'XMP:Creator': creator,
+            'XMP:Rights': copyright,
+            'XMP:Rating': 5,
+            'XMP:CreateDate': isoDate,
+            'XMP:ModifyDate': isoDate,
+            'XMP:MetadataDate': isoDate,
+            'XMP:CreatorTool': software,
 
             // IPTC Core - Universal Microstock Standard (Shutterstock, 123RF, DepositPhotos, Canva)
             'IPTC:ObjectName': title,
-            'IPTC:Headline': title,
-            'IPTC:Caption-Abstract': description,
+            'IPTC:Headline': subject,
+            'IPTC:Caption-Abstract': comment,
             'IPTC:Keywords': uniqueKeywords,
+            'IPTC:DateCreated': iptcDate.date,
+            'IPTC:TimeCreated': iptcDate.time,
+            'IPTC:By-line': creator,
+            'IPTC:By-lineTitle': 'Contributor',
+            'IPTC:Credit': creator,
+            'IPTC:Source': 'MetaZo AI Assistant',
+            'IPTC:CopyrightNotice': copyright,
+            'IPTC:OriginatingProgram': software.substring(0, 32),
             'IPTC:CodedCharacterSet': 'UTF8',
 
             // Photoshop & Standard Tags (Adobe Stock & Windows/Mac OS)
-            'XMP-photoshop:Headline': title,
-            'XMP-photoshop:Caption': description,
+            'XMP-photoshop:Headline': subject,
+            'XMP-photoshop:Caption': comment,
+            'XMP-photoshop:DateCreated': isoDate,
+            'XMP-photoshop:Credit': creator,
+            'XMP-photoshop:Source': 'MetaZo AI Assistant',
             Title: title,
-            Headline: title,
+            Headline: subject,
             ObjectName: title,
             Description: description,
-            'Caption-Abstract': description,
-            ImageDescription: description, // Correctly mapped to description (fixes previous title-overwrite bug)
+            'Caption-Abstract': comment,
+            ImageDescription: description,
             Subject: uniqueKeywords,
             Keywords: uniqueKeywords,
             XPTitle: title,
-            XPComment: description,
+            XPSubject: subject,
+            XPComment: comment,
             XPKeywords: uniqueKeywords.join('; '),
-            XPSubject: title,
-            Software: 'MetaZo AI Assistant'
+            XPAuthor: creator,
+            Artist: creator,
+            Copyright: copyright,
+            Rating: 5,
+            RatingPercent: 99,
+            Software: software,
+            DateTimeOriginal: exifDateStr,
+            CreateDate: exifDateStr,
+            ModifyDate: exifDateStr,
+            DateTime: exifDateStr,
+            UserComment: comment
         };
 
         if (adobeCatName) {
@@ -1991,24 +2034,49 @@ app.get('/api/debug-uploads', (req, res) => {
                 `-XMP-dc:Title=${title}`,
                 `-XMP-dc:Description=${description}`,
                 `-XMP-dc:Subject=${keywordString}`,
+                `-XMP-dc:Creator=${creator}`,
+                `-XMP-dc:Rights=${copyright}`,
                 `-XMP:Title=${title}`,
                 `-XMP:Description=${description}`,
                 `-XMP:Subject=${keywordString}`,
+                `-XMP:Headline=${subject}`,
+                `-XMP:Creator=${creator}`,
+                `-XMP:Rating=5`,
+                `-XMP:CreateDate=${isoDate}`,
+                `-XMP:ModifyDate=${isoDate}`,
+                `-XMP-photoshop:DateCreated=${isoDate}`,
                 `-IPTC:ObjectName=${title}`,
-                `-IPTC:Headline=${title}`,
-                `-IPTC:Caption-Abstract=${description}`,
+                `-IPTC:Headline=${subject}`,
+                `-IPTC:Caption-Abstract=${comment}`,
                 `-IPTC:Keywords=${keywordString}`,
+                `-IPTC:DateCreated=${iptcDate.date}`,
+                `-IPTC:TimeCreated=${iptcDate.time}`,
+                `-IPTC:By-line=${creator}`,
+                `-IPTC:Credit=${creator}`,
+                `-IPTC:CopyrightNotice=${copyright}`,
                 `-Title=${title}`,
-                `-Headline=${title}`,
+                `-Headline=${subject}`,
                 `-ObjectName=${title}`,
                 `-Description=${description}`,
-                `-Caption-Abstract=${description}`,
+                `-Caption-Abstract=${comment}`,
                 `-ImageDescription=${description}`,
                 `-Subject=${keywordString}`,
                 `-Keywords=${keywordString}`,
                 `-XPTitle=${title}`,
-                `-XPComment=${description}`,
+                `-XPSubject=${subject}`,
+                `-XPComment=${comment}`,
                 `-XPKeywords=${keywordString}`,
+                `-XPAuthor=${creator}`,
+                `-Artist=${creator}`,
+                `-Copyright=${copyright}`,
+                `-Rating=5`,
+                `-RatingPercent=99`,
+                `-Software=${software}`,
+                `-DateTimeOriginal=${exifDateStr}`,
+                `-CreateDate=${exifDateStr}`,
+                `-ModifyDate=${exifDateStr}`,
+                `-DateTime=${exifDateStr}`,
+                `-UserComment=${comment}`,
                 filePath
             ];
 
@@ -2041,7 +2109,6 @@ app.get('/api/debug-uploads', (req, res) => {
                     clearTimeout(timer);
                     resolve(filePath);
                 }
-            });
         });
     }
 
@@ -2084,9 +2151,14 @@ app.get('/api/debug-uploads', (req, res) => {
                 return res.status(400).json({ error: 'File tidak ditemukan. Unggah file langsung atau berikan fileUrl + pathKey (R2).' });
             }
 
-            // Step 2: Extract & Clean Title, Description, Keywords, Categories
+            // Step 2: Extract & Clean Title, Description, Subject, Comment, Keywords, Categories, Date
             const title = String(req.body.title || '').trim();
             const description = String(req.body.description || title).trim();
+            const subject = String(req.body.subject || title).trim();
+            const comment = String(req.body.comment || description).trim();
+            const creator = String(req.body.creator || 'MetaZo Contributor').trim();
+            const copyright = String(req.body.copyright || 'All rights reserved').trim();
+            const dateTaken = req.body.dateTaken;
             const adobeCategoryId = req.body.adobeCategoryId || req.body.category_id || '';
             const shutterstockCategory1 = req.body.shutterstockCategory1 || req.body.shutterstock_category_1 || '';
             const shutterstockCategory2 = req.body.shutterstockCategory2 || req.body.shutterstock_category_2 || '';
@@ -2115,13 +2187,18 @@ app.get('/api/debug-uploads', (req, res) => {
                 .filter((k: string) => k.length > 0);
             const uniqueKeywords = Array.from(new Set(keywords));
 
-            console.log(`[Embed Metadata] Embedding: Title="${title}", Keywords=${uniqueKeywords.length}, AdobeCat="${adobeCategoryId}", SST1="${shutterstockCategory1}", File="${originalName}"`);
+            console.log(`[Embed Metadata] Embedding: Title="${title}", Subject="${subject}", Comment="${comment.substring(0, 30)}...", DateTaken="${dateTaken || 'auto'}", Keywords=${uniqueKeywords.length}, AdobeCat="${adobeCategoryId}", SST1="${shutterstockCategory1}", File="${originalName}"`);
 
             // Step 3: Embed metadata into file using complete Universal Microstock Engine
             localOutputPath = localInputPath;
             await embedMetadataForAdobe(localOutputPath, {
                 title,
                 description,
+                subject,
+                comment,
+                creator,
+                copyright,
+                dateTaken,
                 keywords: uniqueKeywords,
                 adobeCategoryId,
                 shutterstockCategory1,

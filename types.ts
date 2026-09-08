@@ -29,7 +29,7 @@ export const toolToPath: Record<ToolType, string> = {
   [ToolType.PROMPT_VIDEO]: '/VideoKeywordAnalyzer',
   [ToolType.PROMPT_IMAGE_CHECK]: '/AiQualityCheck',
   [ToolType.PROMPT_VIDEO_CHECK]: '/AiVideoQualityCheck',
-  [ToolType.VECTOR_EPS]: '/EpsConverter',
+  [ToolType.VECTOR_EPS]: '/ConvertVectorGen',
   [ToolType.CALENDAR_GEN]: '/NicheCalendar',
   [ToolType.MUTE_VIDEO]: '/MuteVideoGen',
   [ToolType.BG_REMOVER]: '/BackgroundRemover',
