@@ -1976,10 +1976,25 @@ export function ensureKeywordCount(
 }
 
 
+function normalizeGeminiModel(m?: string): string {
+  if (!m) return 'gemini-2.5-flash';
+  let clean = m.replace(/^models\//, '');
+  if (clean === 'gemini-2.5-pro' || clean === 'gemini-2.0-pro' || clean === 'gemini-3.1-pro-preview' || clean === 'gemini-1.5-pro' || clean === 'gemini-pro') {
+    return 'gemini-3.1-pro-preview';
+  }
+  if (clean === 'gemini-1.5-flash') {
+    return 'gemini-2.5-flash';
+  }
+  return clean;
+}
+
 function getAIClient(): any {
   return {
     models: {
       generateContent: async (params: any) => {
+        if (params && params.model) {
+          params.model = normalizeGeminiModel(params.model);
+        }
         const store = apiKeyStorage.getStore();
         const provider = (store && store.provider) || 'gemini';
 
@@ -2090,6 +2105,11 @@ function getAIClient(): any {
 
           if (!response.ok) {
             const errText = await response.text();
+            if ((response.status === 404 || errText.includes('NOT_FOUND') || errText.includes('no longer available')) && cleanModel !== 'models/gemini-3.1-pro-preview' && cleanModel !== 'models/gemini-2.5-flash') {
+              console.warn(`[Gemini Direct Fetch] Model ${cleanModel} returned ${response.status}. Auto-retrying with gemini-3.1-pro-preview...`);
+              const retryParams = { ...params, model: 'gemini-3.1-pro-preview' };
+              return await runGeminiDirectFetch(keyToUse, retryParams);
+            }
             throw new Error(`Gemini Direct Fetch Failed (${response.status}): ${errText}`);
           }
 
@@ -2136,6 +2156,19 @@ function getAIClient(): any {
               }
               return directResult;
             } catch (fallbackError: any) {
+              const fbMsg = String(fallbackError?.message || '').toLowerCase();
+              if (fbMsg.includes('404') || fbMsg.includes('no longer available') || fbMsg.includes('not found')) {
+                console.warn(`[getAIClient] Model ${params.model} was rejected with 404/not found. Auto-recovering with gemini-3.1-pro-preview / gemini-2.5-flash...`);
+                try {
+                  const fallbackParams = { ...params, model: 'gemini-3.1-pro-preview' };
+                  return await runGeminiDirectFetch(keyToUse, fallbackParams);
+                } catch (rErr1) {
+                  try {
+                    const fallbackParams2 = { ...params, model: 'gemini-2.5-flash' };
+                    return await runGeminiDirectFetch(keyToUse, fallbackParams2);
+                  } catch (rErr2) {}
+                }
+              }
               console.error(`[getAIClient] Both SDK and REST fallback failed. REST Error: ${fallbackError.message || fallbackError}`);
               throw sdkError; // Throw original SDK error to keep rotation/retry logic intact
             }
@@ -3715,8 +3748,8 @@ export const generateStockMetadata = async (
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-2.5-pro' || activeModel === 'gemini-2.5-flash') {
-      activeModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
+    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-2.5-flash') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-3.1-pro-preview';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -3778,7 +3811,7 @@ export const generateStockMetadata = async (
   
   const mediaTypeContext = directives.mediaTypeContext;
 
-  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
+  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-3.1-pro-preview';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   
   const visionSystemInstruction = `ROLE:
@@ -4415,8 +4448,8 @@ export const generateBatchStockMetadata = async (
 
   let activeModel = model;
   if (provider === 'gemini' || !NON_GEMINI_PROVIDERS.has(provider)) {
-    if (!activeModel || activeModel === 'gemini-2.5-pro' || activeModel === 'gemini-2.5-flash') {
-      activeModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
+    if (!activeModel || activeModel === 'gemini-3.1-pro-preview' || activeModel === 'gemini-2.5-flash') {
+      activeModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-3.1-pro-preview';
     }
   } else if (!activeModel) {
     activeModel = PROVIDER_DEFAULT_MODELS[provider];
@@ -4442,7 +4475,7 @@ export const generateBatchStockMetadata = async (
   // --- TAHAP 1: PROVIDER 1 — GEMINI VISION (VISUAL DETECTION) UNTUK BATCH ---
   let visualDescriptions: string[] = [];
   let parsedVisualFactsList: any[] = [];
-  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-2.5-pro';
+  const fallbackGeminiModel = aiModelPerformance === 'speed' ? 'gemini-2.5-flash' : 'gemini-3.1-pro-preview';
   const visionModelToUse = (activeModel && activeModel.startsWith('gemini-')) ? activeModel : fallbackGeminiModel;
   console.log(`[JohMeta Pipeline - Batch] Stage 1: Running Provider 1 — Dual-Vision / Gemini Vision (Visual Facts Detection)...`);
   
@@ -5519,7 +5552,7 @@ You are an Adobe Stock content strategist. Before generating prompts, avoid conc
     required: ['prompts', 'negativePrompt', 'styleExplanation']
   };
 
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
   let lastError: any = null;
 
   const safetySettings = [
@@ -6156,7 +6189,7 @@ CRITICAL OUTPUT FORMAT:
   };
 
   const imagePart = processFrameServer(image);
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'];
+  const modelsToTry = ['gemini-3.1-pro-preview', 'gemini-2.5-flash', 'gemini-3.5-flash'];
   let lastError;
   let responseText = "";
 
@@ -7158,7 +7191,7 @@ Output strictly in JSON format.`;
     }
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination. Use Google Search if necessary to find current and real-time trending events.`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination. Use Google Search if necessary to find current and real-time trending events.`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -7168,7 +7201,7 @@ Output strictly in JSON format.`;
       responseText = res.text || "{}";
     } catch (err: any) {
       try {
-        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination.`, {
+        const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Find and list ALL major and niche commercial events, holidays, and perayaan negara (MUST include high-value GLOBAL/WORLDWIDE events from USA, Europe, Asia, their current seasonal visual trends, AS WELL AS local Indonesian holidays) that ACTUALLY occur in the month of ${targetMonthEn} (${targetMonthId}) for the year 2026. Be extremely detailed and comprehensive. You MUST find and return at least 25-30 distinct events. Make absolutely sure suggested_topics are STRICTLY VERY SHORT keywords (max 1-3 words each) and NEVER long descriptions. Verify all dates are accurate for 2026 to avoid hallucination.`, {
           systemInstruction,
           responseMimeType: "application/json",
           responseSchema,
@@ -7334,7 +7367,7 @@ Rules:
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST use Google Search to find the absolute latest, real-time trending tags and aesthetics for this event happening right now. Ensure every keyword is extremely short (max 1-3 words).`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST use Google Search to find the absolute latest, real-time trending tags and aesthetics for this event happening right now. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -7343,7 +7376,7 @@ Rules:
       }, 1);
       responseText = res.text || "{}";
     } catch (err: any) {
-      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST provide the absolute latest and most current trending keywords in the market right now. Ensure every keyword is extremely short (max 1-3 words).`, {
+      const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', `Generate a list of commercial stock photography/illustration keywords for this event: "${eventName}". Context: ${eventDetails}. You MUST provide the absolute latest and most current trending keywords in the market right now. Ensure every keyword is extremely short (max 1-3 words).`, {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema,
@@ -7431,7 +7464,7 @@ Existing Keywords: ${existingKeywords.join(', ')}`;
       model
     });
   } else {
-    const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-2.5-pro', promptContents, {
+    const res = await callGeminiWithRetry(model && model.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', promptContents, {
       systemInstruction,
       responseMimeType: "application/json",
       responseSchema,
@@ -7915,7 +7948,7 @@ RULES: Use @remotion packages appropriately. The animation should be smooth, pro
     responseText = res;
   } else {
     try {
-      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-2.5-pro', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
+      const res = await callGeminiWithRetry(model?.startsWith('gemini') ? model : 'gemini-3.1-pro-preview', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 2);
       responseText = res.text || "{}";
     } catch (err: any) {
       const res = await callGeminiWithRetry('gemini-2.5-flash', fullContents, { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.9 }, 1);

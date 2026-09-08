@@ -26,6 +26,7 @@ import { ImageCheckView } from './src/components/ImageCheckView';
 import { VideoQualityCheck } from './src/components/VideoQualityCheck';
 import { CalendarGenView } from './src/components/CalendarGenView';
 import { MuteVideoView } from './src/components/MuteVideoView';
+import { ConvertVectorGenView } from './src/components/ConvertVectorGenView';
 import { BgRemoverView } from './src/components/BgRemoverView';
 import { MotionGenView } from './src/components/MotionGenView';
 import { AntiSpamView } from './src/components/AntiSpamView';
@@ -1029,6 +1030,7 @@ const getToolFromPath = (path: string): ToolType | null => {
     case 'aiqualitycheck': return ToolType.PROMPT_IMAGE_CHECK;
     case 'aivideoqualitycheck': return ToolType.PROMPT_VIDEO_CHECK;
     case 'epsconverter': return ToolType.VECTOR_EPS;
+    case 'convertvectorgen': return ToolType.VECTOR_EPS;
     case 'nichecalendar': return ToolType.CALENDAR_GEN;
     case 'mutevideogen': return ToolType.MUTE_VIDEO;
     case 'motiongen': return ToolType.MOTION_GEN;
@@ -1647,6 +1649,7 @@ const App: React.FC = () => {
       ToolType.PROMPT_VIDEO_CHECK,
       ToolType.CALENDAR_GEN,
       ToolType.MUTE_VIDEO,
+      ToolType.VECTOR_EPS,
       ToolType.MOTION_GEN
     ];
     return tools.reduce((sum, tool) => sum + getDailyCount(tool), 0);
@@ -1891,6 +1894,7 @@ const App: React.FC = () => {
             ToolType.PROMPT_IMAGE_CHECK,
             ToolType.CALENDAR_GEN,
             ToolType.MUTE_VIDEO,
+            ToolType.VECTOR_EPS,
             ToolType.MOTION_GEN
           ];
           tools.forEach((t) => {
@@ -4427,7 +4431,24 @@ const App: React.FC = () => {
     if (!item.file) return null;
     const title = item.title?.trim() || item.description?.trim() || '';
     const description = item.description?.trim() || title;
+    const subject = title;
+    const comment = description;
     const keywords = item.keywords || [];
+
+    // Determine Date Taken: prioritize exifMetadata DateTimeOriginal, then CreateDate, then file.lastModified, then new Date()
+    let dateTaken: Date | string | undefined = undefined;
+    if (item.exifMetadata?.DateTimeOriginal) {
+      dateTaken = item.exifMetadata.DateTimeOriginal;
+    } else if (item.exifMetadata?.CreateDate) {
+      dateTaken = item.exifMetadata.CreateDate;
+    } else if (item.file?.lastModified) {
+      dateTaken = new Date(item.file.lastModified);
+    } else {
+      dateTaken = new Date();
+    }
+
+    const creator = item.exifMetadata?.Artist || 'MetaZo Contributor';
+    const copyright = item.exifMetadata?.Copyright || 'All rights reserved';
 
     const origExt = (item.file.name.split('.').pop() || 'jpg').toLowerCase();
     let exportName: string;
@@ -4451,7 +4472,12 @@ const App: React.FC = () => {
         formData.append('file', item.file, exportName);
         formData.append('title', title);
         formData.append('description', description);
+        formData.append('subject', subject);
+        formData.append('comment', comment);
         formData.append('keywords', JSON.stringify(keywords));
+        if (dateTaken) formData.append('dateTaken', typeof dateTaken === 'string' ? dateTaken : dateTaken.toISOString());
+        formData.append('creator', creator);
+        formData.append('copyright', copyright);
         if (item.adobeCategoryId) formData.append('adobeCategoryId', String(item.adobeCategoryId));
         if (item.shutterstockCategory1) formData.append('shutterstockCategory1', item.shutterstockCategory1);
         if (item.shutterstockCategory2) formData.append('shutterstockCategory2', item.shutterstockCategory2);
@@ -4494,13 +4520,18 @@ const App: React.FC = () => {
       const embeddedBlob = await embedMicrostockMetadata(item.file, {
         title,
         description,
+        subject,
+        comment,
         keywords,
+        creator,
+        copyright,
+        dateTaken,
+        rating: 5,
         adobeCategoryId: item.adobeCategoryId,
         shutterstockCategory1: item.shutterstockCategory1,
         shutterstockCategory2: item.shutterstockCategory2,
         dreamstimeCategory: item.dreamstimeCategory,
         miriCanvasCategory: item.miriCanvasCategory,
-        creator: 'MetaZo Contributor',
         software: 'MetaZo Microstock AI Assistant'
       });
 
@@ -4509,6 +4540,55 @@ const App: React.FC = () => {
       }
     } catch (clientErr) {
       console.warn('[Download Embedded] Client embed warning:', clientErr);
+    }
+
+    // 2b. If client-side embedding didn't produce changes for .ai file, use server-side ExifTool fallback
+    if (origExt === 'ai') {
+      try {
+        const formData = new FormData();
+        formData.append('file', item.file, exportName);
+        formData.append('title', title);
+        formData.append('description', description);
+        formData.append('subject', subject);
+        formData.append('comment', comment);
+        formData.append('keywords', JSON.stringify(keywords));
+        if (dateTaken) formData.append('dateTaken', typeof dateTaken === 'string' ? dateTaken : dateTaken.toISOString());
+        formData.append('creator', creator);
+        formData.append('copyright', copyright);
+        if (item.adobeCategoryId) formData.append('adobeCategoryId', String(item.adobeCategoryId));
+        if (item.shutterstockCategory1) formData.append('shutterstockCategory1', item.shutterstockCategory1);
+        if (item.shutterstockCategory2) formData.append('shutterstockCategory2', item.shutterstockCategory2);
+        if (item.dreamstimeCategory) formData.append('dreamstimeCategory', item.dreamstimeCategory);
+        if (item.miriCanvasCategory) formData.append('miriCanvasCategory', item.miriCanvasCategory);
+
+        const reqHeaders = { ...getHeaders(commonAiOptions) };
+        delete reqHeaders['Content-Type'];
+
+        const resp = await fetch('/api/embed-metadata', {
+          method: 'POST',
+          headers: reqHeaders,
+          body: formData
+        });
+
+        if (resp.ok) {
+          const contentType = resp.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const data = await resp.json();
+            if (data.downloadUrl) {
+              const urlResp = await fetch(data.downloadUrl);
+              if (urlResp.ok) {
+                const urlBlob = await urlResp.blob();
+                return { blob: urlBlob, exportName };
+              }
+            }
+          } else {
+            const blob = await resp.blob();
+            return { blob, exportName };
+          }
+        }
+      } catch (serverAiErr) {
+        console.warn('[Download Embedded AI] Server embed fallback note:', serverAiErr);
+      }
     }
 
     // 3. Fallback: Raw file
@@ -4957,6 +5037,15 @@ const App: React.FC = () => {
               isLicensed={isMzLicensed}
               dailyGenCount={dailyGenCounts[ToolType.MUTE_VIDEO] || 0}
               incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.MUTE_VIDEO, amount)}
+              setShowLimitModal={setShowLimitModal}
+              setShowActivationModal={setShowActivationModal}
+            />
+          ) : activeTool === ToolType.VECTOR_EPS ? (
+            <ConvertVectorGenView
+              t={t}
+              isLicensed={isMzLicensed}
+              dailyGenCount={dailyGenCounts[ToolType.VECTOR_EPS] || 0}
+              incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.VECTOR_EPS, amount)}
               setShowLimitModal={setShowLimitModal}
               setShowActivationModal={setShowActivationModal}
             />
