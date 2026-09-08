@@ -780,6 +780,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span>{t.sidebar_mute_video || "Mute Video Gen"}</span></button>
 
                     <button 
+                      onClick={() => { setActiveTool(ToolType.VECTOR_EPS); setSidebarOpen(false); }}
+                      className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                        activeTool === ToolType.VECTOR_EPS 
+                          ? "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border-l-4 border-emerald-500" 
+                          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      <Maximize2 size={14} className={activeTool === ToolType.VECTOR_EPS ? "text-emerald-400" : "text-slate-400"} />
+                      <span className="truncate">{t.sidebar_convert_vector_gen || "Convert VectorGen"}</span></button>
+
+                    <button 
                       onClick={() => { setActiveTool(ToolType.MOTION_GEN); setSidebarOpen(false); }}
                       className={`w-full text-left flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
                         activeTool === ToolType.MOTION_GEN 
