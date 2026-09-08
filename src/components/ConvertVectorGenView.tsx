@@ -15,9 +15,12 @@ import {
   Layers, 
   Sliders, 
   Check, 
+  FolderArchive,
+  Info,
+  CheckCircle,
   FileCheck,
-  RefreshCw,
-  FolderArchive
+  Zap,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -30,6 +33,7 @@ import {
   convertEpsToAi 
 } from '../utils/vectorConverter';
 import { embedMicrostockMetadata, createZipBlob } from '../utils/microstockEmbedder';
+import { VectorStudioModal } from './VectorStudioModal';
 
 interface ConvertVectorGenViewProps {
   t: any;
@@ -40,7 +44,7 @@ interface ConvertVectorGenViewProps {
   setShowActivationModal?: (show: boolean) => void;
 }
 
-export type TargetFormat = 'eps' | 'ai' | 'svg_resized' | 'both';
+export type TargetFormat = 'eps' | 'ai' | 'both';
 
 export interface VectorQueueItem {
   id: string;
@@ -68,19 +72,38 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
   const [targetFormat, setTargetFormat] = useState<TargetFormat>('eps');
   const [marginPercent, setMarginPercent] = useState<number>(10);
   const [autoEmbedMetadata, setAutoEmbedMetadata] = useState<boolean>(true);
-  const [customWidth, setCustomWidth] = useState<number>(4000);
-  const [customHeight, setCustomHeight] = useState<number>(4000);
-  const [isCustomPreset, setIsCustomPreset] = useState<boolean>(false);
+  const [autoDownload, setAutoDownload] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [isStudioOpen, setIsStudioOpen] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeItem = items.find(i => i.id === activePreviewId) || items[0];
 
-  const currentWidth = isCustomPreset ? customWidth : selectedPreset.width;
-  const currentHeight = isCustomPreset ? customHeight : selectedPreset.height;
+  const currentWidth = selectedPreset.width;
+  const currentHeight = selectedPreset.height;
   const currentMegapixels = ((currentWidth * currentHeight) / 1000000).toFixed(1);
+
+  const handleSaveStudioData = (updatedSvg: string, newW: number, newH: number, newMargin: number) => {
+    if (!activeItem) return;
+    setMarginPercent(newMargin);
+    const matchedPreset = ADOBE_STOCK_PRESETS.find(p => p.width === newW && p.height === newH);
+    if (matchedPreset) {
+      setSelectedPreset(matchedPreset);
+    }
+    setItems(prev => prev.map(item => {
+      if (item.id === activeItem.id) {
+        return {
+          ...item,
+          previewSvg: updatedSvg,
+          originalWidth: newW,
+          originalHeight: newH
+        };
+      }
+      return item;
+    }));
+  };
   const meetsAdobeStock = (currentWidth * currentHeight) >= 4000000;
 
   const handleFilesSelected = async (fileList: FileList | null) => {
@@ -124,7 +147,7 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
     }
 
     if (newItems.length === 0) {
-      setGlobalError(t.vector_error_invalid_files || 'Harap pilih berkas vektor valid (.SVG, .EPS, .AI)');
+      setGlobalError('Format file tidak didukung. Silakan pilih file vektor .SVG, .EPS, atau .AI');
       return;
     }
 
@@ -135,17 +158,33 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
   };
 
   const removeItem = (id: string) => {
-    setItems(prev => prev.filter(item => item.id !== id));
-    if (activePreviewId === id) {
-      const remaining = items.filter(item => item.id !== id);
-      setActivePreviewId(remaining.length > 0 ? remaining[0].id : null);
-    }
+    setItems(prev => {
+      const updated = prev.filter(item => item.id !== id);
+      if (activePreviewId === id) {
+        setActivePreviewId(updated.length > 0 ? updated[0].id : null);
+      }
+      return updated;
+    });
   };
 
   const clearAll = () => {
     setItems([]);
     setActivePreviewId(null);
     setGlobalError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const downloadBlob = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const processItem = async (item: VectorQueueItem): Promise<{ name: string; blob: Blob }[]> => {
@@ -158,27 +197,16 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
       if (!workingSvg) {
         workingSvg = await item.file.text();
       }
-      // Resize artboard
+      // Resize artboard with safe margins & centering
       const resizedSvg = resizeSvgArtboard(workingSvg, currentWidth, currentHeight, marginPercent);
 
-      // Metadata mock/default fallback if autoEmbedMetadata is enabled
       const meta = {
         title: baseName.replace(/[-_]+/g, ' ').trim(),
-        description: baseName.replace(/[-_]+/g, ' ').trim() + ' commercial stock vector illustration',
-        keywords: [baseName.split(/[-_]+/), 'vector', 'illustration', 'graphic', 'design', 'modern', 'commercial', 'artboard', 'adobe stock'].flat().filter(Boolean),
+        description: baseName.replace(/[-_]+/g, ' ').trim() + ' vector graphic design artboard',
+        keywords: [baseName.split(/[-_]+/), 'vector', 'eps', 'ai', 'illustration', 'graphic', 'design', 'modern', 'commercial', 'adobe stock'].flat().filter(Boolean),
         creator: 'MetaZo Contributor',
-        software: 'MetaZo PRO Convert VectorGen'
+        software: 'Adobe Illustrator / MetaZo PRO Convert VectorGen'
       };
-
-      if (targetFormat === 'svg_resized' || targetFormat === 'both') {
-        let svgBlob = new Blob([resizedSvg], { type: 'image/svg+xml' });
-        if (autoEmbedMetadata) {
-          try {
-            svgBlob = await embedMicrostockMetadata(new File([svgBlob], baseName + '_resized.svg', { type: 'image/svg+xml' }), meta);
-          } catch (_) {}
-        }
-        results.push({ name: `${baseName}_4000px.svg`, blob: svgBlob });
-      }
 
       if (targetFormat === 'eps' || targetFormat === 'both') {
         const epsBytes = convertSvgToEps(resizedSvg, currentWidth, currentHeight);
@@ -206,7 +234,7 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
       const meta = {
         title: baseName.replace(/[-_]+/g, ' ').trim(),
         keywords: ['vector', 'eps', 'ai', 'adobe stock', 'illustration'],
-        software: 'MetaZo PRO Convert VectorGen'
+        software: 'Adobe Illustrator / MetaZo PRO Convert VectorGen'
       };
 
       const aiBytes = convertEpsToAi(new Uint8Array(arrayBuffer), currentWidth, currentHeight);
@@ -218,9 +246,8 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
       }
       results.push({ name: `${baseName}_Converted.ai`, blob: aiBlob });
     } else if (item.format === 'ai') {
-      // AI to EPS or metadata embed
       const arrayBuffer = await item.file.arrayBuffer();
-      const epsBytes = convertSvgToEps('<svg></svg>', currentWidth, currentHeight);
+      const epsBytes = convertEpsToAi(new Uint8Array(arrayBuffer), currentWidth, currentHeight);
       results.push({ name: `${baseName}_Converted.eps`, blob: new Blob([epsBytes], { type: 'application/postscript' }) });
     }
 
@@ -231,6 +258,7 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
     if (items.length === 0 || isProcessing) return;
 
     if (!isLicensed && dailyGenCount >= 25) {
+      setGlobalError('Batas Trial Terlampaui. Anda telah mencapai batas 25 konversi gratis hari ini.');
       if (setShowLimitModal) setShowLimitModal(true);
       return;
     }
@@ -238,32 +266,34 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
     setIsProcessing(true);
     setGlobalError(null);
 
+    let activeCount = dailyGenCount;
+
     for (const item of items) {
       if (item.progress === 'done') continue;
+
+      if (!isLicensed && activeCount >= 25) {
+        setGlobalError('Batas Trial Terlampaui. Anda telah mencapai batas maksimal 25 konversi vektor hari ini.');
+        if (setShowLimitModal) setShowLimitModal(true);
+        break;
+      }
 
       setItems(prev => prev.map(i => i.id === item.id ? { ...i, progress: 'processing', error: undefined } : i));
 
       try {
         const blobs = await processItem(item);
         setItems(prev => prev.map(i => i.id === item.id ? { ...i, progress: 'done', processedBlobs: blobs } : i));
+        activeCount++;
         if (incrementDailyCount) incrementDailyCount(1);
+
+        if (autoDownload && blobs.length > 0) {
+          blobs.forEach(b => downloadBlob(b.blob, b.name));
+        }
       } catch (err: any) {
         setItems(prev => prev.map(i => i.id === item.id ? { ...i, progress: 'failed', error: err.message || 'Gagal konversi' } : i));
       }
     }
 
     setIsProcessing(false);
-  };
-
-  const downloadBlob = (blob: Blob, fileName: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   const handleDownloadAllZip = async () => {
@@ -280,295 +310,363 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
 
     try {
       const zipBlob = await createZipBlob(allFiles);
-      downloadBlob(zipBlob, `MetaZo_VectorGen_${Date.now()}.zip`);
+      downloadBlob(zipBlob, `MetaZo_ConvertVectorGen_${Date.now()}.zip`);
     } catch (e: any) {
       setGlobalError('Gagal membuat file zip: ' + e.message);
     }
   };
 
+  const totalFilesCount = items.length;
+  const processedCount = items.filter(f => f.progress === 'done').length;
+  const processingCount = items.filter(f => f.progress === 'processing').length;
+  const failedCount = items.filter(f => f.progress === 'failed').length;
+  const pendingCount = items.filter(f => f.progress === 'idle').length;
+
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-white overflow-hidden">
-      {/* Header Banner */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center justify-between shadow-sm shrink-0">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-            <Maximize2 size={20} />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h1 className="text-lg font-black tracking-tight text-slate-900 dark:text-white">Convert VectorGen</h1>
-              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                Adobe Stock 4MP+ Compliant
-              </span>
+    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
+      {/* Title Header Matching App Theme */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/5 pb-6">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 text-emerald-500 shadow-md">
+              <Maximize2 size={24} />
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Konversi instan SVG ➔ EPS 10, SVG ➔ AI, EPS ➔ AI & Auto-Resize Artboard 4000x4000 px dengan Safe Margins.
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl md:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">
+                  Convert VectorGen
+                </h1>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  Adobe Stock 4MP+ Compliant
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider font-mono">
+                Konversi batch SVG ➔ EPS 10, SVG ➔ AI, EPS ➔ AI & Auto-Resize ke 5000x5000 px (25 MP) dengan Safe Margins
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
-          {items.length > 0 && (
+        {totalFilesCount > 0 && (
+          <div className="flex items-center gap-2">
             <button
               onClick={clearAll}
               disabled={isProcessing}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all"
+              className="px-4 py-2 rounded-2xl text-xs font-bold border border-slate-200 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5 text-slate-600 dark:text-slate-300 transition-all disabled:opacity-50"
             >
-              <Trash2 size={14} />
-              <span>{t.common_clear || 'Bersihkan'}</span>
+              {t.common_clear || "Hapus Semua"}
             </button>
-          )}
-
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-black bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white transition-all shadow-sm"
-          >
-            <Upload size={14} />
-            <span>Tambah Vektor</span>
-          </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={(e) => handleFilesSelected(e.target.files)} 
-            multiple 
-            accept=".svg,.eps,.ai" 
-            className="hidden" 
-          />
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Main 3-Column Workspace */}
-      <div className="flex-1 grid grid-cols-12 gap-0 overflow-hidden">
-        {/* Left Column: File Queue (3 Cols) */}
-        <div className="col-span-3 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 flex flex-col h-full overflow-hidden">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-400">
-              Antrean Berkas ({items.length})
-            </span>
-            {items.some(i => i.progress === 'done') && (
-              <button 
-                onClick={handleDownloadAllZip}
-                className="flex items-center space-x-1 text-xs font-extrabold text-emerald-500 hover:underline"
-              >
-                <FolderArchive size={13} />
-                <span>Unduh ZIP</span>
-              </button>
-            )}
+      {/* Free Trial Limit Controller Banner */}
+      {!isLicensed && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1 flex-1">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${dailyGenCount >= 25 ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500 animate-pulse'}`} />
+              <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-800 dark:text-white font-mono">
+                VECTOR CONVERSION LIMIT CONTROLLER
+              </h4>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
+              {dailyGenCount >= 25 ? (
+                <span className="text-rose-500 font-bold">⚠️ Batas trial gratis harian (25 file) telah dicapai. Masukkan lisensi MetaZo PRO untuk memproses tanpa batas.</span>
+              ) : (
+                <span>Masa Trial gratis 25 file/hari. Sisa kuota hari ini: <strong>{Math.max(0, 25 - dailyGenCount)}</strong> kali</span>
+              )}
+            </p>
           </div>
-
-          <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
-            {items.length === 0 ? (
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="h-64 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center p-6 text-center cursor-pointer hover:border-emerald-500/50 transition-all group"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center text-emerald-500 mb-3 group-hover:scale-110 transition-transform">
-                  <FileCode size={24} />
-                </div>
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Pilih atau Seret Berkas Vektor</p>
-                <p className="text-[10px] text-slate-400 mt-1">Mendukung format .SVG, .EPS, dan .AI</p>
-              </div>
-            ) : (
-              items.map((item) => {
-                const isSelected = activeItem?.id === item.id;
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => setActivePreviewId(item.id)}
-                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                      isSelected 
-                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-500/40 shadow-sm' 
-                        : 'bg-white dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2.5 min-w-0 pr-2">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-300 uppercase text-[9px] font-black shrink-0">
-                        {item.format}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{item.file.name}</p>
-                        <p className="text-[10px] text-slate-400">
-                          {item.originalWidth}x{item.originalHeight} px • {(item.file.size / 1024).toFixed(1)} KB
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-1.5 shrink-0">
-                      {item.progress === 'processing' && <Loader2 size={14} className="animate-spin text-emerald-500" />}
-                      {item.progress === 'done' && <CheckCircle2 size={14} className="text-emerald-500" />}
-                      {item.progress === 'failed' && <AlertCircle size={14} className="text-rose-500" />}
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeItem(item.id);
-                        }}
-                        className="p-1 text-slate-400 hover:text-rose-500 rounded transition-colors"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+          <div className="w-full md:w-64 space-y-2 shrink-0">
+            <div className="flex justify-between text-[10px] font-bold text-slate-400 font-mono">
+              <span>{dailyGenCount} / 25 CONVERTED</span>
+              <span>{Math.max(0, 25 - dailyGenCount)} REMAINING</span>
+            </div>
+            <div className="w-full bg-slate-100 dark:bg-white/5 rounded-full h-2 overflow-hidden border border-slate-200/50 dark:border-white/5">
+              <div
+                className={`h-full transition-all duration-300 rounded-full ${dailyGenCount >= 25 ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                style={{ width: `${Math.min(100, (dailyGenCount / 25) * 100)}%` }}
+              />
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Center Column: Live Interactive Artboard Preview (5 Cols) */}
-        <div className="col-span-5 bg-slate-100 dark:bg-slate-950/70 p-6 flex flex-col items-center justify-center relative overflow-hidden border-r border-slate-200 dark:border-slate-800">
-          {activeItem ? (
-            <div className="w-full h-full flex flex-col items-center justify-center">
-              {/* Artboard Meta Badge */}
-              <div className="mb-4 flex items-center space-x-2 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm text-xs font-bold text-slate-600 dark:text-slate-300">
-                <span>Target Artboard:</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">{currentWidth} x {currentHeight} px</span>
-                <span className="text-slate-400">•</span>
-                <span className={`font-black ${meetsAdobeStock ? 'text-emerald-500' : 'text-amber-500'}`}>
-                  {currentMegapixels} MP {meetsAdobeStock ? '✓ Lolos Adobe Stock' : '⚠️ < 4 MP'}
-                </span>
+      {/* Main Grid: Upload & Controls */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left 2 Columns: Uploader & Queue */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Uploader Box */}
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed rounded-3xl p-8 text-center transition-all border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-black/20 hover:border-emerald-500/40 hover:bg-emerald-500/5 cursor-pointer group"
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".svg,.eps,.ai"
+              multiple
+              onChange={(e) => handleFilesSelected(e.target.files)}
+              className="hidden"
+            />
+            
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <div className="p-4 rounded-full bg-emerald-500/10 text-emerald-500 group-hover:scale-110 transition-transform">
+                <Upload size={32} strokeWidth={1.5} />
               </div>
-
-              {/* Artboard Canvas Frame */}
-              <div 
-                className="relative bg-white shadow-2xl rounded-lg border border-slate-300 dark:border-slate-700 flex items-center justify-center overflow-hidden transition-all"
-                style={{
-                  width: '320px',
-                  height: `${Math.round((320 * currentHeight) / currentWidth)}px`,
-                  maxHeight: '380px'
+              <div>
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                  Tarik & Letakkan file vektor di sini (.SVG, .EPS, .AI)
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Mendukung file vektor dari Figma, Canva, Midjourney, Recraft, Inkscape, dll.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
                 }}
+                disabled={isProcessing}
+                className="px-6 py-2.5 rounded-full text-xs font-black bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
               >
-                {/* Safe Margin Guide (dashed border) */}
-                <div 
-                  className="absolute border border-dashed border-emerald-400/50 pointer-events-none rounded z-10 flex items-start justify-start p-1"
-                  style={{
-                    inset: `${marginPercent}%`
-                  }}
-                >
-                  <span className="text-[8px] font-bold text-emerald-600/70 uppercase">Safe Margin {marginPercent}%</span>
+                PILIH BERKAS VEKTOR
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback/Errors */}
+          <AnimatePresence>
+            {globalError && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-xs font-semibold"
+              >
+                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Perhatian</p>
+                  <p className="text-red-400/90 mt-0.5">{globalError}</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* File Queue List */}
+          {totalFilesCount > 0 && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-white/5 pb-4">
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight">
+                    Daftar Antrean Vektor ({totalFilesCount})
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                    <span className="text-[10px] font-mono font-bold uppercase text-slate-400">
+                      Selesai: <span className="text-emerald-500">{processedCount}</span>
+                    </span>
+                    <span className="text-[10px] font-mono font-bold uppercase text-slate-400">
+                      Proses: <span className="text-emerald-500">{processingCount}</span>
+                    </span>
+                    <span className="text-[10px] font-mono font-bold uppercase text-slate-400">
+                      Gagal: <span className="text-red-500">{failedCount}</span>
+                    </span>
+                    <span className="text-[10px] font-mono font-bold uppercase text-slate-400">
+                      Menunggu: <span className="text-slate-500 dark:text-slate-300">{pendingCount}</span>
+                    </span>
+                  </div>
                 </div>
 
-                {/* SVG Visual Render */}
-                {activeItem.previewSvg ? (
-                  <div 
-                    className="w-full h-full flex items-center justify-center p-2"
-                    dangerouslySetInnerHTML={{
-                      __html: resizeSvgArtboard(activeItem.previewSvg, 300, Math.round((300 * currentHeight) / currentWidth), marginPercent)
-                    }}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center p-6 text-center text-slate-400">
-                    <FileCode size={40} className="mb-2 text-slate-300" />
-                    <p className="text-xs font-bold">{activeItem.file.name}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">Pratinjau Vector EPS/AI Siap Dikonversi</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Auto Download Toggle */}
+                  <div className="flex items-center gap-2 bg-slate-50 dark:bg-white/5 px-3 py-1.5 rounded-2xl border border-slate-100 dark:border-white/10">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={autoDownload}
+                      onClick={() => setAutoDownload(!autoDownload)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        autoDownload ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700"
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          autoDownload ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                    <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-200">
+                      Auto-Unduh
+                    </span>
                   </div>
-                )}
+
+                  {processedCount > 0 && (
+                    <button
+                      onClick={handleDownloadAllZip}
+                      className="px-4 py-2 rounded-full text-xs font-black bg-emerald-500 hover:bg-emerald-600 text-white transition-all flex items-center gap-1.5 shadow-md shadow-emerald-500/10"
+                    >
+                      <FolderArchive size={14} />
+                      <span>Unduh ZIP ({processedCount})</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-4 flex items-center space-x-1.5">
-                <ShieldAlert size={13} className="text-emerald-500 shrink-0" />
-                <span>Garis hijau putus-putus menunjukkan area aman 10% agar vektor tidak terpotong kurator.</span>
-              </p>
-            </div>
-          ) : (
-            <div className="text-center text-slate-400">
-              <Eye size={36} className="mx-auto mb-2 opacity-40" />
-              <p className="text-xs font-bold">Pilih berkas dari antrean untuk melihat pratinjau kanvas.</p>
+              {/* Items List */}
+              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
+                {items.map((item) => {
+                  const isSelected = activeItem?.id === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => setActivePreviewId(item.id)}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                        isSelected
+                          ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-500/40 shadow-sm'
+                          : 'bg-slate-50/50 dark:bg-slate-800/30 border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3 min-w-0 pr-2">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center uppercase text-[10px] font-black shrink-0">
+                          {item.format}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{item.file.name}</p>
+                          <p className="text-[10px] text-slate-400 font-mono">
+                            {item.originalWidth}x{item.originalHeight} px • {(item.file.size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0">
+                        {item.progress === 'processing' && <Loader2 size={16} className="animate-spin text-emerald-500" />}
+                        {item.progress === 'done' && <CheckCircle2 size={16} className="text-emerald-500" />}
+                        {item.progress === 'failed' && <AlertCircle size={16} className="text-rose-500" />}
+
+                        {item.processedBlobs && item.processedBlobs.length > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              item.processedBlobs?.forEach(b => downloadBlob(b.blob, b.name));
+                            }}
+                            className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all"
+                            title="Unduh hasil file"
+                          >
+                            <Download size={13} />
+                          </button>
+                        )}
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeItem(item.id);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                          title="Hapus dari antrean"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Right Column: Settings & Actions (4 Cols) */}
-        <div className="col-span-4 bg-white dark:bg-slate-900 p-6 flex flex-col h-full overflow-y-auto custom-scrollbar">
-          <div className="space-y-6">
-            {/* Format Selection */}
-            <div>
-              <label className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center space-x-1.5 mb-2.5">
-                <Layers size={14} className="text-emerald-500" />
-                <span>Format Output</span>
+        {/* Right 1 Column: Settings, Preview & Actions */}
+        <div className="space-y-6">
+          {/* Settings Card */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl space-y-6">
+            <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2">
+              <Sliders size={16} className="text-emerald-500" />
+              <span>Pengaturan Ekspor</span>
+            </h3>
+
+            {/* Target Format */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 font-mono">
+                Format Output
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setTargetFormat('eps')}
-                  className={`p-3 rounded-xl border text-left transition-all ${
+                  className={`p-3 rounded-2xl border text-left transition-all ${
                     targetFormat === 'eps'
-                      ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-extrabold shadow-sm'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                      ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm'
+                      : 'border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
                   <p className="text-xs font-black">EPS (EPS 10)</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Standar Microstock Global</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">Photopea & Adobe Stock Ready</p>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setTargetFormat('ai')}
-                  className={`p-3 rounded-xl border text-left transition-all ${
+                  className={`p-3 rounded-2xl border text-left transition-all ${
                     targetFormat === 'ai'
-                      ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-extrabold shadow-sm'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                      ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm'
+                      : 'border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
                   <p className="text-xs font-black">AI (Illustrator)</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Kompatibel CS6 - CC</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">CS6 s/d CC 2026 Compatible</p>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setTargetFormat('both')}
-                  className={`p-3 rounded-xl border text-left transition-all col-span-2 ${
+                  className={`col-span-2 p-3 rounded-2xl border text-left transition-all flex items-center justify-between ${
                     targetFormat === 'both'
-                      ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-extrabold shadow-sm'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                      ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm'
+                      : 'border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-black">Multi-Export: EPS + AI Sekaligus</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Sangat direkomendasikan untuk upload multi-agensi</p>
-                    </div>
-                    <Sparkles size={16} className="text-emerald-500 shrink-0" />
+                  <div>
+                    <p className="text-xs font-black">Multi-Export: EPS + AI Sekaligus</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Sangat direkomendasikan untuk upload multi-agensi</p>
                   </div>
+                  <Sparkles size={16} className="text-emerald-500 shrink-0 ml-2" />
                 </button>
               </div>
             </div>
 
-            {/* Artboard Presets */}
-            <div>
-              <label className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center space-x-1.5 mb-2.5">
-                <Sliders size={14} className="text-emerald-500" />
-                <span>Ukuran Artboard Adobe Stock</span>
+            {/* Presets */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 font-mono">
+                Ukuran Artboard Adobe Stock
               </label>
-
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {ADOBE_STOCK_PRESETS.map((preset) => {
-                  const isSelected = !isCustomPreset && selectedPreset.id === preset.id;
+                  const isSelected = selectedPreset.id === preset.id;
                   return (
                     <div
                       key={preset.id}
-                      onClick={() => {
-                        setSelectedPreset(preset);
-                        setIsCustomPreset(false);
-                      }}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                      onClick={() => setSelectedPreset(preset)}
+                      className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
                         isSelected
                           ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 shadow-sm'
-                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                          : 'border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10'
                       }`}
                     >
                       <div>
-                        <div className="flex items-center space-x-2">
-                          <p className="text-xs font-black text-slate-800 dark:text-slate-100">{preset.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-black text-slate-800 dark:text-white">{preset.name}</p>
                           {preset.isRecommended && (
-                            <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-emerald-500 text-white">
-                              Paling Lolos
+                            <span className="text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-emerald-500 text-white">
+                              Recommended
                             </span>
                           )}
                         </div>
                         <p className="text-[10px] text-slate-400 mt-0.5">{preset.description}</p>
                       </div>
-                      {isSelected && <Check size={14} className="text-emerald-500" />}
+                      {isSelected && <Check size={14} className="text-emerald-500 shrink-0 ml-2" />}
                     </div>
                   );
                 })}
@@ -576,44 +674,50 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
             </div>
 
             {/* Margin Slider */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-black uppercase tracking-wider text-slate-400">
-                  Safe Margin Padding ({marginPercent}%)
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 font-mono">
+                  Safe Margin ({marginPercent}%)
                 </label>
-                <span className="text-[10px] font-bold text-slate-400">Rekomendasi: 10%</span>
+                <span className="text-[10px] font-bold text-slate-400 font-mono">10% Safe Guard</span>
               </div>
-              <input 
-                type="range" 
-                min={0} 
-                max={25} 
-                value={marginPercent} 
+              <input
+                type="range"
+                min={0}
+                max={25}
+                value={marginPercent}
                 onChange={(e) => setMarginPercent(Number(e.target.value))}
                 className="w-full accent-emerald-500 cursor-pointer"
               />
             </div>
 
-            {/* Auto-Embed Metadata Toggle */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
-              <div className="pr-3">
-                <p className="text-xs font-black text-slate-800 dark:text-slate-200">Auto-Embed Metadata Microstock</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Otomatis menanamkan Title, Keywords, dan Hak Cipta ke EPS & AI.</p>
+            {/* Metadata Auto-Embed Toggle */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 flex items-center justify-between">
+              <div className="pr-2">
+                <p className="text-xs font-black text-slate-800 dark:text-white">Auto-Embed Metadata Microstock</p>
+                <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                  Menanamkan Title, Keywords, dan Hak Cipta langsung ke EPS & AI.
+                </p>
               </div>
-              <input 
-                type="checkbox" 
-                checked={autoEmbedMetadata} 
+              <input
+                type="checkbox"
+                checked={autoEmbedMetadata}
                 onChange={(e) => setAutoEmbedMetadata(e.target.checked)}
-                className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+                className="w-4 h-4 accent-emerald-500 rounded cursor-pointer shrink-0"
               />
             </div>
 
-            {/* Action Buttons */}
-            <div className="pt-2 space-y-2">
+            {/* Action Button */}
+            <div className="pt-2">
               <button
                 type="button"
                 onClick={handleProcessAll}
-                disabled={items.length === 0 || isProcessing}
-                className="w-full py-3.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
+                disabled={items.length === 0 || isProcessing || (!isLicensed && dailyGenCount >= 25)}
+                className={`w-full py-3.5 px-4 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg ${
+                  items.length === 0 || isProcessing || (!isLicensed && dailyGenCount >= 25)
+                    ? 'bg-slate-300 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed shadow-none'
+                    : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25 active:scale-95'
+                }`}
               >
                 {isProcessing ? (
                   <>
@@ -627,21 +731,89 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
                   </>
                 )}
               </button>
-
-              {items.some(i => i.progress === 'done') && (
-                <button
-                  type="button"
-                  onClick={handleDownloadAllZip}
-                  className="w-full py-2.5 px-4 rounded-xl text-xs font-black bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-all flex items-center justify-center space-x-2"
-                >
-                  <Download size={14} />
-                  <span>Unduh Semua Paket (.ZIP)</span>
-                </button>
-              )}
             </div>
           </div>
+
+          {/* Artboard Canvas Preview Card */}
+          {activeItem && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-1.5">
+                  <Eye size={14} className="text-emerald-500" />
+                  <span>Pratinjau Kanvas</span>
+                </h3>
+                <span className={`text-[10px] font-mono font-bold ${meetsAdobeStock ? 'text-emerald-500' : 'text-amber-500'}`}>
+                  {currentWidth}x{currentHeight} ({currentMegapixels} MP)
+                </span>
+              </div>
+
+              {/* Artboard Canvas Frame */}
+              <div 
+                className="relative bg-white shadow-inner rounded-2xl border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden mx-auto"
+                style={{
+                  width: '240px',
+                  height: `${Math.round((240 * currentHeight) / currentWidth)}px`,
+                  maxHeight: '260px'
+                }}
+              >
+                {/* Safe Margin Guide */}
+                <div 
+                  className="absolute border border-dashed border-emerald-400/60 pointer-events-none rounded z-10 p-1"
+                  style={{ inset: `${marginPercent}%` }}
+                >
+                  <span className="text-[7px] font-mono font-bold text-emerald-600 uppercase">Margin {marginPercent}%</span>
+                </div>
+
+                {activeItem.previewSvg ? (
+                  <div 
+                    className="w-full h-full flex items-center justify-center p-2"
+                    dangerouslySetInnerHTML={{
+                      __html: resizeSvgArtboard(activeItem.previewSvg, 220, Math.round((220 * currentHeight) / currentWidth), marginPercent)
+                    }}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-4 text-center text-slate-400">
+                    <FileCode size={32} className="mb-1 text-slate-300" />
+                    <p className="text-[10px] font-bold">{activeItem.file.name}</p>
+                    <p className="text-[8px] text-slate-400">Siap Dikonversi</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Edit in Illustrator Studio Button */}
+              {activeItem.previewSvg && (
+                <button
+                  type="button"
+                  onClick={() => setIsStudioOpen(true)}
+                  className="w-full py-2 px-3 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 text-xs font-black flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <Sparkles size={14} />
+                  <span>Edit di Illustrator Vector Studio</span>
+                </button>
+              )}
+
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                <ShieldAlert size={14} className="text-emerald-500 shrink-0" />
+                <span>Garis hijau putus-putus menunjukkan area batas aman agar tidak dipotong kurator.</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Vector Studio Modal (Full Illustrator Style Vector Workspace) */}
+      {activeItem && activeItem.previewSvg && (
+        <VectorStudioModal
+          isOpen={isStudioOpen}
+          onClose={() => setIsStudioOpen(false)}
+          fileName={activeItem.file.name}
+          initialSvg={activeItem.previewSvg}
+          artboardWidth={currentWidth}
+          artboardHeight={currentHeight}
+          marginPercent={marginPercent}
+          onSave={handleSaveStudioData}
+        />
+      )}
     </div>
   );
 };
