@@ -230,7 +230,9 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
           title,
           description: description || '',
           existingKeywords: keywords,
-          model: aiOptions?.model
+          model: aiOptions?.model,
+          seasonalBooster: aiOptions?.seasonalBooster,
+          seasonalMonth: aiOptions?.seasonalMonth
         })
       });
 
@@ -465,7 +467,9 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
                       description, 
                       existingKeywords: initialCleaned, 
                       requestCount: targetCount - initialCleaned.length,
-                      model: aiOptions?.model
+                      model: aiOptions?.model,
+                      seasonalBooster: aiOptions?.seasonalBooster,
+                      seasonalMonth: aiOptions?.seasonalMonth
                     })
                   });
                   if (!res.ok) throw new Error();
@@ -678,7 +682,9 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
               description: file.description || '',
               existingKeywords: initialCleaned,
               requestCount: targetCount - initialCleaned.length,
-              model: aiOptions?.model
+              model: aiOptions?.model,
+              seasonalBooster: aiOptions?.seasonalBooster,
+              seasonalMonth: aiOptions?.seasonalMonth
             })
           });
           if (!res.ok) {

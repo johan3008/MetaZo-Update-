@@ -27,6 +27,8 @@ export interface ServiceOptions {
   bluesmindsKeys?: string | string[];
   aiveneKeys?: string | string[];
   zaiKeys?: string | string[];
+  seasonalBooster?: boolean;
+  seasonalMonth?: string;
 }
 
 export const getHeaders = (options?: ServiceOptions, includeContentType: boolean = true) => {
@@ -131,15 +133,33 @@ export const generateStockMetadata = async (
   metadataLanguage?: string,
   aiModelPerformance?: 'speed' | 'detail',
   exifMetadata?: any,
-  seasonalBoost?: string
+  seasonalBooster?: boolean,
+  seasonalMonth?: string
 ): Promise<StockMetadata> => {
   // Convert any blob: URLs into Base64 data URLs on the client side
   const base64Frames = await Promise.all(frames.map(ensureBase64));
 
+  const effectiveBooster = seasonalBooster !== undefined ? seasonalBooster : aiOptions?.seasonalBooster;
+  const effectiveMonth = seasonalMonth !== undefined ? seasonalMonth : aiOptions?.seasonalMonth;
+
   const response = await fetchWithRetry('/api/generate-metadata', {
     method: 'POST',
     headers: getHeaders(aiOptions),
-    body: JSON.stringify({ frames: base64Frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata, seasonalBoost })
+    body: JSON.stringify({ 
+      frames: base64Frames, 
+      keywordCount, 
+      customPrompt, 
+      toolType, 
+      temperature, 
+      model, 
+      keywordMode, 
+      titleLength, 
+      metadataLanguage, 
+      aiModelPerformance, 
+      exifMetadata,
+      seasonalBooster: effectiveBooster,
+      seasonalMonth: effectiveMonth
+    })
   });
   
   const rawText = await response.text();
@@ -164,7 +184,8 @@ export const generateBatchStockMetadata = async (
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
   aiModelPerformance?: 'speed' | 'detail',
-  seasonalBoost?: string
+  seasonalBooster?: boolean,
+  seasonalMonth?: string
 ): Promise<{id: string, metadata: StockMetadata}[]> => {
   // Convert any blob: URLs to Base64 data URLs inside items
   const processedItems = await Promise.all(items.map(async (item) => {
@@ -172,10 +193,26 @@ export const generateBatchStockMetadata = async (
     return { id: item.id, frames: base64Frames, exifMetadata: item.exifMetadata };
   }));
 
+  const effectiveBooster = seasonalBooster !== undefined ? seasonalBooster : aiOptions?.seasonalBooster;
+  const effectiveMonth = seasonalMonth !== undefined ? seasonalMonth : aiOptions?.seasonalMonth;
+
   const response = await fetchWithRetry('/api/generate-batch-metadata', {
     method: 'POST',
     headers: getHeaders(aiOptions),
-    body: JSON.stringify({ items: processedItems, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, seasonalBoost })
+    body: JSON.stringify({ 
+      items: processedItems, 
+      keywordCount, 
+      customPrompt, 
+      toolType, 
+      temperature, 
+      model, 
+      keywordMode, 
+      titleLength, 
+      metadataLanguage, 
+      aiModelPerformance,
+      seasonalBooster: effectiveBooster,
+      seasonalMonth: effectiveMonth
+    })
   });
 
   const rawText = await response.text();

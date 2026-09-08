@@ -18,6 +18,12 @@ interface AiConfigPanelProps {
   setAiCreativity: (val: number) => void;
   aiModelPerformance?: 'speed' | 'detail';
   setAiModelPerformance?: (val: 'speed' | 'detail') => void;
+  seasonalBooster?: boolean;
+  setSeasonalBooster?: (val: boolean) => void;
+  seasonalMonth?: string;
+  setSeasonalMonth?: (m: string) => void;
+  isLicensed?: boolean;
+  setShowActivationModal?: (show: boolean) => void;
   isLoading: boolean;
   progressInfo: ProgressInfo | null;
   isPaused: boolean;
@@ -47,6 +53,12 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
   setAiCreativity,
   aiModelPerformance = 'detail',
   setAiModelPerformance = (val: 'speed' | 'detail') => {},
+  seasonalBooster = true,
+  setSeasonalBooster = (val: boolean) => {},
+  seasonalMonth = 'auto',
+  setSeasonalMonth = (m: string) => {},
+  isLicensed = false,
+  setShowActivationModal,
   isLoading,
   progressInfo,
   isPaused,
@@ -270,6 +282,120 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                   className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-2xl appearance-none cursor-pointer accent-[#7c3aed] focus:outline-none"
                 />
               </div>
+            </div>
+
+            {/* TRENDING & SEASONAL KEYWORD BOOSTER (KALENDER KOMERSIAL) */}
+            <div className={`p-4 rounded-2xl border transition-all relative overflow-hidden ${
+              isLicensed 
+                ? 'bg-gradient-to-br from-violet-500/5 via-amber-500/5 to-purple-500/5 dark:from-violet-950/20 dark:via-slate-900/40 dark:to-purple-950/20 border-violet-500/20 dark:border-violet-500/10' 
+                : 'bg-slate-50/60 dark:bg-slate-900/40 border-dashed border-amber-500/30'
+            } space-y-3`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="text-base select-none">{isLicensed ? '🗓️' : '🔒'}</span>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                        Seasonal & Commercial Booster
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${
+                        isLicensed 
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs' 
+                          : 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                      }`}>
+                        {isLicensed ? 'PRO' : 'PRO ONLY'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                      Suntik otomatis event/momen musiman buyer global (jendela 1-2 bulan)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Switch Toggle or Upgrade Button */}
+                {isLicensed ? (
+                  <button
+                    type="button"
+                    onClick={() => setSeasonalBooster(!seasonalBooster)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      seasonalBooster ? 'bg-[#7c3aed]' : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                    title={seasonalBooster ? 'Nonaktifkan Seasonal Booster' : 'Aktifkan Seasonal Booster'}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                        seasonalBooster ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowActivationModal?.(true)}
+                    className="px-2.5 py-1 text-[10px] font-extrabold uppercase rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                    title="Buka akses PRO untuk mengaktifkan"
+                  >
+                    <span>🔒</span> Upgrade
+                  </button>
+                )}
+              </div>
+
+              {!isLicensed ? (
+                <div 
+                  onClick={() => setShowActivationModal?.(true)}
+                  className="p-2.5 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 rounded-xl flex items-center justify-between cursor-pointer hover:bg-amber-500/20 transition-all group"
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs">⭐</span>
+                    <p className="text-[10px] font-bold text-amber-800 dark:text-amber-300">
+                      Khusus Pengguna PRO: Buka potensi penjualan momen hari raya & event dunia!
+                    </p>
+                  </div>
+                  <span className="text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 group-hover:underline flex items-center gap-0.5 shrink-0">
+                    Aktivasi PRO &rarr;
+                  </span>
+                </div>
+              ) : seasonalBooster ? (
+                <div className="space-y-2 pt-1 border-t border-violet-500/10">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Target Bulan Komersial
+                    </label>
+                    <span className="text-[8px] font-black text-violet-600 dark:text-violet-400">
+                      {seasonalMonth === 'auto' ? '⚡ Auto Detect (Bulan Ini + 1-2 bln)' : '🎯 Manual Month'}
+                    </span>
+                  </div>
+
+                  <select
+                    value={seasonalMonth}
+                    onChange={(e) => setSeasonalMonth(e.target.value)}
+                    className="w-full h-9 px-3 bg-white dark:bg-slate-900 border border-violet-200 dark:border-violet-900/50 rounded-xl text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 font-semibold"
+                  >
+                    <option value="auto">⚡ Auto Detect (Bulan Saat Ini & Buyer Window)</option>
+                    <option value="january">Januari (New Year, Winter, Back to Work)</option>
+                    <option value="february">Februari (Valentine, Lunar New Year, Ramadan prep)</option>
+                    <option value="march">Maret (Women's Day, Ramadan, St. Patrick, Spring)</option>
+                    <option value="april">April (Easter, Earth Day, Spring Festival)</option>
+                    <option value="may">Mei (Mother's Day, Eid al-Fitr / Adha, Graduation)</option>
+                    <option value="june">Juni (Father's Day, Summer, Pride Month)</option>
+                    <option value="july">Juli (Independence Day, Summer Vacation, Back to School prep)</option>
+                    <option value="august">Agustus (Back to School, Harvest Season)</option>
+                    <option value="september">September (Autumn / Fall, Labor Day, Halloween prep)</option>
+                    <option value="october">Oktober (Halloween, Thanksgiving prep, Autumn)</option>
+                    <option value="november">November (Thanksgiving, Black Friday, Cyber Monday, Christmas prep)</option>
+                    <option value="december">Desember (Christmas, New Year Eve, Winter Season)</option>
+                  </select>
+
+                  <div className="p-2 bg-white/70 dark:bg-black/30 rounded-xl border border-violet-500/10 text-[9.5px] text-slate-600 dark:text-slate-300 font-medium">
+                    <span className="font-extrabold text-violet-600 dark:text-violet-400">💡 Contoh: </span>
+                    {seasonalMonth === 'november' || (seasonalMonth === 'auto' && [9, 10, 11].includes(new Date().getMonth()))
+                      ? 'Gambar keluarga/makanan otomatis disarankan tag: Thanksgiving, Black Friday, Christmas holiday, New Year celebration.'
+                      : seasonalMonth === 'december' || (seasonalMonth === 'auto' && new Date().getMonth() === 11)
+                      ? 'Gambar liburan/keluarga otomatis disarankan tag: Christmas, New Year celebration, Winter holiday, Holiday party.'
+                      : 'AI otomatis mendeteksi kecocokan tema visual aset dengan momen musiman pembeli mikrostock global.'}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
