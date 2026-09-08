@@ -2109,8 +2109,9 @@ app.get('/api/debug-uploads', (req, res) => {
                     clearTimeout(timer);
                     resolve(filePath);
                 }
+            });
         });
-    }
+    };
 
     app.post('/api/embed-metadata', upload.single('file'), async (req, res) => {
         let localInputPath = '';
