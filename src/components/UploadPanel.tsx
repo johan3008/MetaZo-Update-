@@ -27,6 +27,21 @@ interface UploadPanelProps {
   setShowActivationModal?: (show: boolean) => void;
 }
 
+const PRESET_AI_MODELS = [
+  'Midjourney',
+  'Flux.1',
+  'Stable Diffusion',
+  'DALL-E 3',
+  'Firefly',
+  'Recraft',
+  'Flow Ai',
+  'Meta',
+  'VEO3',
+  'Kling',
+  'Seadream',
+  'Grok'
+];
+
 export const UploadPanel: React.FC<UploadPanelProps> = ({
   activeTool,
   isDragging,
@@ -51,6 +66,9 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
   setShowActivationModal
 }) => {
   const hasFiles = files.length > 0;
+  const isCustomModel = !PRESET_AI_MODELS.includes(aiModelSource);
+  const [showCustomInput, setShowCustomInput] = React.useState<boolean>(() => isCustomModel);
+  const [customInputValue, setCustomInputValue] = React.useState<string>(() => isCustomModel ? (aiModelSource === 'Custom' ? '' : aiModelSource) : '');
 
   const triggerFileInput = () => {
     if (fileInputRef.current) {
@@ -295,22 +313,68 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
                     Auto-fills Freepik CSV & XMP
                   </span>
                 </div>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
-                  {['Midjourney', 'Flux.1', 'Stable Diffusion', 'DALL-E 3', 'Firefly', 'Recraft'].map((modelName) => (
-                    <button
-                      key={modelName}
-                      type="button"
-                      onClick={() => handleSelectModelSource(modelName)}
-                      className={`py-1 px-1.5 text-[9px] font-extrabold rounded-xl border transition-all text-center truncate cursor-pointer ${
-                        aiModelSource === modelName
-                          ? 'bg-[#7c3aed] text-white border-[#7c3aed] shadow-xs'
-                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-violet-400'
-                      }`}
-                    >
-                      {modelName}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap gap-1.5">
+                  {[...PRESET_AI_MODELS, 'Custom'].map((modelName) => {
+                    const isSelected = modelName === 'Custom'
+                      ? (showCustomInput || isCustomModel)
+                      : (!showCustomInput && aiModelSource === modelName);
+                    return (
+                      <button
+                        key={modelName}
+                        type="button"
+                        onClick={() => {
+                          if (modelName === 'Custom') {
+                            setShowCustomInput(true);
+                            const target = customInputValue.trim() || 'Custom';
+                            handleSelectModelSource(target);
+                          } else {
+                            setShowCustomInput(false);
+                            handleSelectModelSource(modelName);
+                          }
+                        }}
+                        className={`py-1 px-2.5 text-[9.5px] font-extrabold rounded-xl border transition-all text-center cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#7c3aed] text-white border-[#7c3aed] shadow-xs'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-violet-400'
+                        }`}
+                      >
+                        {modelName === 'Custom' ? '✨ Custom' : modelName}
+                      </button>
+                    );
+                  })}
                 </div>
+
+                {(showCustomInput || isCustomModel) && (
+                  <div className="pt-1.5 animate-in fade-in duration-200">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={customInputValue}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCustomInputValue(val);
+                          handleSelectModelSource(val.trim() || 'Custom');
+                        }}
+                        placeholder="Ketik nama AI generator kustom (cth: Leonardo AI, Sora, Ideogram, Luma)..."
+                        className="flex-1 px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-violet-300 dark:border-violet-700/60 rounded-xl text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 font-semibold"
+                        autoFocus
+                      />
+                      {customInputValue && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomInputValue('');
+                            handleSelectModelSource('Custom');
+                          }}
+                          className="px-2 py-1 text-[10px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                          title="Reset input kustom"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : null}
           </div>
