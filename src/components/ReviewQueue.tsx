@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Info, CheckCircle2, Trash2, FileCode, ArrowRight, Check, Loader2, Sparkles, Film, Copy, Download, Wand2 } from 'lucide-react';
+import { Search, Info, CheckCircle2, Trash2, FileCode, ArrowRight, Check, Loader2, Sparkles, Film, Copy, Download, Wand2, Target, Crown, Star, ArrowUp } from 'lucide-react';
 import { ToolType, FileItem, ProgressInfo } from '../../types';
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO, DREAMSTIME_CATEGORIES, MIRICANVAS_CATEGORIES } from '../../constants';
 import { copyToClipboard } from '../utils';
@@ -118,6 +118,158 @@ export const getNearDuplicates = (kws: string[]): string[] => {
   return Array.from(toRemove);
 };
 
+export const convertKeywordsToStyle = (
+  keywords: string[],
+  mode: 'mixed' | 'single' | 'multi'
+): string[] => {
+  if (!keywords || keywords.length === 0) return [];
+
+  if (mode === 'single') {
+    // Split all multi-word phrases into clean individual words
+    const result: string[] = [];
+    const seen = new Set<string>();
+    for (const kw of keywords) {
+      const parts = kw.split(/\s+/).map(p => p.trim()).filter(p => p.length > 1);
+      for (const p of parts) {
+        const lower = p.toLowerCase();
+        if (!seen.has(lower)) {
+          seen.add(lower);
+          result.push(p);
+        }
+      }
+    }
+    return result;
+  }
+
+  return keywords;
+};
+
+export const optimizeTop10Keywords = (
+  keywords: string[],
+  title: string = '',
+  description: string = '',
+  keywordMode: 'mixed' | 'single' | 'multi' = 'mixed'
+): string[] => {
+  if (!keywords || keywords.length === 0) return [];
+  
+  // If single keyword mode, convert any multi-word phrases to single words
+  let processedKeywords = keywords;
+  if (keywordMode === 'single') {
+    processedKeywords = convertKeywordsToStyle(keywords, 'single');
+  }
+
+  // Clean duplicates first while preserving discovery order
+  const seen = new Set<string>();
+  const cleanKeywords: string[] = [];
+  for (const kw of processedKeywords) {
+    const trimmed = (kw || '').trim();
+    if (!trimmed) continue;
+    const lower = trimmed.toLowerCase();
+    if (!seen.has(lower)) {
+      seen.add(lower);
+      cleanKeywords.push(trimmed);
+    }
+  }
+
+  if (cleanKeywords.length <= 1) return cleanKeywords;
+
+  // Words from title and description
+  const cleanTitle = (title || '').toLowerCase().replace(/[^a-z0-9\s-]/g, ' ');
+  const titleWords = cleanTitle.split(/\s+/).filter(w => w.length > 2);
+  const primaryTitleWords = titleWords.slice(0, 4); // First 3-4 words = core commercial subject
+
+  const cleanDesc = (description || '').toLowerCase().replace(/[^a-z0-9\s-]/g, ' ');
+  const descWords = new Set(cleanDesc.split(/\s+/).filter(w => w.length > 2));
+
+  // Generic filler words that degrade Top 10 Adobe Stock algorithm indexing
+  const genericFillers = new Set([
+    'photo', 'image', 'picture', 'design', 'nice', 'beautiful', 'amazing', 'stunning',
+    'best', 'detail', 'quality', 'object', 'thing', 'background', 'element', 'visual',
+    'high quality', 'superb', 'isolated', 'white background', 'copy space', 'copyspace',
+    'nobody', 'close up', 'closeup', 'concept', 'graphic', 'stock'
+  ]);
+
+  // Standalone single colors
+  const standaloneColors = new Set([
+    'white', 'black', 'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'grey'
+  ]);
+
+  // High commercial intent tags
+  const highIntentModifiers = new Set([
+    'template', 'banner', 'lifestyle', 'business', 'holiday', 'celebration', 'seasonal',
+    'advertising', 'marketing', 'presentation', 'modern', 'vintage', 'luxury', 'organic',
+    'fresh', 'healthy', 'traditional', 'authentic', 'artisan', 'technology', 'vector', 'illustration'
+  ]);
+
+  // Score each keyword for Top 10 relevance
+  const scored = cleanKeywords.map((kw, originalIndex) => {
+    const cleanKw = kw.toLowerCase().trim();
+    let score = 50;
+
+    // 1. Primary Title Match (Positions 1-4 of Title = Absolute Core Subject)
+    if (primaryTitleWords.some(tw => cleanKw === tw)) {
+      score += 130; // Direct subject match
+    } else if (primaryTitleWords.some(tw => cleanKw.includes(tw) || tw.includes(cleanKw))) {
+      score += 90;
+    } else if (titleWords.some(tw => cleanKw === tw)) {
+      score += 65; // Matches other title words
+    } else if (titleWords.some(tw => cleanKw.includes(tw) || tw.includes(cleanKw))) {
+      score += 45;
+    }
+
+    // 2. Description match
+    if (descWords.has(cleanKw) || Array.from(descWords).some(dw => cleanKw.includes(dw))) {
+      score += 25;
+    }
+
+    // 3. Keyword Style (Gaya Keyword) Logic
+    const wordCount = cleanKw.split(/\s+/).length;
+    if (keywordMode === 'single') {
+      if (wordCount === 1) {
+        score += 45; // Huge bonus for single words
+      } else {
+        score -= 90; // Demote multi-word phrases in single mode
+      }
+    } else if (keywordMode === 'multi') {
+      if (wordCount >= 2 && wordCount <= 4) {
+        score += 60; // Huge bonus for multi-word phrases
+      } else {
+        score -= 35; // Lower priority for single words
+      }
+    } else {
+      // Mixed mode (default): balanced blend
+      if (wordCount >= 2 && wordCount <= 3) {
+        score += 35;
+      }
+    }
+
+    // 4. Commercial intent boost
+    if (highIntentModifiers.has(cleanKw) || Array.from(highIntentModifiers).some(mod => cleanKw.includes(mod))) {
+      score += 20;
+    }
+
+    // 5. Heavy penalty for generic fillers in Top 10
+    if (genericFillers.has(cleanKw)) {
+      score -= 95;
+    }
+
+    // 6. Penalty for standalone plain colors
+    if (standaloneColors.has(cleanKw)) {
+      score -= 50;
+    }
+
+    // 7. Micro tie-breaker preserving original relative discovery order
+    score += (1 - originalIndex * 0.001);
+
+    return { kw, score, originalIndex };
+  });
+
+  // Sort by score descending
+  scored.sort((a, b) => b.score - a.score);
+
+  return scored.map(s => s.kw);
+};
+
 interface KeywordListProps {
   label: string;
   keywords: string[];
@@ -127,6 +279,8 @@ interface KeywordListProps {
   description?: string;
   aiOptions?: any;
   keywordCount?: number | string;
+  keywordMode?: 'mixed' | 'single' | 'multi';
+  setKeywordMode?: (mode: 'mixed' | 'single' | 'multi') => void;
   hideIndividualFix?: boolean;
   t?: any;
 }
@@ -140,6 +294,8 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
   description,
   aiOptions,
   keywordCount,
+  keywordMode = 'mixed',
+  setKeywordMode,
   hideIndividualFix = false,
   t
 }) => {
@@ -148,6 +304,13 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
   const [isSuggesting, setIsSuggesting] = React.useState(false);
   const [suggestError, setSuggestError] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
+  const [localKeywordMode, setLocalKeywordMode] = React.useState<'mixed' | 'single' | 'multi'>(keywordMode);
+
+  React.useEffect(() => {
+    if (keywordMode) {
+      setLocalKeywordMode(keywordMode);
+    }
+  }, [keywordMode]);
 
   const nearDuplicates = React.useMemo(() => getNearDuplicates(keywords), [keywords]);
 
@@ -349,6 +512,47 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
     }
   };
 
+  const [justOptimized, setJustOptimized] = React.useState(false);
+
+  const handleOptimizeTop10 = (overrideMode?: 'mixed' | 'single' | 'multi') => {
+    if (!keywords || keywords.length === 0) return;
+    const mode = overrideMode || localKeywordMode || keywordMode || 'mixed';
+    let updated = keywords;
+    if (mode === 'single') {
+      updated = convertKeywordsToStyle(keywords, 'single');
+    }
+    const optimized = optimizeTop10Keywords(updated, title, description, mode);
+    onChange(optimized);
+    setJustOptimized(true);
+    setTimeout(() => setJustOptimized(false), 2000);
+  };
+
+  const handleMoveToTop = (index: number) => {
+    if (index <= 0 || index >= keywords.length) return;
+    const newKeywords = [...keywords];
+    const [target] = newKeywords.splice(index, 1);
+    newKeywords.unshift(target);
+    onChange(newKeywords);
+  };
+
+  const handlePromoteToTop10 = (index: number) => {
+    if (index < 10 || index >= keywords.length) return;
+    const newKeywords = [...keywords];
+    const [target] = newKeywords.splice(index, 1);
+    newKeywords.splice(9, 0, target);
+    onChange(newKeywords);
+  };
+
+  const handleNudge = (index: number, direction: -1 | 1) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= keywords.length) return;
+    const newKeywords = [...keywords];
+    const temp = newKeywords[index];
+    newKeywords[index] = newKeywords[targetIndex];
+    newKeywords[targetIndex] = temp;
+    onChange(newKeywords);
+  };
+
   return (
     <div className="space-y-1.5 font-sans">
       <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
@@ -364,13 +568,52 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
             {keywords.length}/49 {keywords.length >= 40 && keywords.length <= 49 ? '• Optimal' : keywords.length < 25 ? '• Kurang' : ''}
           </span>
         </label>
-        <div className="flex items-center space-x-2.5">
+        <div className="flex items-center space-x-2">
           {suggestError && (
             <span className="text-rose-500 font-extrabold normal-case leading-none animate-pulse">
               {suggestError}
             </span>
           )}
+
+          {/* Gaya Keyword Selector (Mixed / Single / Multi) */}
+          <div className="flex items-center gap-0.5 bg-slate-200/70 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-300/50 dark:border-white/5 text-[8.5px] font-bold">
+            <span className="text-[7.5px] font-mono text-slate-500 dark:text-slate-400 uppercase px-1">Gaya:</span>
+            {(['mixed', 'single', 'multi'] as const).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => {
+                  setLocalKeywordMode(mode);
+                  setKeywordMode?.(mode);
+                  handleOptimizeTop10(mode);
+                }}
+                title={`Ubah Gaya Keyword ke ${mode.toUpperCase()} (Mixed: Campuran, Single: Kata Tunggal, Multi: Frasa Gabungan)`}
+                className={`px-1.5 py-0.2 rounded font-extrabold uppercase transition-all cursor-pointer ${
+                  (localKeywordMode || keywordMode) === mode
+                    ? 'bg-[#7c3aed] text-white shadow-xs'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+
           <button 
+            type="button"
+            onClick={() => handleOptimizeTop10()} 
+            title="Otomatis seleksi & urutkan 10 kata kunci paling relevan dengan subjek judul & nilai komersial tinggi ke posisi 1–10 (Algoritma Pencarian Adobe Stock)"
+            className={`px-2 py-0.5 rounded-lg text-[9px] font-black flex items-center gap-1 transition-all cursor-pointer shadow-xs active:scale-95 ${
+              justOptimized 
+                ? 'bg-emerald-500 text-white animate-pulse' 
+                : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+            }`}
+          >
+            <span>🎯</span>
+            <span>{justOptimized ? 'Top 10 Sorted!' : 'optimize top 10'}</span>
+          </button>
+          <button 
+            type="button"
             onClick={handleClipRank} 
             title="Urutkan kata kunci secara semantik berdasarkan relevansi gambar/judul (CLIP Auto-Rank)"
             className={`${buttonColorClass} font-extrabold flex items-center gap-0.5 hover:underline lowercase cursor-pointer`}
@@ -378,6 +621,7 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
             <span className="text-amber-500 text-[10px]">⚡</span> clip rank
           </button>
           <button 
+            type="button"
             onClick={handleClean} 
             title="Bersihkan duplikat & spasi berlebih"
             className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}
@@ -385,6 +629,7 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
             clean
           </button>
           <button 
+            type="button"
             onClick={handleToggleCase} 
             title="Ubah huruf kecil / Huruf Besar Setiap Kata (Title Case)"
             className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}
@@ -392,6 +637,7 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
             Aa case
           </button>
           <button 
+            type="button"
             onClick={handleShuffle} 
             title="Acak urutan kata kunci"
             className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}
@@ -399,6 +645,7 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
             shuffle
           </button>
           <button 
+            type="button"
             onClick={handleCopy} 
             title="Salin semua kata kunci (dipisahkan koma)"
             className={`${buttonColorClass} font-extrabold flex items-center hover:underline lowercase cursor-pointer`}
@@ -406,6 +653,7 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
             {copied ? 'copied!' : 'copy'}
           </button>
           <button
+            type="button"
             onClick={handleSmartSuggest}
             disabled={isSuggesting || !title || !title.trim()}
             title={!title || !title.trim() ? "Tulis judul terlebih dahulu sebagai konteks" : "Sukai 5 kata kunci SEO penting secara otomatis"}
@@ -426,14 +674,20 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
         </div>
       </div>
 
-      <div className="text-[9.5px]/tight text-[#7c3aed] dark:text-violet-400 font-bold flex items-center gap-1 py-1 px-2.5 bg-violet-500/5 dark:bg-violet-500/10 rounded-lg border border-violet-500/10">
-        <span className="shrink-0 select-none">💡</span>
-        <span>
-          {t && t.language === 'Bahasa' 
-            ? "Urutan kata kunci menentukan relevansi pencarian Adobe Stock. Keyword #1 adalah yang TERPENTING! Seret untuk mengurutkan." 
-            : "Keyword order determines search relevance in Adobe Stock. Keyword #1 is the most CRITICAL! Drag & drop to sort."}
+      <div className="text-[9.5px]/tight text-[#7c3aed] dark:text-violet-400 font-bold flex items-center justify-between py-1 px-2.5 bg-violet-500/5 dark:bg-violet-500/10 rounded-lg border border-violet-500/10">
+        <div className="flex items-center gap-1">
+          <span className="shrink-0 select-none">💡</span>
+          <span>
+            {t && t.language === 'Bahasa' 
+              ? "Algoritma Adobe Stock memprioritaskan 10 KEYWORD PERTAMA. Urutan #1 adalah anchor utama!" 
+              : "Adobe Stock search heavily indexes the FIRST 10 KEYWORDS. Keyword #1 is the core anchor!"}
+          </span>
+        </div>
+        <span className="text-[8px] font-mono font-bold text-slate-400 hidden md:inline">
+          Gunakan 🔝 untuk jadikan #1 • ⭐ untuk masuk Top 10
         </span>
       </div>
+
       {nearDuplicates.length > 0 && !hideIndividualFix && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-2 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-600 dark:text-rose-400 text-[10px] mb-2 font-bold gap-2">
           <span className="truncate" title={nearDuplicates.join(', ')}>
@@ -487,53 +741,143 @@ const ProjectKeywordList: React.FC<KeywordListProps> = ({
           </div>
         </div>
       )}
-      <div className="p-2 bg-slate-100/50 dark:bg-black/25 rounded-[1.5rem] border border-slate-200/80 dark:border-slate-800 flex flex-wrap gap-1.5 max-h-[145px] overflow-y-auto">
-        <AnimatePresence mode="popLayout">
-          {keywords.map((kw, index) => {
-            const isFirst = index === 0;
-            const isTop5 = index > 0 && index < 5;
-            let currentBadgeClass = badgeClass;
-            
-            if (isFirst) {
-              currentBadgeClass = "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 shadow-sm shadow-amber-500/5";
-            } else if (isTop5) {
-              currentBadgeClass = "bg-violet-500/15 text-[#7c3aed] dark:text-violet-400 border border-violet-500/20";
-            } else {
-              currentBadgeClass = `${badgeClass} border border-transparent`;
-            }
 
-            return (
-              <motion.span 
-                key={`${kw}-${index}`} 
-                draggable
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragEnd={handleDragEnd}
-                initial={{ scale: 0.6, opacity: 0, y: 8 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.7, opacity: 0, y: -4, transition: { duration: 0.15 } }}
-                transition={{ type: "spring", stiffness: 500, damping: 28 }}
-                layout
-                className={`inline-flex cursor-grab items-center px-2 py-0.5 rounded text-[10px] font-bold select-none ${currentBadgeClass} ${draggedIndex === index ? 'opacity-50' : ''}`}
-                title={isFirst ? "Keyword #1 - Paling Menentukan Relevansi (👑 Utama)" : isTop5 ? `Keyword #${index + 1} - Sangat Penting (Prioritas Tinggi)` : `Keyword #${index + 1}`}
-              >
-                <span className="opacity-65 mr-1 text-[8.5px] font-black font-mono tracking-tighter bg-black/5 dark:bg-white/5 px-1 py-0.2 rounded shrink-0">
-                  {isFirst ? '👑 1' : index + 1}
-                </span>
-                <span className="truncate max-w-[120px]">{kw}</span>
-                <button onClick={() => handleRemove(kw)} className="ml-1 text-[9px] text-rose-500 hover:text-rose-600 font-extrabold cursor-pointer">×</button>
-              </motion.span>
-            );
-          })}
-        </AnimatePresence>
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleAdd}
-          placeholder="Type and press Enter..."
-          className="bg-transparent border-none outline-none text-xs font-semibold p-0.5 text-slate-700 dark:text-slate-300 flex-grow min-w-[110px]"
-        />
+      {/* KEYWORDS CONTAINER WITH TOP 10 VISUAL TIER */}
+      <div className="p-2.5 bg-slate-100/50 dark:bg-black/25 rounded-[1.5rem] border border-slate-200/80 dark:border-slate-800 space-y-2">
+        {/* TOP 10 HEADER BADGE BAR */}
+        <div className="flex items-center justify-between px-2.5 py-1 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/25 rounded-xl">
+          <div className="flex items-center gap-1.5 text-[8.5px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
+            <span className="text-xs">👑</span>
+            <span>Top 10 Adobe Stock Index ({Math.min(10, keywords.length)}/10)</span>
+            <span className="text-[7.5px] font-medium text-amber-600/80 dark:text-amber-400/80 normal-case hidden sm:inline">
+              • Prioritas utama algoritma pencarian
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleOptimizeTop10}
+            title="Otomatis seleksi dan posisikan 10 kata kunci bernilai komersial tertinggi ke posisi 1–10"
+            className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-[7.5px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+          >
+            <span>🎯</span>
+            <span>Re-Rank Top 10</span>
+          </button>
+        </div>
+
+        {/* KEYWORDS CHIPS */}
+        <div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto pr-1 custom-scrollbar">
+          <AnimatePresence mode="popLayout">
+            {keywords.map((kw, index) => {
+              const isFirst = index === 0;
+              const isTop10 = index > 0 && index < 10;
+              const isSecondary = index >= 10;
+              
+              let currentBadgeClass = "";
+              if (isFirst) {
+                currentBadgeClass = "bg-gradient-to-r from-amber-500/25 to-amber-500/15 text-amber-900 dark:text-amber-200 border-amber-500/40 shadow-xs ring-1 ring-amber-500/20";
+              } else if (isTop10) {
+                currentBadgeClass = "bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-400/30 shadow-xs";
+              } else {
+                currentBadgeClass = `${badgeClass} border border-transparent opacity-90`;
+              }
+
+              return (
+                <React.Fragment key={`${kw}-${index}`}>
+                  {index === 10 && (
+                    <div className="w-full my-1 pt-1.5 border-t border-dashed border-slate-300/80 dark:border-slate-700/80 flex items-center justify-between text-[8px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <span>🔽</span>
+                        <span>Secondary & Long-Tail Keywords (#{11}–#{keywords.length})</span>
+                      </span>
+                      <span className="text-[7px] lowercase font-semibold text-slate-400">
+                        Klik 🔝 untuk jadikan #1 • ⭐ untuk masuk Top 10
+                      </span>
+                    </div>
+                  )}
+
+                  <motion.span 
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragEnd={handleDragEnd}
+                    initial={{ scale: 0.6, opacity: 0, y: 8 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.7, opacity: 0, y: -4, transition: { duration: 0.15 } }}
+                    transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                    layout
+                    className={`group inline-flex cursor-grab items-center px-2 py-0.5 rounded text-[10px] font-bold select-none border transition-all ${currentBadgeClass} ${draggedIndex === index ? 'opacity-50' : ''}`}
+                    title={isFirst ? "Keyword #1 - Paling Menentukan Relevansi (👑 Utama)" : isTop10 ? `Keyword #${index + 1} - Top 10 Prioritas Tinggi (Adobe Stock)` : `Keyword #${index + 1}`}
+                  >
+                    <span className="opacity-75 mr-1 text-[8.5px] font-black font-mono tracking-tighter bg-black/5 dark:bg-white/10 px-1 py-0.2 rounded shrink-0">
+                      {isFirst ? '👑 1' : isTop10 ? `⭐ ${index + 1}` : index + 1}
+                    </span>
+                    <span className="truncate max-w-[130px]">{kw}</span>
+
+                    {/* Quick Reorder & Pin Buttons */}
+                    <div className="flex items-center ml-1 space-x-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleMoveToTop(index); }}
+                          title="Pin ke Urutan #1 (Primary Anchor)"
+                          className="hover:scale-125 text-[8.5px] text-amber-600 dark:text-amber-400 font-black cursor-pointer px-0.5"
+                        >
+                          🔝
+                        </button>
+                      )}
+                      {isSecondary && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handlePromoteToTop10(index); }}
+                          title="Promosikan Masuk ke Top 10"
+                          className="hover:scale-125 text-[8.5px] text-amber-500 font-black cursor-pointer px-0.5"
+                        >
+                          ⭐
+                        </button>
+                      )}
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleNudge(index, -1); }}
+                          title="Geser ke kiri / urutan lebih tinggi"
+                          className="hover:scale-125 text-[8px] text-slate-500 dark:text-slate-400 font-extrabold cursor-pointer px-0.5"
+                        >
+                          ◀
+                        </button>
+                      )}
+                      {index < keywords.length - 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleNudge(index, 1); }}
+                          title="Geser ke kanan / urutan lebih rendah"
+                          className="hover:scale-125 text-[8px] text-slate-500 dark:text-slate-400 font-extrabold cursor-pointer px-0.5"
+                        >
+                          ▶
+                        </button>
+                      )}
+                      <button 
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleRemove(kw); }} 
+                        title="Hapus kata kunci"
+                        className="text-[9.5px] text-rose-500 hover:text-rose-600 font-black cursor-pointer px-0.5 ml-0.5"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </motion.span>
+                </React.Fragment>
+              );
+            })}
+          </AnimatePresence>
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleAdd}
+            placeholder="Type and press Enter..."
+            className="bg-transparent border-none outline-none text-xs font-semibold p-0.5 text-slate-700 dark:text-slate-300 flex-grow min-w-[110px]"
+          />
+        </div>
       </div>
     </div>
   );
@@ -593,6 +937,8 @@ interface ReviewQueueProps {
   progressInfo?: ProgressInfo | null;
   aiOptions?: any;
   keywordCount?: number | string;
+  keywordMode?: 'mixed' | 'single' | 'multi';
+  setKeywordMode?: (mode: 'mixed' | 'single' | 'multi') => void;
   handleDownloadSingleEmbedded?: (file: FileItem) => void;
 }
 
@@ -643,10 +989,27 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
   progressInfo,
   aiOptions,
   keywordCount,
+  keywordMode = 'mixed',
+  setKeywordMode,
   handleDownloadSingleEmbedded
 }) => {
   const hasFiles = files.length > 0;
   const [isFixingBatch, setIsFixingBatch] = React.useState(false);
+  const [top10Toast, setTop10Toast] = React.useState<string | null>(null);
+
+  const handleOptimizeTop10All = () => {
+    const validFiles = files.filter(f => f.keywords && f.keywords.length > 0);
+    if (validFiles.length === 0) return;
+    const mode = keywordMode || 'mixed';
+    updateFiles(prev => prev.map(f => {
+      if (!f.keywords || f.keywords.length === 0) return f;
+      const sourceKws = mode === 'single' ? convertKeywordsToStyle(f.keywords, 'single') : f.keywords;
+      const optimized = optimizeTop10Keywords(sourceKws, f.title, f.description, mode);
+      return { ...f, keywords: optimized };
+    }));
+    setTop10Toast(`Sukses mengoptimasi Top 10 Keywords (Gaya: ${mode.toUpperCase()}) pada ${validFiles.length} file!`);
+    setTimeout(() => setTop10Toast(null), 3500);
+  };
 
   const filesWithDuplicates = React.useMemo(() => {
     return files.filter(f => f.title && getNearDuplicates(f.keywords).length > 0);
@@ -793,12 +1156,61 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                 <Copy size={10} />
                 <span>Salin Keywords</span>
               </button>
+              <button
+                onClick={handleOptimizeTop10All}
+                title="Otomatis seleksi & urutkan 10 kata kunci teratas (Top 10 Adobe Stock) pada SEMUA file di antrean"
+                className="px-2.5 py-1 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 hover:text-amber-800 border border-amber-500/30 rounded-xl text-[9px] font-black transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+              >
+                <Target size={10} className="text-amber-600 dark:text-amber-400" />
+                <span>Optimize Top 10 Semua ({files.filter(f => f.keywords && f.keywords.length > 0).length})</span>
+              </button>
+              {/* Gaya Keyword Bulk Selector */}
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700">
+                <span className="text-[8px] font-black uppercase text-slate-400 px-1">Gaya:</span>
+                {(['mixed', 'single', 'multi'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      if (setKeywordMode) setKeywordMode(mode);
+                      const validFiles = files.filter(f => f.keywords && f.keywords.length > 0);
+                      if (validFiles.length > 0) {
+                        updateFiles(prev => prev.map(f => {
+                          if (!f.keywords || f.keywords.length === 0) return f;
+                          const sourceKws = mode === 'single' ? convertKeywordsToStyle(f.keywords, 'single') : f.keywords;
+                          const optimized = optimizeTop10Keywords(sourceKws, f.title, f.description, mode);
+                          return { ...f, keywords: optimized };
+                        }));
+                        setTop10Toast(`Gaya kata kunci diubah ke ${mode.toUpperCase()} & Top 10 dioptimalkan pada ${validFiles.length} file!`);
+                        setTimeout(() => setTop10Toast(null), 3500);
+                      }
+                    }}
+                    title={`Ubah gaya keyword ke ${mode} (${mode === 'single' ? 'Kata Tunggal' : mode === 'multi' ? 'Frasa 2-4 kata' : 'Campuran'}) & optimalkan Top 10 untuk semua file`}
+                    className={`px-1.5 py-0.5 rounded-lg text-[8px] font-black tracking-wide transition-all cursor-pointer ${
+                      keywordMode === mode
+                        ? 'bg-[#7c3aed] text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {mode === 'mixed' ? 'Mixed' : mode === 'single' ? 'Single' : 'Multi'}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
       </div>
 
       <div className="p-6">
+        {top10Toast && (
+          <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between text-amber-800 dark:text-amber-300 text-xs font-bold animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-2">
+              <span className="text-base">👑</span>
+              <span>{top10Toast}</span>
+            </div>
+            <button onClick={() => setTop10Toast(null)} className="text-slate-400 hover:text-slate-600 font-black cursor-pointer px-1">×</button>
+          </div>
+        )}
+
         <p className="text-slate-400 dark:text-slate-500 mb-6 text-xs font-semibold leading-relaxed">
           {t.review_edit_desc}
         </p>
@@ -1130,6 +1542,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                         onChange={(newKeywords) => updateFiles(prev => prev.map(f => f.id === file.id ? {...f, keywords: newKeywords} : f))} 
                         aiOptions={aiOptions}
                         keywordCount={keywordCount}
+                        keywordMode={keywordMode}
+                        setKeywordMode={setKeywordMode}
                         hideIndividualFix={files.length > 1}
                         t={t}
                       />
