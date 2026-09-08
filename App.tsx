@@ -1306,6 +1306,7 @@ const App: React.FC = () => {
 
   const [aiCreativity, setAiCreativity] = useState<number>(0.7);
   const [aiModelPerformance, setAiModelPerformance] = useState<'speed' | 'detail'>('detail');
+  const [seasonalBoost, setSeasonalBoost] = useState<string>(() => localStorage.getItem('mz_seasonal_boost') || 'none');
   const [generationMode, setGenerationMode] = useState<GenerationMode>(GenerationMode.STANDARD);
   const [progressInfo, setProgressInfo] = useState<ProgressInfo | null>(null);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
@@ -3565,7 +3566,7 @@ const App: React.FC = () => {
                 aiveneKeys: aiveneKeysList,
                 zaiKeys: zaiKeysList
               };
-              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance, exifMetadata);
+              const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance, exifMetadata, seasonalBoost);
               
               updateFiles(prev => prev.map(f => f.id === fileItem.id ? {
                 ...f,
@@ -3748,7 +3749,7 @@ const App: React.FC = () => {
                   aiveneKeys: aiveneKeysList,
                   zaiKeys: zaiKeysList
                 };
-                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance);
+                const batchResults = await generateBatchStockMetadata(finalItemsToProcess, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance, seasonalBoost);
 
                 // 4. Update state
                 updateFiles(prev => prev.map(f => {
@@ -5261,6 +5262,11 @@ const App: React.FC = () => {
                   setAiCreativity={setAiCreativity}
                   aiModelPerformance={aiModelPerformance}
                   setAiModelPerformance={setAiModelPerformance}
+                  seasonalBoost={seasonalBoost}
+                  setSeasonalBoost={(val) => {
+                    setSeasonalBoost(val);
+                    localStorage.setItem('mz_seasonal_boost', val);
+                  }}
                   isLoading={isLoading} 
                   progressInfo={progressInfo} 
                   isPaused={isPaused} 
