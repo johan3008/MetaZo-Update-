@@ -2704,6 +2704,77 @@ function getSeasonalEventKeywordContext(metadataLanguage?: string): string {
    - Output keywords in ${language}; preserve established English event names when they are the natural stock-search term.`;
 }
 
+export function buildSeasonalBoostDirective(seasonalBoost?: string, metadataLanguage?: string): string {
+  if (!seasonalBoost || seasonalBoost === 'none') return '';
+
+  const language = getLanguageName(metadataLanguage);
+  const seasonalConfigs: Record<string, { label: string; description: string; keywords: string[] }> = {
+    christmas_winter: {
+      label: 'Winter & Christmas Holidays',
+      description: 'Major Q4 worldwide holiday season including Christmas, New Year, winter vacations, and festive gifting.',
+      keywords: ['christmas', 'winter season', 'holiday festive', 'new year celebration', 'holiday gift', 'cozy winter', 'festive decoration', 'holiday season']
+    },
+    black_friday_sale: {
+      label: 'Black Friday & Cyber Shopping Sale',
+      description: 'Q4 commercial shopping extravaganza, retail discounts, e-commerce promotional campaigns, and special offers.',
+      keywords: ['black friday', 'cyber monday', 'mega sale', 'shopping discount', 'commercial promotion', 'retail deal', 'special offer', 'promo banner']
+    },
+    autumn_halloween: {
+      label: 'Autumn & Halloween Harvest',
+      description: 'Fall season, colorful foliage, Halloween festivities, Thanksgiving gratitude, and autumn harvests.',
+      keywords: ['autumn', 'fall season', 'halloween festive', 'thanksgiving', 'autumn foliage', 'harvest season', 'golden autumn', 'pumpkin harvest']
+    },
+    spring_easter: {
+      label: 'Spring & Easter Renewal',
+      description: 'Springtime blossoms, Easter celebrations, Mother\'s Day, Earth Day, outdoor garden renewal, and fresh beginnings.',
+      keywords: ['spring season', 'easter holiday', 'spring bloom', 'fresh spring', 'floral renewal', 'mothers day', 'earth day', 'nature awakening']
+    },
+    summer_vacation: {
+      label: 'Summer & Tropical Vacation',
+      description: 'Warm sunny weather, beach getaways, swimming, tropical travel, outdoor adventures, and summer holiday tourism.',
+      keywords: ['summer vacation', 'tropical getaway', 'sunny beach', 'summer travel', 'warm sunshine', 'holiday leisure', 'outdoor summer', 'beach holiday']
+    },
+    ramadhan_eid: {
+      label: 'Ramadan & Eid Mubarak Festivities',
+      description: 'Sacred month of Ramadan, fasting, community charity, Eid al-Fitr, Eid al-Adha, and festive family celebrations.',
+      keywords: ['ramadan kareem', 'eid mubarak', 'islamic festival', 'fasting season', 'eid al fitr', 'spiritual celebration', 'muslim holiday', 'traditional celebration']
+    },
+    new_year_resolutions: {
+      label: 'New Year Resolutions & Strategic Planning',
+      description: 'Fresh year start, goal setting, corporate resolutions, calendar planning, personal growth, and fresh vision.',
+      keywords: ['new year 2026', 'new year resolution', 'fresh start', 'annual planning', 'goal setting', 'calendar schedule', 'future vision', 'business roadmap']
+    }
+  };
+
+  const config = seasonalConfigs[seasonalBoost];
+
+  if (seasonalBoost === 'auto') {
+    return `\n\n[COMMERCIAL TRENDING & SEASONAL BOOST - AUTO-DETECT ACTIVE]
+Microstock commercial buyers actively search for visual assets 30 to 90 days ahead of major holidays, seasons, and marketing campaigns.
+Examine the visual scene and context:
+- If the asset shows winter, snow, festive decor, or holiday gifts -> inject relevant winter/Christmas commercial keywords.
+- If it shows leaves, autumn colors, pumpkins, or harvest -> inject relevant autumn/Halloween/Thanksgiving keywords.
+- If it shows flowers, spring blooms, fresh green outdoor -> inject relevant spring/Easter keywords.
+- If it shows beach, ocean, sun, tropical, travel -> inject relevant summer/vacation keywords.
+- If it shows commercial products, shopping, carts, discounts -> inject relevant sale/Black Friday promo keywords.
+- If it shows mosque, crescent, ketupat, modest festive -> inject relevant Ramadan/Eid keywords.
+- Ensure 3 to 6 high-converting seasonal buyer search intent keywords are naturally incorporated in ${language}.`;
+  }
+
+  if (config) {
+    return `\n\n[COMMERCIAL TRENDING & SEASONAL BOOST - ACTIVE: ${config.label.toUpperCase()}]
+Target Seasonal Market: ${config.label} - ${config.description}.
+Microstock commercial buyers search 30-90 days in advance for this seasonal event.
+MANDATORY RULES FOR SEASONAL BOOST:
+1. KEYWORD INJECTION: You MUST naturally incorporate 3 to 6 high-converting keywords from or related to: ${config.keywords.join(', ')} into the "keywords" array in ${language}.
+2. SEAMLESS HARMONY: Blend these seasonal terms naturally with the physical subjects, atmosphere, and context of the asset without inventing impossible elements.
+3. TITLE RELEVANCE: If appropriate, weave a subtle seasonal or commercial touch into the title.
+4. HIGH BUYER SEARCH VALUE: These keywords ensure the asset ranks highly in buyer search queries for upcoming commercial marketing campaigns and seasonal content.`;
+  }
+
+  return '';
+}
+
 // ---- LAPISAN 3: SISTEM PEMBOBOTAN KEYWORD ----------------------------------
 
 interface KeywordScore {
@@ -3741,7 +3812,8 @@ export const generateStockMetadata = async (
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
   aiModelPerformance?: 'speed' | 'detail',
-  exifMetadata?: any
+  exifMetadata?: any,
+  seasonalBoost?: string
 ): Promise<StockMetadata> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -3993,11 +4065,12 @@ MANDATORY RULES FOR TARGET KEYWORDS & TITLE (STRICT PRIORITY):
 5. ASSET RELEVANCE: While following this instruction completely, ensure you still ground the description in the actual visual facts of the asset.` : "";
 
   const mediaContext = mediaTypeContext;
+  const seasonalDirective = buildSeasonalBoostDirective(seasonalBoost, metadataLanguage);
   const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
 OUTPUT MUST BE STRICTLY IN ${getLanguageName(metadataLanguage)} for Title, Description, and Keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
-${mediaContext}${customPromptCommand}${exifInstruction}
+${mediaContext}${customPromptCommand}${exifInstruction}${seasonalDirective}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").
@@ -4439,7 +4512,8 @@ export const generateBatchStockMetadata = async (
   keywordMode?: 'mixed' | 'single' | 'multi',
   titleLength?: 'short' | 'medium' | 'long',
   metadataLanguage?: string,
-  aiModelPerformance?: 'speed' | 'detail'
+  aiModelPerformance?: 'speed' | 'detail',
+  seasonalBoost?: string
 ): Promise<{id: string, metadata: StockMetadata}[]> => {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -4679,11 +4753,12 @@ MANDATORY RULES FOR TARGET KEYWORDS & TITLE (STRICT PRIORITY):
 4. DESIGNER/COMMERCIAL MINDSET: If the instruction implies a graphic design, promo, commercial layout, or background with copy space (e.g. "Graphic Design", "Promo", "Copy Space"), describe the asset's utility for commercial advertising, emphasize where the copy space is, and use professional marketing/design terminology.
 5. ASSET RELEVANCE: While following this instruction completely, ensure you still ground the description in the actual visual facts of the asset.` : "";
 
+  const seasonalDirective = buildSeasonalBoostDirective(seasonalBoost, metadataLanguage);
   const genSystemInstruction = `You are a professional Adobe Stock, Shutterstock, and Getty Images metadata specialist. 
 Your goal is to maximize the discoverability of visual assets and optimize them for search-engine algorithms to rank on the FIRST PAGE of microstock marketplaces.
 OUTPUT MUST BE STRICTLY IN ${getLanguageName(metadataLanguage)} for Title, Description, and Keywords. YOU MUST FULLY POPULATE THE TITLE AND DESCRIPTION FIELDS. NEVER LEAVE THEM EMPTY. ${getTitleLengthRule(titleLength)}
 
-${mediaContext}${customPromptCommand}
+${mediaContext}${customPromptCommand}${seasonalDirective}
 
 CRITICAL RULES FOR TITLES & KEYWORDS (MUST FOLLOW STRICTLY):
 1. NO INTELLECTUAL PROPERTY (IP): NEVER use company names, brand names, trademarks, or product names (e.g., Apple, Nike, iPhone, Coca-Cola). Use generic terms instead (e.g., "smartphone", "athletic shoes", "soda").

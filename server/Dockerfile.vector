@@ -1,0 +1,32 @@
+FROM python:3.11-slim-bookworm
+
+LABEL maintainer="MetaZo Development Team"
+LABEL description="MetaZo Convert VectorGen Dedicated Inkscape CLI Microservice"
+
+# Install Inkscape CLI and core fonts for vector rendering
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    inkscape \
+    fonts-dejavu-core \
+    fonts-freefont-ttf \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY server/requirements-vector.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY server/vector_service.py ./vector_service.py
+
+EXPOSE 8089
+
+ENV VECTOR_HOST=0.0.0.0 \
+    VECTOR_PORT=8089 \
+    INKSCAPE_PATH=/usr/bin/inkscape \
+    PYTHONUNBUFFERED=1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8089/health')" || exit 1
+
+CMD ["python3", "-u", "vector_service.py"]

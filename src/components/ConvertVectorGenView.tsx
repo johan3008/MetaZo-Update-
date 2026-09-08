@@ -20,7 +20,10 @@ import {
   CheckCircle,
   FileCheck,
   Zap,
-  ExternalLink
+  ExternalLink,
+  Cpu,
+  Server,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -30,7 +33,10 @@ import {
   resizeSvgArtboard, 
   convertSvgToEps, 
   convertSvgToAi, 
-  convertEpsToAi 
+  convertEpsToAi,
+  checkVectorEngineStatus,
+  convertVectorViaBackend,
+  VectorEngineInfo
 } from '../utils/vectorConverter';
 import { embedMicrostockMetadata, createZipBlob } from '../utils/microstockEmbedder';
 import { VectorStudioModal } from './VectorStudioModal';
@@ -44,7 +50,7 @@ interface ConvertVectorGenViewProps {
   setShowActivationModal?: (show: boolean) => void;
 }
 
-export type TargetFormat = 'eps' | 'ai' | 'both';
+export type TargetFormat = 'eps' | 'ai' | 'both' | 'pdf' | 'svg' | 'all';
 
 export interface VectorQueueItem {
   id: string;
@@ -71,13 +77,31 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
   const [selectedPreset, setSelectedPreset] = useState<ArtboardPreset>(ADOBE_STOCK_PRESETS[0]);
   const [targetFormat, setTargetFormat] = useState<TargetFormat>('eps');
   const [marginPercent, setMarginPercent] = useState<number>(10);
+  const [textToPath, setTextToPath] = useState<boolean>(true);
   const [autoEmbedMetadata, setAutoEmbedMetadata] = useState<boolean>(true);
   const [autoDownload, setAutoDownload] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [isStudioOpen, setIsStudioOpen] = useState<boolean>(false);
+  const [engineInfo, setEngineInfo] = useState<VectorEngineInfo | null>(null);
+  const [isCheckingEngine, setIsCheckingEngine] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const refreshEngineStatus = async () => {
+    setIsCheckingEngine(true);
+    try {
+      const info = await checkVectorEngineStatus();
+      setEngineInfo(info);
+    } catch (_) {
+    } finally {
+      setIsCheckingEngine(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshEngineStatus();
+  }, []);
 
   const activeItem = items.find(i => i.id === activePreviewId) || items[0];
 
@@ -193,62 +217,118 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
 
     let workingSvg = item.previewSvg;
 
-    if (item.format === 'svg') {
-      if (!workingSvg) {
-        workingSvg = await item.file.text();
-      }
-      // Resize artboard with safe margins & centering
-      const resizedSvg = resizeSvgArtboard(workingSvg, currentWidth, currentHeight, marginPercent);
+    const meta = {
+      title: baseName.replace(/[-_]+/g, ' ').trim(),
+      description: baseName.replace(/[-_]+/g, ' ').trim() + ' vector graphic design artboard',
+      keywords: [baseName.split(/[-_]+/), 'vector', 'eps', 'ai', 'illustration', 'graphic', 'design', 'modern', 'commercial', 'adobe stock'].flat().filter(Boolean),
+      creator: 'MetaZo Contributor',
+      software: 'Adobe Illustrator / MetaZo PRO Convert VectorGen'
+    };
 
-      const meta = {
-        title: baseName.replace(/[-_]+/g, ' ').trim(),
-        description: baseName.replace(/[-_]+/g, ' ').trim() + ' vector graphic design artboard',
-        keywords: [baseName.split(/[-_]+/), 'vector', 'eps', 'ai', 'illustration', 'graphic', 'design', 'modern', 'commercial', 'adobe stock'].flat().filter(Boolean),
-        creator: 'MetaZo Contributor',
-        software: 'Adobe Illustrator / MetaZo PRO Convert VectorGen'
-      };
+    // Determine target formats to export
+    const formatsToExport: ('eps' | 'ai' | 'pdf' | 'svg')[] = [];
+    if (targetFormat === 'eps') formatsToExport.push('eps');
+    else if (targetFormat === 'ai') formatsToExport.push('ai');
+    else if (targetFormat === 'pdf') formatsToExport.push('pdf');
+    else if (targetFormat === 'svg') formatsToExport.push('svg');
+    else if (targetFormat === 'both') formatsToExport.push('eps', 'ai');
+    else if (targetFormat === 'all') formatsToExport.push('eps', 'ai', 'pdf', 'svg');
 
-      if (targetFormat === 'eps' || targetFormat === 'both') {
-        const epsBytes = convertSvgToEps(resizedSvg, currentWidth, currentHeight);
-        let epsBlob = new Blob([epsBytes], { type: 'application/postscript' });
-        if (autoEmbedMetadata) {
-          try {
-            epsBlob = await embedMicrostockMetadata(new File([epsBlob], baseName + '.eps', { type: 'application/postscript' }), meta);
-          } catch (_) {}
+    for (const fmt of formatsToExport) {
+      let convertedBlob: Blob | null = null;
+      let outFileName = `${baseName}_AdobeStock.${fmt}`;
+
+      // 1. Try High-Fidelity Inkscape Engine (FastAPI Docker or Host CLI) via backend
+      try {
+        const backendRes = await convertVectorViaBackend({
+          file: item.file,
+          fileName: item.file.name,
+          targetFormat: fmt,
+          targetWidth: currentWidth,
+          targetHeight: currentHeight,
+          marginPercent,
+          textToPath,
+          metadata: autoEmbedMetadata ? meta : undefined
+        });
+
+        if (backendRes && backendRes.blob && backendRes.blob.size > 0) {
+          convertedBlob = backendRes.blob;
+          outFileName = backendRes.fileName;
         }
-        results.push({ name: `${baseName}_AdobeStock.eps`, blob: epsBlob });
+      } catch (backendErr) {
+        console.warn(`[VECTOR ENGINE] Backend conversion failed for ${fmt}, using native fallback:`, backendErr);
       }
 
-      if (targetFormat === 'ai' || targetFormat === 'both') {
-        const aiBytes = convertSvgToAi(resizedSvg, currentWidth, currentHeight);
-        let aiBlob = new Blob([aiBytes], { type: 'application/illustrator' });
-        if (autoEmbedMetadata) {
-          try {
-            aiBlob = await embedMicrostockMetadata(new File([aiBlob], baseName + '.ai', { type: 'application/illustrator' }), meta);
-          } catch (_) {}
+      // 2. Fallback to Client Transpiler if backend was unreachable or threw an error
+      if (!convertedBlob) {
+        if (item.format === 'svg') {
+          if (!workingSvg) {
+            workingSvg = await item.file.text();
+          }
+          const resizedSvg = resizeSvgArtboard(workingSvg, currentWidth, currentHeight, marginPercent);
+
+          if (fmt === 'eps') {
+            const epsBytes = convertSvgToEps(resizedSvg, currentWidth, currentHeight);
+            let epsBlob = new Blob([epsBytes], { type: 'application/postscript' });
+            if (autoEmbedMetadata) {
+              try {
+                epsBlob = await embedMicrostockMetadata(new File([epsBlob], baseName + '.eps', { type: 'application/postscript' }), meta);
+              } catch (_) {}
+            }
+            convertedBlob = epsBlob;
+            outFileName = `${baseName}_AdobeStock.eps`;
+          } else if (fmt === 'ai' || fmt === 'pdf') {
+            const aiBytes = convertSvgToAi(resizedSvg, currentWidth, currentHeight);
+            let aiBlob = new Blob([aiBytes], { type: fmt === 'ai' ? 'application/illustrator' : 'application/pdf' });
+            if (autoEmbedMetadata) {
+              try {
+                aiBlob = await embedMicrostockMetadata(new File([aiBlob], `${baseName}.${fmt}`, { type: 'application/illustrator' }), meta);
+              } catch (_) {}
+            }
+            convertedBlob = aiBlob;
+            outFileName = `${baseName}_AdobeStock.${fmt}`;
+          } else if (fmt === 'svg') {
+            let svgBlob = new Blob([resizedSvg], { type: 'image/svg+xml' });
+            if (autoEmbedMetadata) {
+              try {
+                svgBlob = await embedMicrostockMetadata(new File([svgBlob], `${baseName}.svg`, { type: 'image/svg+xml' }), meta);
+              } catch (_) {}
+            }
+            convertedBlob = svgBlob;
+            outFileName = `${baseName}_AdobeStock.svg`;
+          }
+        } else if (item.format === 'eps') {
+          const arrayBuffer = await item.file.arrayBuffer();
+          if (fmt === 'ai') {
+            const aiBytes = convertEpsToAi(new Uint8Array(arrayBuffer), currentWidth, currentHeight);
+            let aiBlob = new Blob([aiBytes], { type: 'application/illustrator' });
+            if (autoEmbedMetadata) {
+              try {
+                aiBlob = await embedMicrostockMetadata(new File([aiBlob], baseName + '.ai', { type: 'application/illustrator' }), meta);
+              } catch (_) {}
+            }
+            convertedBlob = aiBlob;
+            outFileName = `${baseName}_Converted.ai`;
+          } else {
+            convertedBlob = new Blob([arrayBuffer], { type: 'application/postscript' });
+            outFileName = `${baseName}_AdobeStock.eps`;
+          }
+        } else if (item.format === 'ai') {
+          const arrayBuffer = await item.file.arrayBuffer();
+          if (fmt === 'eps') {
+            const epsBytes = convertEpsToAi(new Uint8Array(arrayBuffer), currentWidth, currentHeight);
+            convertedBlob = new Blob([epsBytes], { type: 'application/postscript' });
+            outFileName = `${baseName}_Converted.eps`;
+          } else {
+            convertedBlob = new Blob([arrayBuffer], { type: 'application/illustrator' });
+            outFileName = `${baseName}_Converted.ai`;
+          }
         }
-        results.push({ name: `${baseName}_AdobeStock.ai`, blob: aiBlob });
       }
-    } else if (item.format === 'eps') {
-      const arrayBuffer = await item.file.arrayBuffer();
-      const meta = {
-        title: baseName.replace(/[-_]+/g, ' ').trim(),
-        keywords: ['vector', 'eps', 'ai', 'adobe stock', 'illustration'],
-        software: 'Adobe Illustrator / MetaZo PRO Convert VectorGen'
-      };
 
-      const aiBytes = convertEpsToAi(new Uint8Array(arrayBuffer), currentWidth, currentHeight);
-      let aiBlob = new Blob([aiBytes], { type: 'application/illustrator' });
-      if (autoEmbedMetadata) {
-        try {
-          aiBlob = await embedMicrostockMetadata(new File([aiBlob], baseName + '.ai', { type: 'application/illustrator' }), meta);
-        } catch (_) {}
+      if (convertedBlob) {
+        results.push({ name: outFileName, blob: convertedBlob });
       }
-      results.push({ name: `${baseName}_Converted.ai`, blob: aiBlob });
-    } else if (item.format === 'ai') {
-      const arrayBuffer = await item.file.arrayBuffer();
-      const epsBytes = convertEpsToAi(new Uint8Array(arrayBuffer), currentWidth, currentHeight);
-      results.push({ name: `${baseName}_Converted.eps`, blob: new Blob([epsBytes], { type: 'application/postscript' }) });
     }
 
     return results;
@@ -332,16 +412,37 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
               <Maximize2 size={24} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl md:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">
                   Convert VectorGen
                 </h1>
                 <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   Adobe Stock 4MP+ Compliant
                 </span>
+                <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                  engineInfo?.status === 'online'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                }`}>
+                  <Cpu size={12} className={isCheckingEngine ? 'animate-spin text-emerald-500' : ''} />
+                  <span>
+                    {engineInfo?.engine === 'docker_fastapi' 
+                      ? 'Engine: Inkscape CLI (Docker Container)' 
+                      : engineInfo?.engine === 'host_inkscape' 
+                      ? 'Engine: Inkscape CLI (Host Engine)' 
+                      : 'Engine: Vector Transpiler (Fallback)'}
+                  </span>
+                  <button 
+                    onClick={refreshEngineStatus} 
+                    title="Refresh status engine" 
+                    className="ml-1 hover:text-emerald-500 transition-colors"
+                  >
+                    <RefreshCw size={10} className={isCheckingEngine ? 'animate-spin' : ''} />
+                  </button>
+                </div>
               </div>
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider font-mono">
-                Konversi batch SVG ➔ EPS 10, SVG ➔ AI, EPS ➔ AI & Auto-Resize ke 5000x5000 px (25 MP) dengan Safe Margins
+                Konversi batch SVG ➔ EPS 10, AI, PDF & Auto-Resize ke 5000x5000 px (25 MP) dengan Safe Margins
               </p>
             </div>
           </div>
@@ -596,43 +697,85 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setTargetFormat('eps')}
-                  className={`p-3 rounded-2xl border text-left transition-all ${
+                  className={`p-2.5 rounded-2xl border text-left transition-all ${
                     targetFormat === 'eps'
                       ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm'
                       : 'border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
                   <p className="text-xs font-black">EPS (EPS 10)</p>
-                  <p className="text-[9px] text-slate-400 mt-0.5">Photopea & Adobe Stock Ready</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">Adobe Stock & Microstock</p>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setTargetFormat('ai')}
-                  className={`p-3 rounded-2xl border text-left transition-all ${
+                  className={`p-2.5 rounded-2xl border text-left transition-all ${
                     targetFormat === 'ai'
                       ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm'
                       : 'border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
                   <p className="text-xs font-black">AI (Illustrator)</p>
-                  <p className="text-[9px] text-slate-400 mt-0.5">CS6 s/d CC 2026 Compatible</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">CS6 - CC 2026 Compatible</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTargetFormat('pdf')}
+                  className={`p-2.5 rounded-2xl border text-left transition-all ${
+                    targetFormat === 'pdf'
+                      ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm'
+                      : 'border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <p className="text-xs font-black">PDF (Vector)</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">High-Res Print Vector</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTargetFormat('svg')}
+                  className={`p-2.5 rounded-2xl border text-left transition-all ${
+                    targetFormat === 'svg'
+                      ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm'
+                      : 'border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <p className="text-xs font-black">SVG (Artboard)</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">Standardized 5000px</p>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setTargetFormat('both')}
-                  className={`col-span-2 p-3 rounded-2xl border text-left transition-all flex items-center justify-between ${
+                  className={`p-2.5 rounded-2xl border text-left transition-all flex items-center justify-between ${
                     targetFormat === 'both'
                       ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm'
                       : 'border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
                   <div>
-                    <p className="text-xs font-black">Multi-Export: EPS + AI Sekaligus</p>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Sangat direkomendasikan untuk upload multi-agensi</p>
+                    <p className="text-xs font-black">EPS + AI</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">Multi-Agensi</p>
                   </div>
-                  <Sparkles size={16} className="text-emerald-500 shrink-0 ml-2" />
+                  <Sparkles size={14} className="text-emerald-500 shrink-0 ml-1" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTargetFormat('all')}
+                  className={`p-2.5 rounded-2xl border text-left transition-all flex items-center justify-between ${
+                    targetFormat === 'all'
+                      ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm'
+                      : 'border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <div>
+                    <p className="text-xs font-black">All Formats</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">EPS, AI, PDF, SVG</p>
+                  </div>
+                  <Sparkles size={14} className="text-emerald-500 shrink-0 ml-1" />
                 </button>
               </div>
             </div>
@@ -688,6 +831,22 @@ export const ConvertVectorGenView: React.FC<ConvertVectorGenViewProps> = ({
                 value={marginPercent}
                 onChange={(e) => setMarginPercent(Number(e.target.value))}
                 className="w-full accent-emerald-500 cursor-pointer"
+              />
+            </div>
+
+            {/* Text to Path Vectorization Toggle */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 flex items-center justify-between">
+              <div className="pr-2">
+                <p className="text-xs font-black text-slate-800 dark:text-white">Text-to-Path Vectorization</p>
+                <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                  Mengonversi teks ke kurva vektor agar tidak ditolak Adobe Stock karena missing font.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={textToPath}
+                onChange={(e) => setTextToPath(e.target.checked)}
+                className="w-4 h-4 accent-emerald-500 rounded cursor-pointer shrink-0"
               />
             </div>
 
