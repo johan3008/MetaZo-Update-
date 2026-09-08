@@ -15,6 +15,7 @@ import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
 import { testFtpConnection, uploadToFtp } from './server/ftpService.ts';
 import { embedJpegMetadata, embedPngMetadata, embedSvgMetadata, embedEpsMetadata, embedEpsMetadataBytes, embedAiMetadataBytes, embedMp4MetadataBytes, ADOBE_CATEGORY_NAMES, cleanKeywordArray, resolveDateTaken, formatExifDate, formatIsoDate, formatIptcDate } from './src/utils/microstockEmbedder.ts';
+import { resizeSvgArtboard, convertSvgToEps, convertSvgToAi } from './src/utils/vectorConverter.ts';
 import fluentFfmpeg from 'fluent-ffmpeg';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
@@ -1678,12 +1679,12 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-metadata', async (req, res) => {
         try {
-            const { frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata } = req.body;
+            const { frames, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata, seasonalBoost } = req.body;
             if (!frames || !Array.isArray(frames)) {
                 return res.status(400).json({ error: 'Missing or invalid frames' });
             }
             const temperatureVal = temperature !== undefined ? parseFloat(String(temperature)) : undefined;
-            const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata);
+            const metadata = await generateStockMetadata(frames, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, exifMetadata, seasonalBoost);
             res.json(metadata);
         } catch (e: any) {
             console.warn('Server generate-metadata error:', e);
@@ -1697,12 +1698,12 @@ app.get('/api/debug-uploads', (req, res) => {
 
     app.post('/api/generate-batch-metadata', async (req, res) => {
         try {
-            const { items, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance } = req.body;
+            const { items, keywordCount, customPrompt, toolType, temperature, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, seasonalBoost } = req.body;
             if (!items || !Array.isArray(items)) {
                 return res.status(400).json({ error: 'Missing or invalid items' });
             }
             const temperatureVal = temperature !== undefined ? parseFloat(String(temperature)) : undefined;
-            const batchMetadata = await generateBatchStockMetadata(items, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance);
+            const batchMetadata = await generateBatchStockMetadata(items, keywordCount, customPrompt, toolType, temperatureVal, model, keywordMode, titleLength, metadataLanguage, aiModelPerformance, seasonalBoost);
             res.json(batchMetadata);
         } catch (e: any) {
             console.warn('Server generate-batch-metadata error:', e);
@@ -3252,6 +3253,331 @@ app.get('/api/debug-uploads', (req, res) => {
                     console.log("[MANDOR GC] Memori dibersihkan untuk worker selanjutnya.");
                 }
             }, 100);
+        }
+    });
+
+    // =========================================================================
+    // META-ZO CONVERT VECTORGEN: INKSCAPE CLI DOCKER & HOST BACKEND ENGINE
+    // =========================================================================
+
+    const VECTOR_SERVICE_URL = process.env.VECTOR_SERVICE_URL || 'http://localhost:8089';
+
+    function findInkscapeBin(): string | null {
+        const custom = process.env.INKSCAPE_PATH;
+        if (custom && fs.existsSync(custom)) return custom;
+
+        const candidates = [
+            'C:\\Program Files\\Inkscape\\bin\\inkscape.com',
+            'C:\\Program Files\\Inkscape\\bin\\inkscape.exe',
+            'C:\\Program Files (x86)\\Inkscape\\bin\\inkscape.com',
+            'C:\\Program Files (x86)\\Inkscape\\bin\\inkscape.exe',
+            '/usr/bin/inkscape',
+            '/usr/local/bin/inkscape'
+        ];
+        for (const c of candidates) {
+            if (fs.existsSync(c)) return c;
+        }
+        return null;
+    }
+
+    async function checkVectorServiceOnline(): Promise<{ online: boolean; details?: any }> {
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 1800);
+            const res = await fetch(`${VECTOR_SERVICE_URL}/health`, { signal: controller.signal });
+            clearTimeout(timer);
+            if (res.ok) {
+                const data = await res.json();
+                return { online: true, details: data };
+            }
+        } catch (_) {}
+        return { online: false };
+    }
+
+    function patchEpsHeadersForStock(epsPath: string, width: number, height: number) {
+        try {
+            let content = fs.readFileSync(epsPath, 'latin1');
+            const wInt = Math.round(width);
+            const hInt = Math.round(height);
+            const bboxStr = `%%BoundingBox: 0 0 ${wInt} ${hInt}`;
+            const hiresStr = `%%HiResBoundingBox: 0 0 ${width.toFixed(4)} ${height.toFixed(4)}`;
+
+            if (content.includes('%%BoundingBox:')) {
+                content = content.replace(/%%BoundingBox:[^\r\n]+/, bboxStr);
+            } else {
+                content = content.replace('%!PS-Adobe-3.0 EPSF-3.0', `%!PS-Adobe-3.0 EPSF-3.0\n${bboxStr}`);
+            }
+
+            if (content.includes('%%HiResBoundingBox:')) {
+                content = content.replace(/%%HiResBoundingBox:[^\r\n]+/, hiresStr);
+            } else {
+                content = content.replace(bboxStr, `${bboxStr}\n${hiresStr}`);
+            }
+
+            const aiComments = [
+                '%%Creator: Adobe Illustrator(R) 10.0 / MetaZo Convert VectorGen',
+                '%%AI8_CreatorVersion: 10.0.0',
+                '%AI5_FileFormat 2.0',
+                '%AI3_ColorUsage: Color'
+            ].join('\n');
+
+            if (!content.includes('%AI5_FileFormat')) {
+                content = content.replace('%%EndComments', `${aiComments}\n%%EndComments`);
+            }
+
+            fs.writeFileSync(epsPath, content, 'latin1');
+        } catch (err) {
+            console.warn('[VECTOR EPS PATCH WARN]', err);
+        }
+    }
+
+    // Check status of VectorGen engine (Docker FastAPI vs Host Inkscape vs Fallback)
+    app.get('/api/vector/engine-status', async (req, res) => {
+        try {
+            const dockerCheck = await checkVectorServiceOnline();
+            if (dockerCheck.online) {
+                return res.json({
+                    status: 'online',
+                    engine: 'docker_fastapi',
+                    serviceUrl: VECTOR_SERVICE_URL,
+                    inkscapeVersion: dockerCheck.details?.inkscape_version || 'Inkscape CLI in Docker Container',
+                    features: dockerCheck.details?.features || {
+                        text_to_path: true,
+                        adobe_stock_eps10: true,
+                        artboard_scaling: true
+                    }
+                });
+            }
+
+            const localInkscape = findInkscapeBin();
+            if (localInkscape) {
+                return res.json({
+                    status: 'online',
+                    engine: 'host_inkscape',
+                    inkscapePath: localInkscape,
+                    inkscapeVersion: 'Inkscape 1.3+ CLI (Host)',
+                    features: {
+                        text_to_path: true,
+                        adobe_stock_eps10: true,
+                        artboard_scaling: true
+                    }
+                });
+            }
+
+            return res.json({
+                status: 'fallback',
+                engine: 'fallback_js',
+                message: 'No Inkscape detected (Docker service or Host). Using browser/server native vector transpiler.'
+            });
+        } catch (err: any) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+
+    // High-fidelity Vector Conversion endpoint
+    app.post('/api/vector/convert', upload.single('file'), async (req, res) => {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No vector file uploaded.' });
+        }
+
+        const inputPath = req.file.path;
+        const originalName = req.file.originalname || 'vector.svg';
+        const baseName = path.parse(originalName).name;
+        const ext = path.extname(originalName).toLowerCase();
+
+        const targetFormat = String(req.body.target_format || 'eps').toLowerCase().trim();
+        const targetWidth = parseInt(String(req.body.target_width || 5000), 10) || 5000;
+        const targetHeight = parseInt(String(req.body.target_height || 5000), 10) || 5000;
+        const marginPercent = parseFloat(String(req.body.margin_percent || 10)) || 10;
+        const textToPath = String(req.body.text_to_path) !== 'false';
+        
+        let metadata: any = null;
+        if (req.body.metadata) {
+            try {
+                metadata = typeof req.body.metadata === 'string' ? JSON.parse(req.body.metadata) : req.body.metadata;
+            } catch (_) {}
+        }
+
+        const uniqueTmpDir = path.join(uploadDir, `vec_${Date.now()}_${Math.random().toString(36).substring(7)}`);
+        
+        try {
+            fs.mkdirSync(uniqueTmpDir, { recursive: true });
+
+            // Priority 1: Check Docker FastAPI Vector Microservice
+            const dockerCheck = await checkVectorServiceOnline();
+            if (dockerCheck.online) {
+                console.log(`[VECTOR ENGINE] Routing conversion to Docker FastAPI service for ${originalName}`);
+                const fileBuffer = await fs.promises.readFile(inputPath);
+                const forwardForm = new FormData();
+                const forwardBlob = new Blob([fileBuffer], { type: req.file.mimetype || 'image/svg+xml' });
+                forwardForm.append('file', forwardBlob, originalName);
+                forwardForm.append('target_format', targetFormat);
+                forwardForm.append('target_width', String(targetWidth));
+                forwardForm.append('target_height', String(targetHeight));
+                forwardForm.append('margin_percent', String(marginPercent));
+                forwardForm.append('text_to_path', textToPath ? 'true' : 'false');
+
+                const serviceRes = await fetch(`${VECTOR_SERVICE_URL}/convert`, {
+                    method: 'POST',
+                    body: forwardForm
+                });
+
+                if (serviceRes.ok) {
+                    let outBuf = Buffer.from(await serviceRes.arrayBuffer());
+
+                    // Microstock metadata injection
+                    if (metadata) {
+                        try {
+                            if (targetFormat === 'eps') {
+                                outBuf = Buffer.from(embedEpsMetadataBytes(new Uint8Array(outBuf), metadata));
+                            } else if (targetFormat === 'ai' || targetFormat === 'pdf') {
+                                outBuf = Buffer.from(embedAiMetadataBytes(new Uint8Array(outBuf), metadata));
+                            } else if (targetFormat === 'svg') {
+                                outBuf = Buffer.from(embedSvgMetadata(outBuf.toString('utf-8'), metadata), 'utf-8');
+                            }
+                        } catch (metaErr) {
+                            console.warn('[METADATA INJECT WARN]', metaErr);
+                        }
+                    }
+
+                    const outExt = targetFormat === 'ai' ? 'ai' : targetFormat;
+                    const mimeTypes: Record<string, string> = {
+                        eps: 'application/postscript',
+                        ai: 'application/illustrator',
+                        pdf: 'application/pdf',
+                        svg: 'image/svg+xml'
+                    };
+
+                    res.setHeader('Content-Type', mimeTypes[targetFormat] || 'application/octet-stream');
+                    res.setHeader('Content-Disposition', `attachment; filename="${baseName}_AdobeStock.${outExt}"`);
+                    res.setHeader('X-Engine', 'Inkscape-Docker-FastAPI');
+                    return res.send(outBuf);
+                } else {
+                    console.warn(`[VECTOR ENGINE] Docker service returned ${serviceRes.status}, falling back to host Inkscape...`);
+                }
+            }
+
+            // Priority 2: Local Host Inkscape CLI
+            const localInkscape = findInkscapeBin();
+            if (localInkscape) {
+                console.log(`[VECTOR ENGINE] Using Local Host Inkscape CLI: ${localInkscape} for ${originalName}`);
+                let preparedInputPath = inputPath;
+
+                // If input is SVG, pre-standardize artboard dimensions & safe margins
+                if (ext === '.svg') {
+                    try {
+                        const rawSvg = await fs.promises.readFile(inputPath, 'utf-8');
+                        const resizedSvg = resizeSvgArtboard(rawSvg, targetWidth, targetHeight, marginPercent);
+                        preparedInputPath = path.join(uniqueTmpDir, 'resized.svg');
+                        await fs.promises.writeFile(preparedInputPath, resizedSvg, 'utf-8');
+                    } catch (resizeErr) {
+                        console.warn('[VECTOR RESIZE WARN]', resizeErr);
+                    }
+                }
+
+                const isAi = (targetFormat === 'ai');
+                const inkscapeExportType = isAi ? 'pdf' : targetFormat;
+                const outExt = isAi ? 'ai' : inkscapeExportType;
+                const outputPath = path.join(uniqueTmpDir, `output.${outExt}`);
+
+                const inkscapeArgs = [
+                    preparedInputPath,
+                    `--export-filename=${outputPath}`,
+                    `--export-type=${inkscapeExportType}`,
+                    '--export-area-page'
+                ];
+
+                if (targetFormat === 'eps') {
+                    inkscapeArgs.push('--export-ps-level=3');
+                }
+                if (textToPath) {
+                    inkscapeArgs.push('--export-text-to-path');
+                }
+
+                await spawnAsync(localInkscape, inkscapeArgs, { timeout: 60000 });
+
+                if (!fs.existsSync(outputPath)) {
+                    throw new Error('Inkscape CLI failed to generate output file.');
+                }
+
+                if (targetFormat === 'eps') {
+                    patchEpsHeadersForStock(outputPath, targetWidth, targetHeight);
+                }
+
+                let outBuf = await fs.promises.readFile(outputPath);
+
+                if (metadata) {
+                    try {
+                        if (targetFormat === 'eps') {
+                            outBuf = Buffer.from(embedEpsMetadataBytes(new Uint8Array(outBuf), metadata));
+                        } else if (targetFormat === 'ai' || targetFormat === 'pdf') {
+                            outBuf = Buffer.from(embedAiMetadataBytes(new Uint8Array(outBuf), metadata));
+                        } else if (targetFormat === 'svg') {
+                            outBuf = Buffer.from(embedSvgMetadata(outBuf.toString('utf-8'), metadata), 'utf-8');
+                        }
+                    } catch (metaErr) {
+                        console.warn('[METADATA INJECT WARN]', metaErr);
+                    }
+                }
+
+                const mimeTypes: Record<string, string> = {
+                    eps: 'application/postscript',
+                    ai: 'application/illustrator',
+                    pdf: 'application/pdf',
+                    svg: 'image/svg+xml'
+                };
+
+                res.setHeader('Content-Type', mimeTypes[targetFormat] || 'application/octet-stream');
+                res.setHeader('Content-Disposition', `attachment; filename="${baseName}_AdobeStock.${outExt}"`);
+                res.setHeader('X-Engine', 'Host-Inkscape-CLI');
+                return res.send(outBuf);
+            }
+
+            // Priority 3: Fallback JavaScript Vector Transpiler
+            console.log(`[VECTOR ENGINE] Inkscape not available. Using fallback JS transpiler for ${originalName}`);
+            const rawFile = await fs.promises.readFile(inputPath);
+            let resultBuffer: Buffer;
+            const outExt = targetFormat;
+
+            if (ext === '.svg') {
+                const svgText = rawFile.toString('utf-8');
+                const resizedSvg = resizeSvgArtboard(svgText, targetWidth, targetHeight, marginPercent);
+                if (targetFormat === 'eps') {
+                    const epsBytes = convertSvgToEps(resizedSvg, targetWidth, targetHeight);
+                    resultBuffer = Buffer.from(epsBytes);
+                } else if (targetFormat === 'ai' || targetFormat === 'pdf') {
+                    const aiBytes = convertSvgToAi(resizedSvg, targetWidth, targetHeight);
+                    resultBuffer = Buffer.from(aiBytes);
+                } else {
+                    resultBuffer = Buffer.from(resizedSvg, 'utf-8');
+                }
+            } else {
+                throw new Error('Non-SVG format requires Inkscape CLI to convert.');
+            }
+
+            if (metadata) {
+                try {
+                    if (targetFormat === 'eps') {
+                        resultBuffer = Buffer.from(embedEpsMetadataBytes(new Uint8Array(resultBuffer), metadata));
+                    } else if (targetFormat === 'ai' || targetFormat === 'pdf') {
+                        resultBuffer = Buffer.from(embedAiMetadataBytes(new Uint8Array(resultBuffer), metadata));
+                    }
+                } catch (_) {}
+            }
+
+            res.setHeader('Content-Disposition', `attachment; filename="${baseName}_AdobeStock.${outExt}"`);
+            res.setHeader('X-Engine', 'Fallback-JS-Transpiler');
+            return res.send(resultBuffer);
+
+        } catch (err: any) {
+            console.error('[VECTOR CONVERT ERROR]', err);
+            return res.status(500).json({ error: err.message || 'Gagal mengonversi file vektor' });
+        } finally {
+            // Clean up files
+            try {
+                if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+                if (fs.existsSync(uniqueTmpDir)) fs.rmSync(uniqueTmpDir, { recursive: true, force: true });
+            } catch (_) {}
         }
     });
 
