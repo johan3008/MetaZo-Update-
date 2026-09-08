@@ -5301,6 +5301,8 @@ const App: React.FC = () => {
                 progressInfo={progressInfo}
                 keywordCount={keywordCount}
                 aiOptions={commonAiOptions}
+                keywordMode={keywordMode}
+                setKeywordMode={setKeywordMode}
                 handleDownloadSingleEmbedded={handleDownloadSingleEmbedded}
               />
 
