@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCcw, Zap, Clock, ArrowRight, Loader2, Calendar } from 'lucide-react';
+import { RefreshCcw, Zap, Clock, ArrowRight, Loader2 } from 'lucide-react';
 import { ToolType, ProgressInfo } from '../../types';
 
 interface AiConfigPanelProps {
@@ -18,8 +18,6 @@ interface AiConfigPanelProps {
   setAiCreativity: (val: number) => void;
   aiModelPerformance?: 'speed' | 'detail';
   setAiModelPerformance?: (val: 'speed' | 'detail') => void;
-  seasonalBoost?: string;
-  setSeasonalBoost?: (val: string) => void;
   isLoading: boolean;
   progressInfo: ProgressInfo | null;
   isPaused: boolean;
@@ -49,8 +47,6 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
   setAiCreativity,
   aiModelPerformance = 'detail',
   setAiModelPerformance = (val: 'speed' | 'detail') => {},
-  seasonalBoost = 'none',
-  setSeasonalBoost = (val: string) => {},
   isLoading,
   progressInfo,
   isPaused,
@@ -224,39 +220,6 @@ export const AiConfigPanel: React.FC<AiConfigPanelProps> = ({
                 <option value="ko">Korean / 한국어</option>
                 <option value="ru">Russian / Русский</option>
               </select>
-            </div>
-
-            {/* Seasonal & Commercial Keyword Booster */}
-            <div className="space-y-2 p-3.5 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5">
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                  <Calendar size={12} className="text-violet-500" />
-                  <span>Seasonal & Commercial Booster</span>
-                </label>
-                {seasonalBoost && seasonalBoost !== 'none' && (
-                  <span className="text-[8px] font-extrabold px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-950/60 text-violet-600 dark:text-violet-300 border border-violet-200/60 dark:border-violet-800/40 animate-pulse">
-                    Active
-                  </span>
-                )}
-              </div>
-              <select
-                value={seasonalBoost}
-                onChange={(e) => setSeasonalBoost?.(e.target.value)}
-                className="w-full h-10 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 font-medium"
-              >
-                <option value="none">Off (Pure Image Analysis)</option>
-                <option value="auto">🌟 Auto Commercial Intent (30-90 Days Ahead)</option>
-                <option value="christmas_winter">❄️ Winter Holidays & Christmas Season</option>
-                <option value="black_friday_sale">🛍️ Black Friday, Cyber Monday & Big Sales</option>
-                <option value="autumn_halloween">🍂 Autumn, Fall Harvest & Halloween</option>
-                <option value="spring_easter">🌸 Spring Season, Easter & Renewal</option>
-                <option value="summer_vacation">☀️ Summer Vacation, Travel & Beach</option>
-                <option value="ramadhan_eid">🌙 Ramadan, Eid Mubarak & Islamic Festivities</option>
-                <option value="new_year_resolutions">🎯 New Year, Business Planning & Goals</option>
-              </select>
-              <p className="text-[9px] text-slate-400 dark:text-slate-500 font-medium leading-relaxed">
-                Injects high-intent buyer keywords & commercial event tags into metadata for microstock search algorithms.
-              </p>
             </div>
 
             <div className="space-y-2 p-3.5 bg-slate-50/80 dark:bg-black/20 rounded-2xl border border-slate-200/50 dark:border-white/5">

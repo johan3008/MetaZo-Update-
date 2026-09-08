@@ -67,6 +67,9 @@ export interface StockMetadata {
   miricanvas_category: string;
   category_reason?: string;
   yolo_detected_objects?: YOLODetectedObject[];
+  isGenerativeAI?: boolean;
+  aiModelSource?: string;
+  fictionalPeopleProperty?: boolean;
 }
 
 export interface FileItem {
@@ -89,6 +92,9 @@ export interface FileItem {
   error: string | null;
   exifMetadata?: any;
   yolo_detected_objects?: YOLODetectedObject[];
+  isGenerativeAI?: boolean;
+  aiModelSource?: string;
+  fictionalPeopleProperty?: boolean;
 }
 
 export interface ProgressInfo {

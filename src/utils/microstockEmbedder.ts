@@ -33,6 +33,9 @@ export interface MicrostockMetadataInput {
   subject?: string;
   comment?: string;
   rating?: number;
+  isGenerativeAI?: boolean;
+  aiModelSource?: string;
+  fictionalPeopleProperty?: boolean;
 }
 
 export function resolveDateTaken(input?: string | Date | number): Date {
@@ -183,6 +186,8 @@ export function buildXmpPacket(metadata: MicrostockMetadataInput, mimeType: stri
       xmlns:dc="http://purl.org/dc/elements/1.1/"
       xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"
       xmlns:Iptc4xmpCore="http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/"
+      xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"
+      xmlns:plus="http://ns.useplus.org/ldf/xmp/1.0/"
       xmlns:xmp="http://ns.adobe.com/xap/1.0/"
       xmlns:xmpRights="http://ns.adobe.com/xap/1.0/rights/">
       <dc:format>${escapeXml(mimeType)}</dc:format>
@@ -221,12 +226,15 @@ ${suppCatItems}
         </rdf:Bag>
       </photoshop:SupplementalCategories>` : ''}
       <photoshop:Credit>${escapeXml(creator)}</photoshop:Credit>
-      <photoshop:Source>MetaZo AI Assistant</photoshop:Source>
+      <photoshop:Source>${escapeXml(metadata.aiModelSource ? `${metadata.aiModelSource} via MetaZo` : 'MetaZo AI Assistant')}</photoshop:Source>
+      ${metadata.isGenerativeAI ? `<Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType>` : ''}
+      ${metadata.isGenerativeAI && metadata.fictionalPeopleProperty ? `<plus:ModelReleaseStatus>http://ns.useplus.org/ldf/vocab/MR-NON</plus:ModelReleaseStatus>
+      <plus:PropertyReleaseStatus>http://ns.useplus.org/ldf/vocab/PR-NON</plus:PropertyReleaseStatus>` : ''}
       <xmp:CreateDate>${escapeXml(isoDate)}</xmp:CreateDate>
       <xmp:ModifyDate>${escapeXml(isoDate)}</xmp:ModifyDate>
       <xmp:MetadataDate>${escapeXml(isoDate)}</xmp:MetadataDate>
       <xmp:Rating>${rating}</xmp:Rating>
-      <xmp:CreatorTool>${escapeXml(software)}</xmp:CreatorTool>
+      <xmp:CreatorTool>${escapeXml(metadata.aiModelSource ? `${software} (${metadata.aiModelSource})` : software)}</xmp:CreatorTool>
       <xmpRights:Marked>True</xmpRights:Marked>
       <xmpRights:UsageTerms>
         <rdf:Alt>

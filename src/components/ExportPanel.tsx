@@ -34,6 +34,10 @@ interface ExportPanelProps {
   setEmbedNamingMode?: (mode: 'matching_csv' | 'seo_title') => void;
   handleSelectAllPlatforms?: (enableAll: boolean) => void;
   completedCount?: number;
+  isGenerativeAI?: boolean;
+  setIsGenerativeAI?: (v: boolean) => void;
+  aiModelSource?: string;
+  setAiModelSource?: (v: string) => void;
   t: any;
 }
 
@@ -70,6 +74,10 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   setEmbedNamingMode,
   handleSelectAllPlatforms,
   completedCount = 0,
+  isGenerativeAI = false,
+  setIsGenerativeAI,
+  aiModelSource = 'Midjourney',
+  setAiModelSource,
   t
 }) => {
   const platforms = [
@@ -314,6 +322,77 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* Generative AI Compliance Mode */}
+          <div className={`p-3.5 rounded-2xl border transition-all space-y-2.5 ${
+            isGenerativeAI
+              ? 'bg-violet-500/10 border-violet-500/30 dark:bg-violet-950/20 dark:border-violet-500/30 shadow-xs'
+              : 'bg-slate-50/80 dark:bg-black/20 border-slate-200/50 dark:border-white/5'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className={isGenerativeAI ? 'text-violet-600 dark:text-violet-400 animate-pulse' : 'text-slate-400'} />
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-xs font-extrabold text-slate-800 dark:text-slate-200 uppercase tracking-wider block">
+                      Generative AI Compliance
+                    </label>
+                    <span className={`text-[8px] font-black px-1.5 py-0.2 rounded uppercase ${
+                      isGenerativeAI ? 'bg-violet-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                    }`}>
+                      {isGenerativeAI ? 'ACTIVE' : 'OFF'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold block">
+                    Tag as AI Asset (Adobe Stock, Freepik CSV & IPTC XMP)
+                  </span>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsGenerativeAI && setIsGenerativeAI(!isGenerativeAI)}
+                className={`w-11 h-6 rounded-full p-0.5 transition-colors relative flex items-center cursor-pointer ${
+                  isGenerativeAI ? 'bg-[#7c3aed]' : 'bg-slate-300 dark:bg-slate-700'
+                }`}
+                title="Aktifkan kepatuhan resmi untuk aset hasil buatan AI"
+              >
+                <div 
+                  className={`w-5 h-5 rounded-full bg-white transition-all shadow-sm transform ${
+                    isGenerativeAI ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {isGenerativeAI && (
+              <div className="pt-2 border-t border-violet-200/40 dark:border-violet-800/30 space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    AI Generator / Model Source:
+                  </label>
+                  <span className="text-[8px] font-bold text-violet-600 dark:text-violet-400">
+                    Auto-fills Freepik CSV & XMP
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+                  {['Midjourney', 'Flux.1', 'Stable Diffusion', 'DALL-E 3', 'Firefly', 'Recraft'].map((modelName) => (
+                    <button
+                      key={modelName}
+                      type="button"
+                      onClick={() => setAiModelSource && setAiModelSource(modelName)}
+                      className={`py-1 px-1.5 text-[9px] font-extrabold rounded-xl border transition-all text-center truncate cursor-pointer ${
+                        aiModelSource === modelName
+                          ? 'bg-[#7c3aed] text-white border-[#7c3aed] shadow-xs'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-violet-400'
+                      }`}
+                    >
+                      {modelName}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Master Auto-Download Toggle */}

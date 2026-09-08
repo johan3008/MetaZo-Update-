@@ -589,11 +589,13 @@ interface ReviewQueueProps {
   isAllFinished: boolean;
   successfulFilesCount: number;
   canDownload: boolean;
-  isLoading?: boolean;
+isLoading?: boolean;
   progressInfo?: ProgressInfo | null;
   aiOptions?: any;
   keywordCount?: number | string;
   handleDownloadSingleEmbedded?: (file: FileItem) => void;
+  isGenerativeAI?: boolean;
+  aiModelSource?: string;
 }
 
 const FileNameInput: React.FC<{
@@ -643,7 +645,9 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
   progressInfo,
   aiOptions,
   keywordCount,
-  handleDownloadSingleEmbedded
+  handleDownloadSingleEmbedded,
+  isGenerativeAI = false,
+  aiModelSource = 'Midjourney'
 }) => {
   const hasFiles = files.length > 0;
   const [isFixingBatch, setIsFixingBatch] = React.useState(false);
@@ -1040,6 +1044,43 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                               <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-bold rounded-xl">
                                 📝 {file.title.length} chars
                               </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentAi = file.isGenerativeAI ?? isGenerativeAI;
+                                updateFiles(prev => prev.map(f => f.id === file.id ? { ...f, isGenerativeAI: !currentAi } : f));
+                              }}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-xl border transition-all cursor-pointer ${
+                                (file.isGenerativeAI ?? isGenerativeAI)
+                                  ? 'bg-violet-500/15 text-[#7c3aed] dark:text-violet-400 border-violet-500/30 hover:bg-violet-500/25'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:text-slate-600'
+                              }`}
+                              title="Klik untuk mengubah status kepatuhan Generative AI file ini"
+                            >
+                              <Sparkles size={10} />
+                              <span>{(file.isGenerativeAI ?? isGenerativeAI) ? `AI: ${file.aiModelSource || aiModelSource || 'Gen AI'}` : 'Non-AI'}</span>
+                            </button>
+                            {(file.isGenerativeAI ?? isGenerativeAI) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentVal = !!file.fictionalPeopleProperty;
+                                  updateFiles(prev => prev.map(f => f.id === file.id ? { ...f, fictionalPeopleProperty: !currentVal } : f));
+                                }}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-xl border transition-all cursor-pointer ${
+                                  file.fictionalPeopleProperty
+                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:text-slate-600'
+                                }`}
+                                title={
+                                  file.fictionalPeopleProperty
+                                    ? "Terdeteksi ada Orang/Properti: Kotak 'People and Property are fictional' di Adobe Stock otomatis DICENTANG (Bebas Model/Property Release)."
+                                    : "Tidak terdeteksi Orang/Properti (Alam/Abstrak/Objek). Kotak 'People and Property are fictional' di Adobe Stock otomatis TIDAK DICENTANG."
+                                }
+                              >
+                                <span>{file.fictionalPeopleProperty ? '👤🏛️ Fictional: YES ✅' : '🍃 Fictional: NO (No Release)'}</span>
+                              </button>
                             )}
                           </>
                         ) : (

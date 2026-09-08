@@ -37,7 +37,7 @@ import { SaaSPortal } from './src/components/SaaSPortal';
 import { FAQAccordion } from './src/components/FAQAccordion';
 import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
-import { copyToClipboard } from './src/utils';
+import { copyToClipboard, detectFictionalPeopleProperty } from './src/utils';
 import UTIF from 'utif';
 import piexif from 'piexifjs';
 import { embedMicrostockMetadata, createZipBlob } from './src/utils/microstockEmbedder';
@@ -1321,6 +1321,33 @@ const App: React.FC = () => {
   const [shutterstockDescMode, setShutterstockDescMode] = useState<'desc' | 'title_desc'>('desc');
   const [triggerAutoDownload, setTriggerAutoDownload] = useState(0);
   
+  const [isGenerativeAI, setIsGenerativeAI] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('mz_is_generative_ai') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [aiModelSource, setAiModelSource] = useState<string>(() => {
+    try {
+      return localStorage.getItem('mz_ai_model_source') || 'Midjourney';
+    } catch {
+      return 'Midjourney';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('mz_is_generative_ai', String(isGenerativeAI));
+    } catch {}
+  }, [isGenerativeAI]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('mz_ai_model_source', aiModelSource);
+    } catch {}
+  }, [aiModelSource]);
+
   const [showWelcomeScreen, setShowWelcomeScreen] = useState(() => {
       return !sessionStorage.getItem('vixer_welcomed');
   });
@@ -3567,6 +3594,14 @@ const App: React.FC = () => {
               };
               const metadata = await generateStockMetadata(analysisFrames, kCount, customPrompt, activeTool, aiCreativity, modelParam, keywordMode, aiOptions, titleLength, metadataLanguage, aiModelPerformance, exifMetadata);
               
+              const fictionalDetection = detectFictionalPeopleProperty(
+                metadata.title,
+                metadata.keywords,
+                metadata.category_id,
+                metadata.yolo_detected_objects
+              );
+              const shouldBeFictional = fictionalDetection.isFictionalEligible;
+
               updateFiles(prev => prev.map(f => f.id === fileItem.id ? {
                 ...f,
                 title: toSentenceCase(metadata.title),
@@ -3579,6 +3614,11 @@ const App: React.FC = () => {
                 miriCanvasCategory: metadata.miricanvas_category || '',
                 categoryReason: metadata.category_reason,
                 yolo_detected_objects: metadata.yolo_detected_objects,
+                isGenerativeAI: f.isGenerativeAI ?? isGenerativeAI,
+                aiModelSource: f.aiModelSource || aiModelSource,
+                fictionalPeopleProperty: f.fictionalPeopleProperty !== undefined 
+                  ? f.fictionalPeopleProperty 
+                  : ((f.isGenerativeAI ?? isGenerativeAI) ? shouldBeFictional : false),
                 isGenerating: false,
                 error: null
               } : f));
@@ -3754,6 +3794,14 @@ const App: React.FC = () => {
                 updateFiles(prev => prev.map(f => {
                     const result = batchResults.find(r => r.id === f.id);
                     if (result) {
+                        const fictionalDetection = detectFictionalPeopleProperty(
+                            result.metadata.title,
+                            result.metadata.keywords,
+                            result.metadata.category_id,
+                            result.metadata.yolo_detected_objects
+                        );
+                        const shouldBeFictional = fictionalDetection.isFictionalEligible;
+
                         return {
                             ...f,
                             title: toSentenceCase(result.metadata.title),
@@ -3766,6 +3814,11 @@ const App: React.FC = () => {
                             miriCanvasCategory: result.metadata.miricanvas_category || '',
                             categoryReason: result.metadata.category_reason,
                             yolo_detected_objects: result.metadata.yolo_detected_objects,
+                            isGenerativeAI: f.isGenerativeAI ?? isGenerativeAI,
+                            aiModelSource: f.aiModelSource || aiModelSource,
+                            fictionalPeopleProperty: f.fictionalPeopleProperty !== undefined
+                              ? f.fictionalPeopleProperty
+                              : ((f.isGenerativeAI ?? isGenerativeAI) ? shouldBeFictional : false),
                             isGenerating: false,
                             error: null
                         };
@@ -4227,14 +4280,24 @@ const App: React.FC = () => {
     };
 
     if (exportAdobe) {
-      // Adobe Stock CSV Format: Filename,Title,Keywords,Category
-      const headers = ['Filename', 'Title', 'Keywords', 'Category'];
-      const rows = toolFiles.map(f => [
-          escapeCsv(getExportFilename(f.customFileName || f.file.name, f.file)), 
-          escapeCsv(f.title || ''), 
-          escapeCsv((f.keywords || []).join(', ')), 
-          escapeCsv(String(f.adobeCategoryId || ''))
-      ]);
+      // Adobe Stock CSV Format: Filename,Title,Keywords,Category[,Generative AI]
+      const hasAnyAi = toolFiles.some(f => (f.isGenerativeAI ?? isGenerativeAI));
+      const headers = hasAnyAi 
+        ? ['Filename', 'Title', 'Keywords', 'Category', 'Generative AI']
+        : ['Filename', 'Title', 'Keywords', 'Category'];
+      const rows = toolFiles.map(f => {
+          const isAi = f.isGenerativeAI ?? isGenerativeAI;
+          const baseCols = [
+            escapeCsv(getExportFilename(f.customFileName || f.file.name, f.file)), 
+            escapeCsv(f.title || ''), 
+            escapeCsv((f.keywords || []).join(', ')), 
+            escapeCsv(String(f.adobeCategoryId || ''))
+          ];
+          if (hasAnyAi) {
+            baseCols.push(isAi ? 'yes' : 'no');
+          }
+          return baseCols;
+      });
       const csvContent = "\ufeff" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
@@ -4333,12 +4396,15 @@ const App: React.FC = () => {
       // Freepik CSV Format: File name;Title;Keywords;Prompt;Model
       const headers = ['File name', 'Title', 'Keywords', 'Prompt', 'Model'];
       const rows = toolFiles.map(f => {
+          const isAi = f.isGenerativeAI ?? isGenerativeAI;
+          const promptText = isAi ? (customPrompt || f.description || f.title || '') : '';
+          const modelText = isAi ? (f.aiModelSource || aiModelSource || 'Midjourney') : '';
           return [
               escapeSemicolonCsv(getExportFilename(f.customFileName || f.file.name, f.file)),
               escapeSemicolonCsv(f.title || ''),
               escapeSemicolonCsv((f.keywords || []).join(',')), // Freepik keywords comma separated
-              '', // Prompt
-              ''  // Model
+              escapeSemicolonCsv(promptText), // Prompt
+              escapeSemicolonCsv(modelText)  // Model
           ];
       });
       const csvContent = "\ufeff" + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
@@ -4466,6 +4532,12 @@ const App: React.FC = () => {
 
     const isVideo = ['mp4', 'mov', 'webm', 'm4v', 'avi'].includes(origExt);
 
+    const isItemAi = item.isGenerativeAI ?? isGenerativeAI;
+    const modelSource = item.aiModelSource || aiModelSource || 'Midjourney';
+    const isFictional = item.fictionalPeopleProperty ?? (
+      isItemAi ? detectFictionalPeopleProperty(title, keywords, item.adobeCategoryId, item.yolo_detected_objects).isFictionalEligible : false
+    );
+
     // 1. For Video files: prioritize Server FFmpeg engine to write full native Windows Explorer & Microstock metadata atoms
     if (isVideo) {
       try {
@@ -4484,6 +4556,11 @@ const App: React.FC = () => {
         if (item.shutterstockCategory2) formData.append('shutterstockCategory2', item.shutterstockCategory2);
         if (item.dreamstimeCategory) formData.append('dreamstimeCategory', item.dreamstimeCategory);
         if (item.miriCanvasCategory) formData.append('miriCanvasCategory', item.miriCanvasCategory);
+        if (isItemAi) {
+          formData.append('isGenerativeAI', 'true');
+          formData.append('aiModelSource', modelSource);
+          formData.append('fictionalPeopleProperty', isFictional ? 'true' : 'false');
+        }
         if (commonAiOptions?.model) formData.append('model', commonAiOptions.model);
 
         const reqHeaders = { ...getHeaders(commonAiOptions) };
@@ -4533,7 +4610,10 @@ const App: React.FC = () => {
         shutterstockCategory2: item.shutterstockCategory2,
         dreamstimeCategory: item.dreamstimeCategory,
         miriCanvasCategory: item.miriCanvasCategory,
-        software: 'MetaZo Microstock AI Assistant'
+        software: 'MetaZo Microstock AI Assistant',
+        isGenerativeAI: isItemAi,
+        aiModelSource: isItemAi ? modelSource : undefined,
+        fictionalPeopleProperty: isFictional
       });
 
       if (embeddedBlob && embeddedBlob.size > 0 && embeddedBlob !== item.file) {
@@ -4561,6 +4641,11 @@ const App: React.FC = () => {
         if (item.shutterstockCategory2) formData.append('shutterstockCategory2', item.shutterstockCategory2);
         if (item.dreamstimeCategory) formData.append('dreamstimeCategory', item.dreamstimeCategory);
         if (item.miriCanvasCategory) formData.append('miriCanvasCategory', item.miriCanvasCategory);
+        if (isItemAi) {
+          formData.append('isGenerativeAI', 'true');
+          formData.append('aiModelSource', modelSource);
+          formData.append('fictionalPeopleProperty', isFictional ? 'true' : 'false');
+        }
 
         const reqHeaders = { ...getHeaders(commonAiOptions) };
         delete reqHeaders['Content-Type'];
@@ -5296,6 +5381,8 @@ const App: React.FC = () => {
                 keywordCount={keywordCount}
                 aiOptions={commonAiOptions}
                 handleDownloadSingleEmbedded={handleDownloadSingleEmbedded}
+                isGenerativeAI={isGenerativeAI}
+                aiModelSource={aiModelSource}
               />
 
               {/* Section Row 3: Bulk Export Integration Panels */}
@@ -5334,6 +5421,10 @@ const App: React.FC = () => {
                     embedNamingMode={embedNamingMode}
                     setEmbedNamingMode={setEmbedNamingMode}
                     handleSelectAllPlatforms={handleSelectAllPlatforms}
+                    isGenerativeAI={isGenerativeAI}
+                    setIsGenerativeAI={setIsGenerativeAI}
+                    aiModelSource={aiModelSource}
+                    setAiModelSource={setAiModelSource}
                     t={t} 
                   />
                 )}
