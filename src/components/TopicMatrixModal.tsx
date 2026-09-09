@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Sparkles, Copy, Check, Download, Search, 
   ArrowRight, FileSpreadsheet, FileText, RefreshCw, 
-  Layers, Info
+  Layers, ChevronLeft, ArrowLeft
 } from 'lucide-react';
 import { copyToClipboard as robustCopy } from '../utils';
 import { getHeaders } from '../../services/geminiService';
@@ -219,44 +219,58 @@ export const TopicMatrixModal: React.FC<TopicMatrixModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-150" 
-      onClick={onClose}
+      className="fixed inset-0 z-[200] w-full h-full flex flex-col bg-[#f8f9fc] dark:bg-[#0f1422] text-slate-800 dark:text-slate-100 overflow-hidden animate-in fade-in duration-200" 
+      onClick={(e) => e.stopPropagation()}
     >
-      <div 
-        className="bg-white dark:bg-[#111827] rounded-3xl p-6 max-w-xl w-full shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col relative max-h-[90vh]" 
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Close button identical to Pengaturan Model AI */}
-        <button 
-          onClick={onClose} 
-          className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full transition-all"
-          title="Tutup Modal"
-        >
-          <X size={14} />
-        </button>
+      {/* Top Navbar Header (Full Window Bar) */}
+      <div className="h-16 px-4 sm:px-6 bg-white dark:bg-[#111827] border-b border-slate-200 dark:border-white/10 flex items-center justify-between shrink-0 shadow-sm">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onClose}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all mr-2"
+            title="Kembali ke Editor"
+          >
+            <ArrowLeft size={14} />
+            <span className="hidden sm:inline">{uiLanguage === 'id' ? 'Kembali' : 'Back'}</span>
+          </button>
 
-        {/* Header styled identical to Pengaturan Model AI */}
-        <div className="flex items-center space-x-2.5 mb-4 pb-3 border-b border-slate-200 dark:border-white/5 shrink-0 select-none">
-          <span className="p-1.5 bg-violet-500/10 rounded-2xl">
-            <Sparkles size={16} className="text-[#7c3aed]" />
+          <span className="p-2 bg-violet-500/10 rounded-2xl">
+            <Sparkles size={18} className="text-[#7c3aed]" />
           </span>
-          <div className="flex-1 flex items-center justify-between pr-8">
-            <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
-              {uiLanguage === 'id' ? '👑 Riset AI (Topik Bertingkat)' : '👑 AI Topic Research (Multi-Level)'}
-            </h2>
-            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-violet-500/10 text-[#7c3aed] dark:text-violet-400 border border-violet-500/20">
-              {providerName}
-            </span>
+
+          <div>
+            <div className="flex items-center space-x-2">
+              <h2 className="text-sm sm:text-base font-black text-slate-800 dark:text-white uppercase tracking-wider">
+                {uiLanguage === 'id' ? '👑 Riset AI • Eksplorasi Topik Bertingkat' : '👑 AI Topic Research • Multi-Level Explorer'}
+              </h2>
+              <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-violet-500/10 text-[#7c3aed] dark:text-violet-400 border border-violet-500/20">
+                {providerName}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400 hidden md:block">
+              {uiLanguage === 'id'
+                ? 'Riset ide judul komersial microstock dan visual AI: Medium (Volume Tinggi) • Specific (Adegan Jelas) • Niche (Long-tail)'
+                : 'Commercial stock and AI concept research: Medium (High Volume) • Specific (Clear Scene) • Niche (Long-tail)'}
+            </p>
           </div>
         </div>
 
-        {/* Input Card Container (Styled like Settings Main Provider Box) */}
-        <div className="mb-3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shrink-0 shadow-inner space-y-2.5">
-          <div>
-            <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] block mb-1.5 flex items-center gap-1.5">
-              <Search size={11} className="text-[#7c3aed]" />
-              {uiLanguage === 'id' ? 'Kata Kunci Utama / Tema Awal' : 'Seed Keyword / Theme'}
-            </label>
+        {/* Close Button at top right */}
+        <button 
+          onClick={onClose} 
+          className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-full transition-all"
+          title="Tutup Jendela"
+        >
+          <X size={16} />
+        </button>
+      </div>
+
+      {/* Control / Config Bar */}
+      <div className="px-4 sm:px-6 py-4 bg-white/70 dark:bg-[#111827]/70 backdrop-blur-md border-b border-slate-200 dark:border-white/10 shrink-0">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
+          {/* Keyword input */}
+          <div className="flex-1 relative">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={keyword}
@@ -264,47 +278,35 @@ export const TopicMatrixModal: React.FC<TopicMatrixModalProps> = ({
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !loading) handleGenerate();
               }}
-              placeholder={uiLanguage === 'id' ? "Contoh: feliz dia de la madre, ramadan coffee, cyberpunk street..." : "e.g. happy mothers day, ramadan coffee, cyberpunk street..."}
-              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-2 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all placeholder:text-slate-400 font-medium"
+              placeholder={uiLanguage === 'id' ? "Ketik kata kunci atau tema awal (contoh: feliz dia de la madre, ramadan coffee, cyberpunk...)" : "Enter seed keyword (e.g. mothers day, ramadan coffee, cyberpunk...)"}
+              className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all placeholder:text-slate-400 font-medium"
             />
           </div>
 
-          <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-                <Layers size={11} className="text-[#7c3aed]" />
-                {uiLanguage === 'id' ? 'Pilih Jumlah Ide' : 'Total Ideas'}
-              </label>
-              <span className="text-[9px] text-slate-400 font-bold">
-                {targetCount === 100 ? '30 Medium • 40 Specific • 30 Niche' : 
-                 targetCount === 50 ? '15 Medium • 20 Specific • 15 Niche' : 
-                 '10 Medium • 10 Specific • 10 Niche'}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {([30, 50, 100] as const).map((num) => (
-                <button
-                  key={num}
-                  type="button"
-                  onClick={() => setTargetCount(num)}
-                  className={`py-1.5 px-3 rounded-[1.25rem] border font-bold text-xs transition-all ${
-                    targetCount === num
-                      ? 'bg-white dark:bg-slate-950 border-[#7c3aed] text-[#7c3aed] shadow-sm'
-                      : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  {num} Ide
-                </button>
-              ))}
-            </div>
+          {/* Count Selector Pills */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] shrink-0">
+            {([30, 50, 100] as const).map((num) => (
+              <button
+                key={num}
+                type="button"
+                onClick={() => setTargetCount(num)}
+                className={`py-1.5 px-3.5 rounded-[1.25rem] font-bold text-xs transition-all ${
+                  targetCount === num
+                    ? 'bg-white dark:bg-[#111827] border border-[#7c3aed] text-[#7c3aed] shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                {num} Ide
+              </button>
+            ))}
           </div>
 
+          {/* Start Generate Button */}
           <button
             type="button"
             onClick={handleGenerate}
             disabled={loading || !keyword.trim()}
-            className={`w-full py-2.5 font-bold rounded-2xl text-xs uppercase shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${
+            className={`px-6 py-2.5 font-bold rounded-2xl text-xs uppercase shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 shrink-0 ${
               loading || !keyword.trim()
                 ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                 : 'bg-gradient-to-r from-violet-600 to-[#7c3aed] text-white shadow-violet-500/20 cursor-pointer hover:opacity-95'
@@ -312,54 +314,102 @@ export const TopicMatrixModal: React.FC<TopicMatrixModalProps> = ({
           >
             {loading ? (
               <>
-                <RefreshCw size={13} className="animate-spin" />
-                <span>{uiLanguage === 'id' ? 'Sedang Meracik...' : 'Generating Topics...'}</span>
+                <RefreshCw size={14} className="animate-spin" />
+                <span>{uiLanguage === 'id' ? 'Sedang Meracik...' : 'Generating...'}</span>
               </>
             ) : (
               <>
-                <Sparkles size={13} />
-                <span>{uiLanguage === 'id' ? 'Mulai Riset AI' : 'Start AI Research'}</span>
+                <Sparkles size={14} />
+                <span>{uiLanguage === 'id' ? 'Mulai Riset AI' : 'Start Research'}</span>
               </>
             )}
           </button>
         </div>
 
         {error && (
-          <div className="mb-3 p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs text-rose-600 dark:text-rose-400 font-semibold">
+          <div className="max-w-7xl mx-auto mt-2.5 p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs text-rose-600 dark:text-rose-400 font-semibold">
             {error}
           </div>
         )}
+      </div>
 
-        {/* Content Section */}
-        {result ? (
-          <div className="flex flex-col flex-1 overflow-hidden space-y-2.5">
-            {/* Tab dropdown styled identical to Settings Modal Tab selector */}
-            <div className="flex items-center gap-2">
-              <select
-                value={activeTab}
-                onChange={(e) => setActiveTab(e.target.value as any)}
-                className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[1.5rem] px-3 py-1.5 outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all shadow-sm"
+      {/* Sub Toolbar (Categories Tabs & Actions when results exist) */}
+      {result && (
+        <div className="px-4 sm:px-6 py-2.5 bg-slate-50 dark:bg-[#141b2d] border-b border-slate-200 dark:border-white/5 shrink-0">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+            {/* Category Filter Pills */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === 'all'
+                    ? 'bg-[#7c3aed] text-white shadow-sm'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
               >
-                <option value="all">Semua Kategori ({result.total} Topik)</option>
-                <option value="medium">🟦 Medium Topics ({result.medium.length} - Pencarian Umum)</option>
-                <option value="specific">🟩 Specific Topics ({result.specific.length} - Konsep Jelas)</option>
-                <option value="highlySpecific">🟪 Niche / Long-tail ({result.highlySpecific.length} - Konversi Tinggi)</option>
-              </select>
+                Semua ({result.total})
+              </button>
+              <button
+                onClick={() => setActiveTab('medium')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  activeTab === 'medium'
+                    ? 'bg-sky-500 text-white shadow-sm'
+                    : 'bg-sky-500/10 text-sky-600 dark:text-sky-400 hover:bg-sky-500/20'
+                }`}
+              >
+                <span>Medium</span>
+                <span className="text-[10px] opacity-80">({result.medium.length})</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('specific')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  activeTab === 'specific'
+                    ? 'bg-emerald-500 text-white shadow-sm'
+                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                }`}
+              >
+                <span>Specific</span>
+                <span className="text-[10px] opacity-80">({result.specific.length})</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('highlySpecific')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  activeTab === 'highlySpecific'
+                    ? 'bg-purple-500 text-white shadow-sm'
+                    : 'bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20'
+                }`}
+              >
+                <span>Niche / Long-tail</span>
+                <span className="text-[10px] opacity-80">({result.highlySpecific.length})</span>
+              </button>
+            </div>
 
-              {/* Action buttons */}
+            {/* Quick in-results search & export tools */}
+            <div className="flex items-center gap-2">
+              <div className="relative w-48 sm:w-60">
+                <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  placeholder={uiLanguage === 'id' ? `Saring ${filteredItems.length} topik...` : `Filter ${filteredItems.length} topics...`}
+                  className="w-full pl-8 pr-3 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed]"
+                />
+              </div>
+
               <button
                 type="button"
                 onClick={handleCopyAll}
-                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl text-xs font-bold transition-all flex items-center gap-1 shrink-0"
+                className="px-3 py-1 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shrink-0"
                 title="Salin Semua Topik"
               >
                 {copiedAll ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                <span>{copiedAll ? 'Tersalin' : 'Salin'}</span>
+                <span>{copiedAll ? 'Tersalin' : 'Salin Semua'}</span>
               </button>
               <button
                 type="button"
                 onClick={handleDownloadTxt}
-                className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-full transition-all shrink-0"
+                className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl transition-all shrink-0"
                 title="Download TXT"
               >
                 <FileText size={13} />
@@ -367,38 +417,32 @@ export const TopicMatrixModal: React.FC<TopicMatrixModalProps> = ({
               <button
                 type="button"
                 onClick={handleDownloadCsv}
-                className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full transition-all shrink-0"
-                title="Download CSV"
+                className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-xl transition-all shrink-0"
+                title="Download CSV (Excel)"
               >
                 <FileSpreadsheet size={13} />
               </button>
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Quick in-results search filter */}
-            <div className="relative">
-              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder={uiLanguage === 'id' ? `Saring ${filteredItems.length} topik...` : `Filter ${filteredItems.length} topics...`}
-                className="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[1.25rem] outline-none text-xs text-slate-800 dark:text-slate-100 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all placeholder:text-slate-400"
-              />
-            </div>
-
-            {/* Scrollable List identical to settings card list items */}
-            <div className="space-y-2 text-xs font-semibold overflow-y-auto pr-1 flex-1 scrollbar-thin">
-              {filteredItems.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs">
-                  Tidak ada topik yang cocok dengan pencarian Anda.
-                </div>
-              ) : (
-                filteredItems.map((item) => {
+      {/* Main Body Content: Multi-Column Grid spanning full body */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
+        <div className="max-w-7xl mx-auto">
+          {result ? (
+            filteredItems.length === 0 ? (
+              <div className="py-20 text-center text-slate-400 text-xs">
+                Tidak ada topik yang cocok dengan pencarian "{searchFilter}".
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {filteredItems.map((item) => {
                   const isCopied = copiedId === item.id;
                   const badgeClass = 
                     item.level === 'medium' ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20' :
                     item.level === 'specific' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' :
-                    'bg-violet-500/10 text-[#7c3aed] dark:text-violet-400 border-violet-500/20';
+                    'bg-purple-500/10 text-[#7c3aed] dark:text-violet-400 border-purple-500/20';
 
                   const badgeLabel = 
                     item.level === 'medium' ? 'Medium' :
@@ -407,28 +451,30 @@ export const TopicMatrixModal: React.FC<TopicMatrixModalProps> = ({
                   return (
                     <div 
                       key={item.id}
-                      className="p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between text-xs transition-all hover:border-[#7c3aed]/50 shadow-inner"
+                      className="group p-3.5 bg-white dark:bg-[#111827] border border-slate-200 dark:border-white/10 rounded-2xl flex flex-col justify-between transition-all hover:border-[#7c3aed]/60 hover:shadow-md dark:hover:shadow-black/20"
                     >
-                      <div className="flex items-center space-x-2.5 min-w-0 pr-2">
-                        <span className="text-[10px] font-mono text-slate-400 font-bold shrink-0">
-                          #{item.num}
-                        </span>
-                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md border shrink-0 ${badgeClass}`}>
-                          {badgeLabel}
-                        </span>
-                        <span className="text-slate-800 dark:text-slate-100 font-medium truncate">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono text-slate-400 font-bold">
+                            #{item.num}
+                          </span>
+                          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md border ${badgeClass}`}>
+                            {badgeLabel}
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 leading-relaxed group-hover:text-[#7c3aed] dark:group-hover:text-violet-400 transition-colors">
                           {item.text}
-                        </span>
+                        </p>
                       </div>
 
-                      <div className="flex items-center space-x-1.5 shrink-0">
+                      <div className="flex items-center justify-end space-x-2 pt-3 mt-3 border-t border-slate-100 dark:border-white/5">
                         <button
                           type="button"
                           onClick={() => handleCopySingle(item.text, item.id)}
-                          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl transition-all"
+                          className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all"
                           title="Salin Topik"
                         >
-                          {isCopied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                          {isCopied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
                         </button>
                         <button
                           type="button"
@@ -436,34 +482,34 @@ export const TopicMatrixModal: React.FC<TopicMatrixModalProps> = ({
                             onSelectTopic(item.text);
                             onClose();
                           }}
-                          className="px-2.5 py-1 bg-[#7c3aed] hover:bg-violet-700 text-white font-bold text-[11px] rounded-xl flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
-                          title="Jadikan Subject Prompt"
+                          className="px-3 py-1.5 bg-[#7c3aed] hover:bg-violet-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                          title="Jadikan Subject Prompt di Prompt Studio"
                         >
                           <span>Gunakan</span>
-                          <ArrowRight size={11} />
+                          <ArrowRight size={12} />
                         </button>
                       </div>
                     </div>
                   );
-                })
-              )}
+                })}
+              </div>
+            )
+          ) : (
+            <div className="py-24 text-center text-slate-400 flex flex-col items-center justify-center space-y-3">
+              <span className="p-3 bg-violet-500/10 rounded-3xl text-[#7c3aed]">
+                <Sparkles size={28} />
+              </span>
+              <h3 className="text-sm sm:text-base font-bold text-slate-700 dark:text-slate-200">
+                {uiLanguage === 'id' ? 'Studio Riset AI: Jelajahi Puluhan Ide Topik Komersial' : 'AI Topic Studio: Explore Commercial Themes'}
+              </h3>
+              <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+                {uiLanguage === 'id'
+                  ? 'Ketik kata kunci atau tema awal pada bilah atas, pilih jumlah ide (30, 50, atau 100), lalu klik "Mulai Riset AI" untuk meracik ide judul bertingkat dalam tampilan luas.'
+                  : 'Type a seed theme above, choose total ideas (30, 50, or 100), then click "Start Research" to explore multi-level topics in full-screen.'}
+              </p>
             </div>
-          </div>
-        ) : (
-          <div className="py-8 text-center text-slate-400 text-xs flex flex-col items-center justify-center space-y-2">
-            <span className="p-2.5 bg-violet-500/10 rounded-2xl text-[#7c3aed]">
-              <Sparkles size={20} />
-            </span>
-            <p className="font-semibold text-slate-700 dark:text-slate-300">
-              {uiLanguage === 'id' ? 'Siap Meriset Ide Topik Komersial' : 'Ready to Explore Commercial Topics'}
-            </p>
-            <p className="text-[11px] text-slate-400 max-w-sm leading-relaxed">
-              {uiLanguage === 'id'
-                ? 'Ketik kata kunci di atas lalu klik tombol "Mulai Riset AI" untuk menghasilkan variasi topik Medium, Specific, dan Niche.'
-                : 'Enter a keyword above and click "Start AI Research" to generate Medium, Specific, and Niche topic variations.'}
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
