@@ -235,6 +235,7 @@ export function getHeuristicCategories(title: string, keywords: string[]): {
   category_id: number;
   shutterstock_category_1: string;
   shutterstock_category_2: string;
+  miricanvas_category: string;
 } {
   const t = String(title || "").toLowerCase();
   const kList = (keywords || []).map(x => String(x).toLowerCase());
@@ -323,10 +324,38 @@ export function getHeuristicCategories(title: string, keywords: string[]): {
 
   const choice = mapping[bestCatId] || { cat1: "Abstract", cat2: "Backgrounds/Textures" };
 
+  // Calculate MiriCanvas category: 'Background', 'Frame', 'Object', 'Icon', 'Line', 'Photo', 'Text', 'Template'
+  const hasMiriPattern = (patterns: string[]): boolean => {
+    return patterns.some(pattern => {
+      const regex = new RegExp(`(^|[\\s,.-])${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s,.-]|$)`, 'i');
+      return regex.test(t) || kList.some(k => k === pattern || regex.test(k));
+    });
+  };
+
+  let miriCat = "Photo";
+  if (hasMiriPattern(['typography', 'lettering', 'calligraphy', 'quote', 'quotes', 'font', 'fonts', 'typeface', 'word art', 'text art', 'tulisan', 'kaligrafi'])) {
+    miriCat = "Text";
+  } else if (hasMiriPattern(['icon', 'icons', 'symbol', 'symbols', 'pictogram', 'glyph', 'logo', 'badge', 'sign', 'emblem', 'lambang', 'simbol', 'ikon'])) {
+    miriCat = "Icon";
+  } else if (hasMiriPattern(['divider', 'dividers', 'line', 'lines', 'border line', 'dashed line', 'separator', 'stroke', 'swirl', 'garis', 'pembatas'])) {
+    miriCat = "Line";
+  } else if (hasMiriPattern(['frame', 'frames', 'border', 'borders', 'photo frame', 'floral frame', 'corner', 'wreath', 'bingkai', 'pigura'])) {
+    miriCat = "Frame";
+  } else if (hasMiriPattern(['template', 'templates', 'flyer', 'flyers', 'banner', 'banners', 'poster', 'posters', 'brochure', 'invitation', 'business card', 'layout', 'undangan', 'brosur'])) {
+    miriCat = "Template";
+  } else if ([1, 4, 7, 9, 10, 14, 18, 19, 20].includes(bestCatId) || hasMiriPattern(['isolated', 'white background', 'transparent background', 'object', 'objects', 'cutout', 'item', 'items', '3d render', 'illustration', 'clipart', 'benda', 'barang'])) {
+    miriCat = "Object";
+  } else if (bestCatId === 8 || bestCatId === 11 || hasMiriPattern(['background', 'backgrounds', 'texture', 'textures', 'pattern', 'patterns', 'wallpaper', 'wallpapers', 'backdrop', 'abstract', 'gradient', 'seamless', 'landscape', 'scenery', 'latar belakang', 'pola', 'tekstur'])) {
+    miriCat = "Background";
+  } else {
+    miriCat = "Photo";
+  }
+
   return {
     category_id: bestCatId,
     shutterstock_category_1: choice.cat1,
-    shutterstock_category_2: choice.cat2
+    shutterstock_category_2: choice.cat2,
+    miricanvas_category: miriCat
   };
 }
 
@@ -3853,6 +3882,7 @@ export const generateStockMetadata = async (
 
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
+  const miriCanvasCategoriesText = MIRICANVAS_CATEGORIES.join(', ');
   
   const imageParts = frames.map(frame => processFrameServer(frame));
 
@@ -3968,6 +3998,7 @@ ${florenceContextPrompt}
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
 - Shutterstock Categories: ${shutterstockCategoriesText}
+- MiriCanvas Categories: ${miriCanvasCategoriesText} (Options: Background, Frame, Object, Icon, Line, Photo, Text, Template)
 
 OUTPUT FORMAT:
 {
@@ -4293,12 +4324,16 @@ ${seasonalInstruction ? `\n${seasonalInstruction}` : ''}
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the visually suggested category id "${visualFacts?.semantic_category_analysis?.adobe_id || ""}" with semantic reason "${visualFacts?.semantic_category_analysis?.reason || ""}" if it perfectly matches the visual content.
 2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the visually suggested categories "${visualFacts?.semantic_category_analysis?.shutterstock_category_1 || ""}" and "${visualFacts?.semantic_category_analysis?.shutterstock_category_2 || ""}" if accurate.
+3. MiriCanvas: Select EXACTLY one valid category from: "Background", "Frame", "Object", "Icon", "Line", "Photo", "Text", "Template". Select "Icon" for icons/symbols, "Line" for dividers/borders/lines, "Frame" for frames, "Text" for typography/lettering, "Template" for full layouts/cards/flyers, "Background" for wallpapers/patterns/textures/backdrops, "Object" for isolated 3D renders/illustrations/items, and "Photo" for realistic photographs.
 
 Adobe Stock Categories:
 ${categoriesText}
 
 Shutterstock Categories:
 ${shutterstockCategoriesText}
+
+MiriCanvas Categories:
+${miriCanvasCategoriesText}
 
 VISUAL_FACTS:
 ${JSON.stringify(visualFacts, null, 2)}
@@ -4350,7 +4385,7 @@ OUTPUT FORMAT:
       shutterstock_category_1: heur.shutterstock_category_1, 
       shutterstock_category_2: heur.shutterstock_category_2,
       dreamstime_category: "Abstract",
-      miricanvas_category: "Background" 
+      miricanvas_category: heur.miricanvas_category || "Background" 
     };
   }
 
@@ -4441,6 +4476,13 @@ OUTPUT FORMAT:
       }
       data.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : (validShutterstockCats.find(cat => cat !== data.shutterstock_category_1) || "Backgrounds/Textures");
     }
+
+    // 3. Sanitasi & Fallback Otomatis Kategori MiriCanvas
+    const validMiriCanvasCats = MIRICANVAS_CATEGORIES;
+    if (!data.miricanvas_category || !validMiriCanvasCats.includes(data.miricanvas_category)) {
+      const heur = getHeuristicCategories(data.title, data.keywords || []);
+      data.miricanvas_category = validMiriCanvasCats.includes(heur.miricanvas_category) ? heur.miricanvas_category : (toolType === ToolType.VECTOR ? "Object" : "Photo");
+    }
     
     data.category_reason = data.category_reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
     
@@ -4500,7 +4542,7 @@ OUTPUT FORMAT:
         recovery.shutterstock_category_1 = heur.shutterstock_category_1;
         recovery.shutterstock_category_2 = heur.shutterstock_category_2;
         recovery.dreamstime_category = "Abstract";
-        recovery.miricanvas_category = "Background";
+        recovery.miricanvas_category = heur.miricanvas_category || "Background";
       }
 
       recovery.category_reason = recovery.category_reason || visualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
@@ -4568,6 +4610,7 @@ export const generateBatchStockMetadata = async (
 
   const categoriesText = ADOBE_CATEGORIES.map(c => `${c.id}: ${c.name}`).join(', ');
   const shutterstockCategoriesText = (toolType === ToolType.VIDEO ? SHUTTERSTOCK_CATEGORIES_VIDEO : SHUTTERSTOCK_CATEGORIES).join(', ');
+  const miriCanvasCategoriesText = MIRICANVAS_CATEGORIES.join(', ');
 
   // Amankan hitungan target keyword sejak awal
   const targetCount = parseInt(String(keywordCount), 10) || 50; // Dynamic keyword rules: no fixed slots, no category quotas.
@@ -4682,6 +4725,7 @@ ${itemFlorenceContextPrompt}
 OFFICIAL MICROSTOCK CATEGORY REFERENTIALS FOR SEMANTIC SUGGESTIONS:
 - Adobe Stock Categories: ${categoriesText}
 - Shutterstock Categories: ${shutterstockCategoriesText}
+- MiriCanvas Categories: ${miriCanvasCategoriesText} (Options: Background, Frame, Object, Icon, Line, Photo, Text, Template)
 
 OUTPUT FORMAT:
 {
@@ -4831,12 +4875,16 @@ ${seasonalInstruction ? `\n${seasonalInstruction}` : ''}
 Rules for Categories:
 1. Adobe: Choose carefully from the provided list. Heavily prioritize the suggested adobe_id from the corresponding visual_facts if accurate.
 2. Shutterstock: Category 1 and Category 2 MUST be selected from the provided list and MUST NOT be the same. Heavily prioritize the suggested shutterstock categories from target visual_facts if accurate.
+3. MiriCanvas: Select EXACTLY one valid category from: "Background", "Frame", "Object", "Icon", "Line", "Photo", "Text", "Template".
 
 Adobe Stock Categories:
 ${categoriesText}
 
 Shutterstock Categories:
 ${shutterstockCategoriesText}
+
+MiriCanvas Categories:
+${miriCanvasCategoriesText}
 
 STRICT DEFINING RULES:
 - Return a JSON OBJECT containing a "results" array of exactly ${items.length} objects.
@@ -5053,8 +5101,8 @@ OUTPUT FORMAT:
         category_id: heur.category_id, 
         shutterstock_category_1: heur.shutterstock_category_1, 
         shutterstock_category_2: heur.shutterstock_category_2,
-      dreamstime_category: "Abstract",
-      miricanvas_category: "Background" 
+        dreamstime_category: "Abstract",
+        miricanvas_category: heur.miricanvas_category || "Background" 
       };
     });
   }
@@ -5162,6 +5210,13 @@ OUTPUT FORMAT:
               secondFallback = validShutterstockCats.find(cat => cat !== metadata.shutterstock_category_1) || possibleVal;
           }
           metadata.shutterstock_category_2 = validShutterstockCats.includes(secondFallback) ? secondFallback : (validShutterstockCats.find(cat => cat !== metadata.shutterstock_category_1) || "Backgrounds/Textures");
+        }
+
+        // 3. Sanitasi & Fallback Otomatis Kategori MiriCanvas
+        const validMiriCanvasCats = MIRICANVAS_CATEGORIES;
+        if (!metadata.miricanvas_category || !validMiriCanvasCats.includes(metadata.miricanvas_category)) {
+          const heur = getHeuristicCategories(metadata.title, metadata.keywords || []);
+          metadata.miricanvas_category = validMiriCanvasCats.includes(heur.miricanvas_category) ? heur.miricanvas_category : (toolType === ToolType.VECTOR ? "Object" : "Photo");
         }
 
         metadata.category_reason = metadata.category_reason || assetVisualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";

@@ -4,7 +4,7 @@ import { copyToClipboard as robustCopy } from '../utils';
 import { getHeaders } from '../../services/geminiService';
 import { 
   Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X, Loader2,
-  FileSpreadsheet, CheckCheck, FileText, SlidersHorizontal, Layers, ShieldCheck, Filter
+  FileSpreadsheet, CheckCheck, FileText, SlidersHorizontal, Layers, ShieldCheck, Filter, Lock
 } from 'lucide-react';
 
 import { FeatureGuideButton } from './FeatureGuideModal';
@@ -233,6 +233,14 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   };
 
   const triggerAutoSubject = async () => {
+    if (!isLicensed) {
+      if (setShowActivationModal) {
+        setShowActivationModal(true);
+      } else {
+        setError(uiLanguage === 'id' ? 'Fitur Ide Subject AI khusus untuk pengguna PRO. Silakan aktivasi lisensi Anda.' : 'AI Subject Idea is an exclusive PRO feature. Please activate your license.');
+      }
+      return;
+    }
     setIsAutoGeneratingSubject(true);
     const marketResearchFallbacks = promptMode === 'png' ? [
       "Modern Fintech Credit Card with Shield",
@@ -948,14 +956,30 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                         }
                         triggerAutoSubject();
                       }}
-                      disabled={isAutoGeneratingSubject}
-                      className="px-2.5 py-1 bg-gradient-to-r from-amber-500/15 via-purple-500/15 to-indigo-500/15 hover:from-amber-500/25 hover:to-purple-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-sm text-[11px] font-bold"
-                      title={uiLanguage === 'id' ? "Ubah kata kunci sederhana menjadi Judul / Topik Tren komersial otomatis (Khusus PRO)" : "Transform simple keywords into trending commercial stock titles/topics (PRO Only)"}
+                      disabled={!isLicensed || isAutoGeneratingSubject}
+                      className={`px-2.5 py-1 rounded-xl transition-all flex items-center gap-1.5 shadow-sm text-[11px] font-bold ${
+                        !isLicensed 
+                          ? 'bg-slate-100 dark:bg-slate-800/70 border border-slate-300/80 dark:border-slate-700/80 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-75' 
+                          : 'bg-gradient-to-r from-amber-500/15 via-purple-500/15 to-indigo-500/15 hover:from-amber-500/25 hover:to-purple-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 active:scale-95 cursor-pointer'
+                      }`}
+                      title={
+                        !isLicensed 
+                          ? (uiLanguage === 'id' ? "Fitur Ide Judul / Topik AI Terkunci (Khusus Akun Pro)" : "AI Title / Topic Idea Feature Locked (Pro Only)")
+                          : (uiLanguage === 'id' ? "Ubah kata kunci sederhana menjadi Judul / Topik Tren komersial otomatis" : "Transform simple keywords into trending commercial stock titles/topics")
+                      }
                     >
-                      <Sparkles size={12} className={`${isAutoGeneratingSubject ? 'animate-spin text-amber-500' : 'text-amber-600 dark:text-amber-400'}`} />
-                      <span>{isAutoGeneratingSubject ? (uiLanguage === 'id' ? 'Meracik Judul...' : 'Crafting Title...') : (uiLanguage === 'id' ? '👑 Ide Judul / Topik AI' : '👑 AI Title / Topic Idea')}</span>
+                      {!isLicensed ? (
+                        <Lock size={12} className="text-amber-500 dark:text-amber-400" />
+                      ) : (
+                        <Sparkles size={12} className={`${isAutoGeneratingSubject ? 'animate-spin text-amber-500' : 'text-amber-600 dark:text-amber-400'}`} />
+                      )}
+                      <span>
+                        {!isLicensed 
+                          ? (uiLanguage === 'id' ? 'Ide Subject AI' : 'AI Subject Idea')
+                          : (isAutoGeneratingSubject ? (uiLanguage === 'id' ? 'Meracik Judul...' : 'Crafting Title...') : (uiLanguage === 'id' ? '👑 Ide Judul / Topik AI' : '👑 AI Title / Topic Idea'))}
+                      </span>
                       {!isLicensed && (
-                        <span className="text-[9px] bg-gradient-to-r from-amber-500 to-amber-600 text-white font-black px-1.5 py-0.2 rounded-md uppercase tracking-wider shadow-xs">
+                        <span className="text-[9px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5">
                           PRO
                         </span>
                       )}

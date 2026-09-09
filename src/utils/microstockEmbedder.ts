@@ -167,8 +167,9 @@ export function buildXmpPacket(metadata: MicrostockMetadataInput, mimeType: stri
   const adobeCatName = (!isNaN(catNum) && ADOBE_CATEGORY_NAMES[catNum]) ? ADOBE_CATEGORY_NAMES[catNum] : '';
   const sstCat1 = metadata.shutterstockCategory1?.trim() || '';
   const sstCat2 = metadata.shutterstockCategory2?.trim() || '';
+  const miriCat = metadata.miriCanvasCategory?.trim() || '';
 
-  const supplementalCats = [adobeCatName, sstCat1, sstCat2].filter(c => Boolean(c && c.length > 0));
+  const supplementalCats = [adobeCatName, sstCat1, sstCat2, miriCat].filter(c => Boolean(c && c.length > 0));
   const uniqueSuppCats = Array.from(new Set(supplementalCats));
 
   const keywordItems = keywords

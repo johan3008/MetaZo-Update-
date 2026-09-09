@@ -310,3 +310,87 @@ export const detectFictionalPeopleProperty = (
   };
 };
 
+/**
+ * Heuristically detects the official MiriCanvas category ('Background', 'Frame', 'Object', 'Icon', 'Line', 'Photo', 'Text', 'Template').
+ */
+export const detectMiriCanvasCategory = (
+  title?: string,
+  keywords?: string[],
+  adobeCategoryId?: number | '',
+  toolType?: string,
+  yoloObjects?: Array<{ label?: string; name?: string }>
+): string => {
+  const t = String(title || '').toLowerCase();
+  const kw = (keywords || []).map(k => String(k).toLowerCase());
+  const hasPattern = (patterns: string[]): boolean => {
+    return patterns.some(pattern => {
+      // Check as whole word / whole keyword
+      const regex = new RegExp(`(^|[\\s,.-])${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s,.-]|$)`, 'i');
+      return regex.test(t) || kw.some(k => k === pattern || regex.test(k));
+    });
+  };
+
+  // 1. Text & Typography check (priority before icon)
+  const textPatterns = ['typography', 'lettering', 'calligraphy', 'quote', 'quotes', 'font', 'fonts', 'typeface', 'word art', 'text art', 'tulisan', 'kaligrafi'];
+  if (hasPattern(textPatterns)) {
+    return 'Text';
+  }
+
+  // 2. Icon & Symbol check
+  const iconPatterns = ['icon', 'icons', 'symbol', 'symbols', 'pictogram', 'glyph', 'logo', 'badge', 'sign', 'emblem', 'lambang', 'simbol', 'ikon'];
+  if (hasPattern(iconPatterns)) {
+    return 'Icon';
+  }
+
+  // 3. Line & Divider check
+  const linePatterns = ['divider', 'dividers', 'line', 'lines', 'border line', 'dashed line', 'separator', 'stroke', 'swirl', 'garis', 'pembatas'];
+  if (hasPattern(linePatterns)) {
+    return 'Line';
+  }
+
+  // 4. Frame & Border check
+  const framePatterns = ['frame', 'frames', 'border', 'borders', 'photo frame', 'floral frame', 'corner', 'wreath', 'bingkai', 'pigura'];
+  if (hasPattern(framePatterns)) {
+    return 'Frame';
+  }
+
+  // 5. Template check
+  const templatePatterns = ['template', 'templates', 'flyer', 'flyers', 'banner', 'banners', 'poster', 'posters', 'brochure', 'invitation', 'business card', 'layout', 'undangan', 'brosur'];
+  if (hasPattern(templatePatterns)) {
+    return 'Template';
+  }
+
+  // 6. Object check (isolated items, cutouts, animals, food, products, electronics, etc.)
+  const objectPatterns = ['isolated', 'white background', 'transparent background', 'object', 'objects', 'cutout', 'item', 'items', '3d render', 'illustration', 'clipart', 'benda', 'barang'];
+  if (
+    hasPattern(objectPatterns) ||
+    (yoloObjects && yoloObjects.length > 0) ||
+    adobeCategoryId === 1 || // Animals
+    adobeCategoryId === 4 || // Drinks
+    adobeCategoryId === 7 || // Food
+    adobeCategoryId === 14 || // Plants and Flowers
+    adobeCategoryId === 18 || // Sports
+    adobeCategoryId === 19 || // Technology
+    adobeCategoryId === 20 || // Transport
+    toolType === 'vector'
+  ) {
+    return 'Object';
+  }
+
+  // 7. Background check (patterns, textures, wallpapers, landscapes, abstract backdrops)
+  const bgPatterns = ['background', 'backgrounds', 'texture', 'textures', 'pattern', 'patterns', 'wallpaper', 'wallpapers', 'backdrop', 'abstract', 'gradient', 'seamless', 'landscape', 'scenery', 'latar belakang', 'pola', 'tekstur'];
+  if (hasPattern(bgPatterns) || adobeCategoryId === 8 || adobeCategoryId === 11) {
+    return 'Background';
+  }
+
+  // 8. Photo check (people, lifestyle, real world photos)
+  const photoPatterns = ['photo', 'photograph', 'portrait', 'realistic', 'camera', 'man', 'woman', 'people', 'foto'];
+  if (hasPattern(photoPatterns) || adobeCategoryId === 13 || adobeCategoryId === 12) {
+    return 'Photo';
+  }
+
+  // Default fallback
+  return toolType === 'vector' ? 'Object' : 'Photo';
+};
+
+

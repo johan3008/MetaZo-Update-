@@ -37,7 +37,7 @@ import { SaaSPortal } from './src/components/SaaSPortal';
 import { FAQAccordion } from './src/components/FAQAccordion';
 import { TRANSLATIONS, AppLanguage, getDailyLimit, ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO } from './constants';
 import { generateStockMetadata, generateBatchStockMetadata } from './services/geminiService';
-import { copyToClipboard, detectFictionalPeopleProperty } from './src/utils';
+import { copyToClipboard, detectFictionalPeopleProperty, detectMiriCanvasCategory } from './src/utils';
 import UTIF from 'utif';
 import piexif from 'piexifjs';
 import { embedMicrostockMetadata, createZipBlob } from './src/utils/microstockEmbedder';
@@ -3642,7 +3642,13 @@ const App: React.FC = () => {
                 shutterstockCategory1: metadata.shutterstock_category_1,
                 shutterstockCategory2: metadata.shutterstock_category_2,
                 dreamstimeCategory: metadata.dreamstime_category || '',
-                miriCanvasCategory: metadata.miricanvas_category || '',
+                miriCanvasCategory: metadata.miricanvas_category || detectMiriCanvasCategory(
+                  metadata.title,
+                  metadata.keywords,
+                  metadata.category_id,
+                  activeTool,
+                  metadata.yolo_detected_objects
+                ),
                 categoryReason: metadata.category_reason,
                 yolo_detected_objects: metadata.yolo_detected_objects,
                 isGenerativeAI: isMzLicensed ? (f.isGenerativeAI ?? isGenerativeAI) : false,
@@ -3843,7 +3849,13 @@ const App: React.FC = () => {
                             shutterstockCategory1: result.metadata.shutterstock_category_1,
                             shutterstockCategory2: result.metadata.shutterstock_category_2,
                             dreamstimeCategory: result.metadata.dreamstime_category || '',
-                            miriCanvasCategory: result.metadata.miricanvas_category || '',
+                            miriCanvasCategory: result.metadata.miricanvas_category || detectMiriCanvasCategory(
+                              result.metadata.title,
+                              result.metadata.keywords,
+                              result.metadata.category_id,
+                              activeTool,
+                              result.metadata.yolo_detected_objects
+                            ),
                             categoryReason: result.metadata.category_reason,
                             yolo_detected_objects: result.metadata.yolo_detected_objects,
                             isGenerativeAI: isMzLicensed ? (f.isGenerativeAI ?? isGenerativeAI) : false,
