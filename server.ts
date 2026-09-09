@@ -12,7 +12,7 @@ import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { PakasirClient } from 'pakasir-client';
-import { generateStockMetadata, generateAutoSubject, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
+import { generateStockMetadata, generateAutoSubject, generateTopicMatrix, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
 import { testFtpConnection, uploadToFtp } from './server/ftpService.ts';
 import { embedJpegMetadata, embedPngMetadata, embedSvgMetadata, embedEpsMetadata, embedEpsMetadataBytes, embedAiMetadataBytes, embedMp4MetadataBytes, ADOBE_CATEGORY_NAMES, cleanKeywordArray, resolveDateTaken, formatExifDate, formatIsoDate, formatIptcDate } from './src/utils/microstockEmbedder.ts';
 import fluentFfmpeg from 'fluent-ffmpeg';
@@ -2286,6 +2286,19 @@ app.get('/api/debug-uploads', (req, res) => {
         } catch (e: any) {
             console.warn('Error in auto-subject:', e);
             res.status(500).json({ error: e.message || 'Failed to generate subject idea' });
+        }
+    });
+
+    app.post('/api/generate-topic-matrix', async (req, res) => {
+        try {
+            const { keyword, count, styleCategory, promptMode, model } = req.body;
+            console.log('[API /api/generate-topic-matrix] keyword:', keyword, 'count:', count, 'styleCategory:', styleCategory);
+            
+            const result = await generateTopicMatrix(keyword, count, styleCategory, promptMode, model);
+            res.json(result);
+        } catch (e: any) {
+            console.warn('Error in generate-topic-matrix:', e);
+            res.status(500).json({ error: e.message || 'Failed to generate topic research matrix' });
         }
     });
 

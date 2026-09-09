@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 
 import { FeatureGuideButton } from './FeatureGuideModal';
+import { TopicMatrixModal } from './TopicMatrixModal';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface PromptGenViewProps {
@@ -176,6 +177,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   const [showFlatIconModal, setShowFlatIconModal] = useState(false);
   const [vectorSubType, setVectorSubType] = useState<'minimal_flat' | 'flat_vector' | 'corporate_flat' | 'gradient_flat' | 'flat_icon' | 'isometric_flat' | 'flat_pastel'>('minimal_flat');
   const [showVectorModal, setShowVectorModal] = useState(false);
+  const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
   
   
   const compressImage = (file: File): Promise<string> => {
@@ -978,6 +980,42 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                           ? (uiLanguage === 'id' ? 'Ide Subject AI' : 'AI Subject Idea')
                           : (isAutoGeneratingSubject ? (uiLanguage === 'id' ? 'Meracik Judul...' : 'Crafting Title...') : (uiLanguage === 'id' ? '👑 Ide Judul / Topik AI' : '👑 AI Title / Topic Idea'))}
                       </span>
+                      {!isLicensed && (
+                        <span className="text-[9px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5">
+                          PRO
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isLicensed) {
+                          if (setShowActivationModal) {
+                            setShowActivationModal(true);
+                          } else {
+                            setError(uiLanguage === 'id' ? 'Fitur Riset AI khusus untuk pengguna PRO. Silakan aktivasi lisensi Anda.' : 'AI Research is an exclusive PRO feature. Please activate your license.');
+                          }
+                          return;
+                        }
+                        setIsTopicModalOpen(true);
+                      }}
+                      className={`px-2.5 py-1 rounded-xl transition-all flex items-center gap-1.5 shadow-sm text-[11px] font-bold ${
+                        !isLicensed 
+                          ? 'bg-slate-100 dark:bg-slate-800/70 border border-slate-300/80 dark:border-slate-700/80 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-75' 
+                          : 'bg-gradient-to-r from-purple-500/15 via-indigo-500/15 to-blue-500/15 hover:from-purple-500/25 hover:to-indigo-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/30 active:scale-95 cursor-pointer'
+                      }`}
+                      title={
+                        !isLicensed 
+                          ? (uiLanguage === 'id' ? "Fitur Riset AI Terkunci (Khusus Akun Pro)" : "AI Research Feature Locked (Pro Only)")
+                          : (uiLanguage === 'id' ? "Riset 30, 50, atau 100 ide judul & topik komersial bertingkat" : "Research 30, 50, or 100 multi-level commercial stock topic ideas")
+                      }
+                    >
+                      {!isLicensed ? (
+                        <Lock size={12} className="text-purple-500 dark:text-purple-400" />
+                      ) : (
+                        <Sparkles size={12} className="text-purple-600 dark:text-purple-400" />
+                      )}
+                      <span>👑 Riset AI</span>
                       {!isLicensed && (
                         <span className="text-[9px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5">
                           PRO
@@ -2335,6 +2373,17 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
           </div>
         )}
       </AnimatePresence>
+
+      <TopicMatrixModal
+        isOpen={isTopicModalOpen}
+        onClose={() => setIsTopicModalOpen(false)}
+        initialKeyword={subject}
+        onSelectTopic={(topic) => setSubject(topic)}
+        styleCategory={styleCategory}
+        promptMode={promptMode}
+        aiOptions={aiOptions}
+        uiLanguage={uiLanguage}
+      />
     </div>
   );
 };

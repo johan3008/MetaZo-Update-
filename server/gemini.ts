@@ -8615,3 +8615,188 @@ Return ONLY the plain title text, without quotes, prefixes, or markdown formatti
     return randomFallback;
   }
 }
+
+export async function generateTopicMatrix(
+  keyword: string,
+  count: number = 100,
+  styleCategory?: string,
+  promptMode?: 'background' | 'png',
+  model?: string
+): Promise<{
+  keyword: string;
+  total: number;
+  medium: string[];
+  specific: string[];
+  highlySpecific: string[];
+}> {
+  const store = apiKeyStorage.getStore();
+  const provider = (store && store.provider) || 'gemini';
+
+  const cleanKeyword = (keyword || '').trim() || 'trending stock themes';
+  const targetCount = Number(count) || 100;
+  
+  let mediumCount = 30;
+  let specificCount = 40;
+  let highlySpecificCount = 30;
+
+  if (targetCount <= 30) {
+    mediumCount = 10;
+    specificCount = 10;
+    highlySpecificCount = 10;
+  } else if (targetCount <= 50) {
+    mediumCount = 15;
+    specificCount = 20;
+    highlySpecificCount = 15;
+  }
+
+  const totalCalculated = mediumCount + specificCount + highlySpecificCount;
+  const isPng = promptMode === 'png';
+
+  const systemInstruction = `You are an elite microstock trend analyst, commercial art director, and keyword strategist for global microstock agencies (Adobe Stock, Freepik, Shutterstock) and AI creative production (Midjourney, Flux).
+Your task is to take a seed keyword/concept and generate a structured matrix of high-demand, commercial stock titles and topic ideas with varying levels of specificity.
+
+Structure required:
+1. "medium": Exactly ${mediumCount} broad commercial topics (2 to 4 words, high search volume).
+2. "specific": Exactly ${specificCount} targeted topics with clear subject and scene context (4 to 7 words).
+3. "highlySpecific": Exactly ${highlySpecificCount} long-tail niche topics with high buyer purchase intent (6 to 11 words).
+
+Strict rules:
+- Ensure all ${totalCalculated} entries are 100% unique without repetitions or filler duplicates.
+- Keep all entries strictly as commercial title phrases (do NOT add camera gear, render engines, resolution tags, or sentences).
+- If the target asset type is ${isPng ? 'isolated PNG / icon / vector graphic' : 'full background scene / photo / illustration'}, tailor the concepts accordingly.
+- Return STRICTLY valid JSON matching the schema.`;
+
+  const promptText = `Generate a commercial topic research matrix based on the seed: "${cleanKeyword}".
+Style / Medium hint: ${styleCategory || 'Commercial Stock'}.
+Asset Format: ${isPng ? 'Isolated PNG Graphic / Icon / Element' : 'Full Composition / Background'}.
+
+Provide exactly:
+- ${mediumCount} items in "medium"
+- ${specificCount} items in "specific"
+- ${highlySpecificCount} items in "highlySpecific"
+
+Return ONLY a valid JSON object.`;
+
+  const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      medium: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING }
+      },
+      specific: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING }
+      },
+      highlySpecific: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING }
+      }
+    },
+    required: ["medium", "specific", "highlySpecific"]
+  };
+
+  const activeModel = model || (NON_GEMINI_PROVIDERS.has(provider) ? (PROVIDER_DEFAULT_MODELS[provider] || 'gpt-4o-mini') : 'gemini-2.5-flash');
+
+  try {
+    let responseText = '';
+    if (NON_GEMINI_PROVIDERS.has(provider)) {
+      responseText = await callOpenAICompatibleWithRetry({
+        systemInstruction,
+        contents: promptText,
+        responseMimeType: 'application/json',
+        responseSchema,
+        config: { temperature: 0.7, maxOutputTokens: 3500 },
+        model: activeModel
+      });
+    } else {
+      try {
+        const res = await callGeminiWithRetry(activeModel, {
+          parts: [{ text: promptText }]
+        }, {
+          systemInstruction,
+          responseMimeType: 'application/json',
+          responseSchema,
+          temperature: 0.7,
+          maxOutputTokens: 3500
+        }, 2);
+        responseText = res.text || '{}';
+      } catch (geminiErr) {
+        console.warn('[TopicMatrix] Primary model failed, falling back to gemini-2.5-flash:', geminiErr);
+        const res = await callGeminiWithRetry('gemini-2.5-flash', {
+          parts: [{ text: promptText }]
+        }, {
+          systemInstruction,
+          responseMimeType: 'application/json',
+          responseSchema,
+          temperature: 0.7,
+          maxOutputTokens: 3500
+        }, 1);
+        responseText = res.text || '{}';
+      }
+    }
+
+    const parsed = JSON.parse(extractJSON(responseText));
+    const cleanList = (list: any): string[] => {
+      if (!Array.isArray(list)) return [];
+      const seen = new Set<string>();
+      const result: string[] = [];
+      for (const item of list) {
+        if (typeof item === 'string') {
+          const t = item.trim().replace(/^["'\d.\-\s]+/, '').trim();
+          if (t && !seen.has(t.toLowerCase())) {
+            seen.add(t.toLowerCase());
+            result.push(t);
+          }
+        }
+      }
+      return result;
+    };
+
+    const medium = cleanList(parsed.medium);
+    const specific = cleanList(parsed.specific);
+    const highlySpecific = cleanList(parsed.highlySpecific);
+
+    return {
+      keyword: cleanKeyword,
+      total: medium.length + specific.length + highlySpecific.length,
+      medium,
+      specific,
+      highlySpecific
+    };
+  } catch (err: any) {
+    console.error('[TopicMatrix] Failed generating topic matrix:', err);
+    // Fallback if AI fails completely
+    const baseWord = cleanKeyword.toLowerCase();
+    const mockMedium = [
+      `${baseWord} concept`,
+      `${baseWord} background`,
+      `${baseWord} illustration`,
+      `${baseWord} banner`,
+      `modern ${baseWord}`
+    ];
+    const mockSpecific = [
+      `creative ${baseWord} in modern setting`,
+      `close up view of ${baseWord}`,
+      `top view flat lay ${baseWord}`,
+      `hand drawn ${baseWord} design element`,
+      `colorful ${baseWord} composition`
+    ];
+    const mockHighlySpecific = [
+      `minimalist aesthetic ${baseWord} with copy space for text`,
+      `vibrant commercial photography of ${baseWord} with natural lighting`,
+      `high quality 3d render of ${baseWord} isolated on clean background`,
+      `authentic lifestyle scene featuring ${baseWord} in everyday atmosphere`,
+      `professional graphic layout of ${baseWord} for holiday promotional campaign`
+    ];
+
+    return {
+      keyword: cleanKeyword,
+      total: mockMedium.length + mockSpecific.length + mockHighlySpecific.length,
+      medium: mockMedium,
+      specific: mockSpecific,
+      highlySpecific: mockHighlySpecific
+    };
+  }
+}
+
