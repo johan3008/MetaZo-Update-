@@ -2,7 +2,7 @@ import React from 'react';
 import { Search, Info, CheckCircle2, Trash2, FileCode, ArrowRight, Check, Loader2, Sparkles, Film, Copy, Download, Wand2 } from 'lucide-react';
 import { ToolType, FileItem, ProgressInfo } from '../../types';
 import { ADOBE_CATEGORIES, SHUTTERSTOCK_CATEGORIES, SHUTTERSTOCK_CATEGORIES_VIDEO, DREAMSTIME_CATEGORIES, MIRICANVAS_CATEGORIES } from '../../constants';
-import { copyToClipboard } from '../utils';
+import { copyToClipboard, detectFictionalPeopleProperty } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { getHeaders } from '../../services/geminiService';
 
@@ -1062,32 +1062,44 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({
                                   ? 'bg-violet-500/15 text-[#7c3aed] dark:text-violet-400 border-violet-500/30 hover:bg-violet-500/25'
                                   : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:text-slate-600'
                               }`}
-                              title="Klik untuk mengubah status kepatuhan Generative AI file ini"
+                              title="Klik untuk mengubah status kepatuhan Generative AI file ini (Adobe Stock, Freepik, Vecteezy)"
                             >
                               <Sparkles size={10} />
                               <span>{(file.isGenerativeAI ?? isGenerativeAI) ? `AI: ${file.aiModelSource || aiModelSource || 'Gen AI'}` : 'Non-AI'}</span>
                             </button>
-                            {(file.isGenerativeAI ?? isGenerativeAI) && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const currentVal = !!file.fictionalPeopleProperty;
-                                  updateFiles(prev => prev.map(f => f.id === file.id ? { ...f, fictionalPeopleProperty: !currentVal } : f));
-                                }}
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-xl border transition-all cursor-pointer ${
-                                  file.fictionalPeopleProperty
-                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:text-slate-600'
-                                }`}
-                                title={
-                                  file.fictionalPeopleProperty
-                                    ? "Terdeteksi ada Orang/Properti: Kotak 'People and Property are fictional' di Adobe Stock otomatis DICENTANG (Bebas Model/Property Release)."
-                                    : "Tidak terdeteksi Orang/Properti (Alam/Abstrak/Objek). Kotak 'People and Property are fictional' di Adobe Stock otomatis TIDAK DICENTANG."
-                                }
-                              >
-                                <span>{file.fictionalPeopleProperty ? '👤🏛️ Fictional: YES ✅' : '🍃 Fictional: NO (No Release)'}</span>
-                              </button>
-                            )}
+                            {(file.isGenerativeAI ?? isGenerativeAI) && (() => {
+                              const detection = detectFictionalPeopleProperty(
+                                file.title,
+                                file.keywords,
+                                file.adobeCategoryId,
+                                file.yolo_detected_objects,
+                                file.description
+                              );
+                              const isFictionalActive = file.fictionalPeopleProperty !== undefined
+                                ? file.fictionalPeopleProperty
+                                : detection.isFictionalEligible;
+
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updateFiles(prev => prev.map(f => f.id === file.id ? { ...f, fictionalPeopleProperty: !isFictionalActive } : f));
+                                  }}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-xl border transition-all cursor-pointer ${
+                                    isFictionalActive
+                                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:text-slate-600'
+                                  }`}
+                                  title={
+                                    isFictionalActive
+                                      ? `Terdeteksi ada Orang/Properti${detection.matchedTerms.length > 0 ? ` (${detection.matchedTerms.slice(0, 4).join(', ')})` : ''}: Kotak 'People and Property are fictional' di Adobe Stock & deklarasi Vecteezy otomatis DICENTANG (Bebas Model/Property Release).`
+                                      : "Tidak terdeteksi Orang/Properti (Murni Alam/Abstrak/Tekstur). Kotak 'People and Property are fictional' di Adobe Stock & deklarasi Vecteezy otomatis TIDAK DICENTANG."
+                                  }
+                                >
+                                  <span>{isFictionalActive ? '👤🏛️ Fictional: YES ✅' : '🍃 Fictional: NO (No Release)'}</span>
+                                </button>
+                              );
+                            })()}
                           </>
                         ) : (
                           <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-wider rounded-xl border border-slate-200 dark:border-white/5 shadow-md shadow-black/5">

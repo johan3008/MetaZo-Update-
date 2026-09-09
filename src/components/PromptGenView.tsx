@@ -15,6 +15,7 @@ interface PromptGenViewProps {
   prefilledSubject?: string;
   onPrefillConsumed?: () => void;
   isLicensed?: boolean;
+  setShowActivationModal?: (show: boolean) => void;
   dailyGenCount?: number;
   incrementDailyCount?: () => void;
   aiOptions?: any;
@@ -146,6 +147,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   prefilledSubject, 
   onPrefillConsumed,
   isLicensed = false,
+  setShowActivationModal,
   dailyGenCount = 0,
   incrementDailyCount,
   aiOptions,
@@ -233,31 +235,31 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   const triggerAutoSubject = async () => {
     setIsAutoGeneratingSubject(true);
     const marketResearchFallbacks = promptMode === 'png' ? [
-      "isolated modern fintech credit card with glowing digital security shield and upward economic growth line",
-      "isolated green sustainability leaf emblem with circular recycling arrows and fresh water droplet",
-      "isolated medical diagnostic stethoscope resting beside digital healthcare tablet with vital heartbeat graph",
-      "isolated smart logistics cardboard parcel box with digital QR tracking barcode and priority shipping label",
-      "isolated artificial intelligence processor microchip with glowing gold circuit board pathways",
-      "isolated clean energy solar panel module with sunbeam icon and high-capacity battery level indicator",
-      "isolated golden winner trophy cup surrounded by floating victory stars and ribbon badge",
-      "isolated modern smartphone mockup with blank bezel-less screen and floating notification badges",
-      "isolated cybersecurity padlock hardware device with illuminated digital biometric fingerprint scanner",
-      "isolated electric vehicle fast-charging connector plug with green lightning bolt energy badge"
+      "Modern Fintech Credit Card with Shield",
+      "Green Sustainability Leaf Recycling Emblem",
+      "Digital Healthcare Diagnostic Stethoscope",
+      "Smart Logistics Delivery Parcel Box",
+      "Golden AI Microprocessor Chip",
+      "Clean Energy Solar Panel Module",
+      "Victory Champion Winner Trophy Cup",
+      "Minimalist Smartphone Mockup with App Badges",
+      "Cybersecurity Biometric Fingerprint Padlock",
+      "Electric Vehicle Fast-Charging Station"
     ] : [
-      "diverse corporate executive team analyzing predictive growth charts in sunlit modern boardroom",
-      "multinational business professionals collaborating around digital tablet in glass-walled hybrid coworking space",
-      "research scientists in cleanroom lab coats examining molecular cell cultures through automated digital microscope",
-      "compassionate female physician explaining diagnostic results to an elderly patient using a medical digital tablet",
-      "renewable energy engineers in hardhats inspecting vast industrial solar panel farm across sun-drenched valley",
-      "offshore wind turbine technician wearing safety harness securing blade assembly against vast ocean horizon",
-      "cybersecurity intelligence team monitoring simulated global network intrusion alerts in dark command center",
-      "industrial automation engineer testing collaborative robotic arm in smart manufacturing factory",
-      "active multi-ethnic senior citizens practicing morning yoga outdoors in lush green public park",
-      "elementary school students collaborating enthusiastically on educational robotics kit in modern STEM laboratory",
-      "sustainable urban rooftop community garden with volunteers harvesting organic leafy greens against city skyline",
-      "warehouse logistics workers packing eco-friendly cardboard parcels alongside autonomous mobile transport robots",
-      "satisfying instant contactless mobile payment transaction at modern boutique coffee and bakery counter",
-      "architect and green building engineer examining sustainable timber construction blueprints on active site"
+      "Corporate Executive Team Analyzing Market Growth",
+      "Business Professionals Collaborating in Modern Coworking",
+      "Scientists Examining Cell Cultures with Digital Microscope",
+      "Female Physician Consulting Senior Patient with Tablet",
+      "Renewable Energy Engineers Inspecting Solar Farm",
+      "Offshore Wind Turbine Technician on Safety Harness",
+      "Cybersecurity Team Monitoring Global Network Intrusion",
+      "Industrial Robotic Arm Automated Factory Testing",
+      "Multi-Ethnic Senior Citizens Practicing Outdoor Yoga",
+      "STEM Students Programming Educational Robotics Kit",
+      "Sustainable Rooftop Community Garden Vegetable Harvest",
+      "Warehouse Logistics Workers with Autonomous Mobile Robots",
+      "Contactless Mobile Payment at Artisan Boutique Cafe",
+      "Architect Reviewing Sustainable Timber Blueprints"
     ];
 
     try {
@@ -266,6 +268,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
         body: JSON.stringify({ 
           currentSubject: subject,
+          styleCategory,
           promptMode,
           model: aiOptions?.model
         })
@@ -934,13 +937,28 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     </label>
                     <button
                       type="button"
-                      onClick={triggerAutoSubject}
+                      onClick={() => {
+                        if (!isLicensed) {
+                          if (setShowActivationModal) {
+                            setShowActivationModal(true);
+                          } else {
+                            setError(uiLanguage === 'id' ? 'Fitur Ide Judul / Topik AI khusus untuk pengguna PRO. Silakan aktivasi lisensi Anda.' : 'AI Title / Topic Idea is an exclusive PRO feature. Please activate your license.');
+                          }
+                          return;
+                        }
+                        triggerAutoSubject();
+                      }}
                       disabled={isAutoGeneratingSubject}
-                      className="px-2.5 py-1 bg-gradient-to-r from-purple-500/15 via-indigo-500/15 to-purple-500/15 hover:from-purple-500/25 hover:to-indigo-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/30 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-sm text-[11px] font-bold"
-                      title="Generate ide subjek komersial berbasis Riset Pasar Microstock Global (High Demand)"
+                      className="px-2.5 py-1 bg-gradient-to-r from-amber-500/15 via-purple-500/15 to-indigo-500/15 hover:from-amber-500/25 hover:to-purple-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-sm text-[11px] font-bold"
+                      title={uiLanguage === 'id' ? "Ubah kata kunci sederhana menjadi Judul / Topik Tren komersial otomatis (Khusus PRO)" : "Transform simple keywords into trending commercial stock titles/topics (PRO Only)"}
                     >
-                      <Wand2 size={12} className={`${isAutoGeneratingSubject ? 'animate-spin text-purple-500' : 'text-purple-600 dark:text-purple-400'}`} />
-                      <span>{isAutoGeneratingSubject ? 'Meracik Ide...' : '✨ Ide Subjek AI'}</span>
+                      <Sparkles size={12} className={`${isAutoGeneratingSubject ? 'animate-spin text-amber-500' : 'text-amber-600 dark:text-amber-400'}`} />
+                      <span>{isAutoGeneratingSubject ? (uiLanguage === 'id' ? 'Meracik Judul...' : 'Crafting Title...') : (uiLanguage === 'id' ? '👑 Ide Judul / Topik AI' : '👑 AI Title / Topic Idea')}</span>
+                      {!isLicensed && (
+                        <span className="text-[9px] bg-gradient-to-r from-amber-500 to-amber-600 text-white font-black px-1.5 py-0.2 rounded-md uppercase tracking-wider shadow-xs">
+                          PRO
+                        </span>
+                      )}
                     </button>
                   </div>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full">Bilingual Support</span>
@@ -951,7 +969,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                   <textarea
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    placeholder={t.prompt_subject_placeholder}
+                    placeholder={uiLanguage === 'id' ? "Ketik 2-3 kata ide awal (misal: 'kucing minum kopi') lalu klik tombol Ide Judul AI di atas untuk mengubahnya jadi Judul / Topik Tren komersial..." : "Type 2-3 initial words (e.g. 'cat drinking coffee') then click the AI Title Idea button above to turn it into a trending commercial title/topic..."}
                     className="relative w-full min-h-[140px] rounded-[1.5rem] border border-slate-200/80 dark:border-white/10 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm p-4 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent transition-all font-medium leading-relaxed resize-y shadow-inner z-10"
                   />
                 </div>

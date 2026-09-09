@@ -3628,7 +3628,8 @@ const App: React.FC = () => {
                 metadata.title,
                 metadata.keywords,
                 metadata.category_id,
-                metadata.yolo_detected_objects
+                metadata.yolo_detected_objects,
+                metadata.description
               );
               const shouldBeFictional = fictionalDetection.isFictionalEligible;
 
@@ -3646,9 +3647,7 @@ const App: React.FC = () => {
                 yolo_detected_objects: metadata.yolo_detected_objects,
                 isGenerativeAI: isMzLicensed ? (f.isGenerativeAI ?? isGenerativeAI) : false,
                 aiModelSource: f.aiModelSource || aiModelSource,
-                fictionalPeopleProperty: f.fictionalPeopleProperty !== undefined 
-                  ? f.fictionalPeopleProperty 
-                  : ((isMzLicensed && (f.isGenerativeAI ?? isGenerativeAI)) ? shouldBeFictional : false),
+                fictionalPeopleProperty: shouldBeFictional,
                 isGenerating: false,
                 error: null
               } : f));
@@ -3830,7 +3829,8 @@ const App: React.FC = () => {
                             result.metadata.title,
                             result.metadata.keywords,
                             result.metadata.category_id,
-                            result.metadata.yolo_detected_objects
+                            result.metadata.yolo_detected_objects,
+                            result.metadata.description
                         );
                         const shouldBeFictional = fictionalDetection.isFictionalEligible;
 
@@ -3848,9 +3848,7 @@ const App: React.FC = () => {
                             yolo_detected_objects: result.metadata.yolo_detected_objects,
                             isGenerativeAI: isMzLicensed ? (f.isGenerativeAI ?? isGenerativeAI) : false,
                             aiModelSource: f.aiModelSource || aiModelSource,
-                            fictionalPeopleProperty: f.fictionalPeopleProperty !== undefined
-                              ? f.fictionalPeopleProperty
-                              : ((isMzLicensed && (f.isGenerativeAI ?? isGenerativeAI)) ? shouldBeFictional : false),
+                            fictionalPeopleProperty: shouldBeFictional,
                             isGenerating: false,
                             error: null
                         };
@@ -4313,12 +4311,12 @@ const App: React.FC = () => {
 
     if (exportAdobe) {
       // Adobe Stock CSV Format: Filename,Title,Keywords,Category[,Generative AI]
-      const hasAnyAi = isMzLicensed && toolFiles.some(f => (f.isGenerativeAI ?? isGenerativeAI));
+      const hasAnyAi = toolFiles.some(f => (f.isGenerativeAI ?? isGenerativeAI));
       const headers = hasAnyAi 
         ? ['Filename', 'Title', 'Keywords', 'Category', 'Generative AI']
         : ['Filename', 'Title', 'Keywords', 'Category'];
       const rows = toolFiles.map(f => {
-          const isAi = isMzLicensed && (f.isGenerativeAI ?? isGenerativeAI);
+          const isAi = !!(f.isGenerativeAI ?? isGenerativeAI);
           const baseCols = [
             escapeCsv(getExportFilename(f.customFileName || f.file.name, f.file)), 
             escapeCsv(f.title || ''), 
@@ -4376,10 +4374,16 @@ const App: React.FC = () => {
               return cleaned.replace(/\s+/g, ' ').trim();
           };
           
+          const isAi = !!(f.isGenerativeAI ?? isGenerativeAI);
           const cleanTitle = removeSpecialChars(f.title || '');
           const titleField = escapeCsv(cleanTitle);
+          const cleanDesc = removeSpecialChars(f.description || '');
+          const descriptionField = escapeCsv(cleanDesc || cleanTitle);
           
-          const forbiddenKeywords = ['photo', 'vector', 'video'];
+          // Vecteezy forbids media types and strictly rejects AI spam buzzwords in keywords
+          const forbiddenKeywords = isAi 
+              ? ['photo', 'vector', 'video', 'ai', 'gen ai', 'generative ai', 'ai generated', 'artificial intelligence', 'midjourney', 'dall-e', 'dalle', 'stable diffusion', 'firefly', 'leonardo ai', 'ai art'] 
+              : ['photo', 'vector', 'video'];
           const filteredKeywords = (f.keywords || [])
               .map(k => removeSpecialChars(k))
               .filter(k => k.length > 0 && !forbiddenKeywords.includes(k.toLowerCase().trim()));
@@ -4391,7 +4395,7 @@ const App: React.FC = () => {
           return [
               escapeCsv(vecteezyFilename),
               titleField,
-              titleField, // Description matches Title
+              descriptionField,
               keywordsField,
               'Free', // License automatically set to Free
               '' // Id left empty
@@ -4564,11 +4568,11 @@ const App: React.FC = () => {
 
     const isVideo = ['mp4', 'mov', 'webm', 'm4v', 'avi'].includes(origExt);
 
-    const isItemAi = isMzLicensed && (item.isGenerativeAI ?? isGenerativeAI);
+    const isItemAi = !!(item.isGenerativeAI ?? isGenerativeAI);
     const modelSource = item.aiModelSource || aiModelSource || 'Midjourney';
-    const isFictional = item.fictionalPeopleProperty ?? (
-      isItemAi ? detectFictionalPeopleProperty(title, keywords, item.adobeCategoryId, item.yolo_detected_objects).isFictionalEligible : false
-    );
+    const isFictional = item.fictionalPeopleProperty !== undefined
+      ? item.fictionalPeopleProperty
+      : (isItemAi ? detectFictionalPeopleProperty(title, keywords, item.adobeCategoryId, item.yolo_detected_objects, description).isFictionalEligible : false);
 
     // 1. For Video files: prioritize Server FFmpeg engine to write full native Windows Explorer & Microstock metadata atoms
     if (isVideo) {
@@ -5085,6 +5089,7 @@ const App: React.FC = () => {
               prefilledSubject={prefilledSubject} 
               onPrefillConsumed={() => setPrefilledSubject('')} 
               isLicensed={isMzLicensed}
+              setShowActivationModal={setShowActivationModal}
               dailyGenCount={dailyGenCounts[ToolType.PROMPT_GEN] || 0}
               incrementDailyCount={() => incrementDailyCount(ToolType.PROMPT_GEN)}
               aiOptions={commonAiOptions}

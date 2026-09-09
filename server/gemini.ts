@@ -5166,6 +5166,15 @@ OUTPUT FORMAT:
 
         metadata.category_reason = metadata.category_reason || assetVisualFacts?.semantic_category_analysis?.reason || "Suggested based on visual semantic analysis.";
 
+        if (Array.isArray(assetVisualFacts?.yolo_detected_objects) && assetVisualFacts.yolo_detected_objects.length > 0) {
+          metadata.yolo_detected_objects = assetVisualFacts.yolo_detected_objects.map((y: any) => ({
+            label: y.name || y.label || 'object',
+            confidence: Number(y.confidence) || 0.9,
+            box_2d: Array.isArray(y.box_2d) ? y.box_2d : undefined,
+            category: y.category || 'subject'
+          }));
+        }
+
         const targetId = items[index] ? items[index].id : (items[0]?.id || 'unknown');
         return { id: targetId, metadata };
     }));
@@ -8493,18 +8502,26 @@ export async function generateAutoSubject(styleCategory: string, model?: string,
   const randomSeedKeyword = isPng ? "isolated commercial stock asset icon or character" : creativeSeedsGeneral[Math.floor(Math.random() * creativeSeedsGeneral.length)];
 
   let systemInstruction = isPng
-    ? `You are an elite commercial microstock art director specializing in isolated PNG assets, icons, stickers, and standalone design elements. Generate a highly unique, modern, high-demand commercial subject idea for an isolated element. Return ONLY the plain text subject idea in 1 concise, vivid sentence describing the object, materials, and isolated composition. Do NOT use prefixes, quotes, or markdown formatting.`
-    : `You are an elite creative director for a global microstock agency (Adobe Stock, Shutterstock). Generate a highly unique, modern, and high-demand commercial subject idea for a text-to-image generator. Return ONLY the plain text subject idea in 1-2 vivid, descriptive sentences, without quotes, prefixes, or formatting.`;
+    ? `You are an elite microstock trend analyst and commercial art director specializing in isolated PNG assets, icons, and graphic elements.
+Your role: When given a brief user input or seed, generate a concise, high-demand COMMERCIAL TITLE or TRENDING TOPIC IDEA (NOT an image generation prompt, do NOT add camera lenses, render engines, lighting, or full descriptive sentences).
+Output format: A punchy, trending commercial stock title / subject topic in English (4 to 8 words maximum), perfectly suited for high-converting microstock assets.
+Example: If input is "kucing minum kopi", output: "Cute Kitten Sipping Hot Morning Espresso" or "Barista Cat Enjoying Artisan Latte".
+Return ONLY the plain title text, without quotes, prefixes, or formatting.`
+    : `You are an elite microstock trend researcher and creative art director for global stock agencies (Adobe Stock, Freepik, Shutterstock).
+Your role: When given a brief user seed or 2-4 keywords, transform it directly into a high-demand, trending COMMERCIAL TITLE or TOPIC IDEA (NOT a visual prompt, do NOT include camera gear, rendering engines, technical lighting descriptors, or full narrative paragraphs).
+Output format: A punchy, highly searchable commercial title / subject topic in English (5 to 10 words maximum) reflecting current visual trends and high buyer demand.
+Example: If input is "kucing minum kopi", output: "Fluffy Cat Enjoying Morning Warm Coffee in Cozy Cafe" or "Artisan Barista Feline Tasting Fresh Espresso".
+Return ONLY the plain title text, without quotes, prefixes, or markdown formatting.`;
 
   let promptText = "";
   if (currentSubject && currentSubject.trim()) {
     promptText = isPng
-      ? `Transform and enhance the concept "${currentSubject.trim()}" into a high-demand isolated commercial asset/icon/sticker idea tailored for style: "${styleCategory || 'General'}". Return ONLY 1 descriptive sentence.`
-      : `Expand and enhance the concept "${currentSubject.trim()}" into a rich, commercial microstock visual scene for style: "${styleCategory || 'General'}". Use rich, compound long-tail keyword descriptors. Return ONLY 1-2 descriptive sentences.`;
+      ? `Transform this input "${currentSubject.trim()}" into a trending, high-demand commercial title or topic idea for an isolated PNG/icon asset. Style category: "${styleCategory || 'General'}". Keep it strictly as a concise TITLE or TOPIC (4 to 8 words), NOT a descriptive prompt.`
+      : `Transform this input "${currentSubject.trim()}" into a trending, high-demand commercial stock title or subject topic. Style category: "${styleCategory || 'General'}". Keep it strictly as a punchy TITLE or TOPIC (5 to 10 words), NOT a prompt.`;
   } else {
     promptText = isPng
-      ? `Generate a fresh, highly creative standalone isolated asset idea for style: "${styleCategory || 'General'}". Ensure it is distinct and commercial. Inspiration angle: "${randomSeedKeyword}". Return ONLY 1 descriptive sentence.`
-      : `Generate a fresh, highly creative commercial subject idea for style: "${styleCategory || 'General'}". Ensure absolute uniqueness across repeated clicks using this seed angle: "${randomSeedKeyword}". Return ONLY 1-2 descriptive sentences.`;
+      ? `Generate a fresh, high-demand trending commercial title/topic idea for an isolated PNG element based on trend angle: "${randomSeedKeyword}". Keep it strictly as a concise TITLE (4 to 8 words).`
+      : `Generate a fresh, high-demand trending commercial stock title or topic idea based on trend angle: "${randomSeedKeyword}". Keep it strictly as a punchy TITLE (5 to 10 words).`;
   }
 
   const activeModel = model || 'gemini-2.5-flash';
@@ -8515,7 +8532,7 @@ export async function generateAutoSubject(styleCategory: string, model?: string,
       rawText = await callOpenAICompatibleWithRetry({
         systemInstruction,
         contents: { parts: [{ text: promptText }] },
-        config: { temperature: 0.95, maxOutputTokens: 150 },
+        config: { temperature: 0.85, maxOutputTokens: 100 },
         model: activeModel
       });
     } else {
@@ -8523,15 +8540,15 @@ export async function generateAutoSubject(styleCategory: string, model?: string,
         parts: [{ text: promptText }]
       }, {
         systemInstruction,
-        temperature: 0.98,
-        maxOutputTokens: 150
+        temperature: 0.85,
+        maxOutputTokens: 100
       });
       rawText = response.text || '';
     }
 
     let cleaned = (rawText || '').trim()
       .replace(/^["']|["']$/g, '')
-      .replace(/^(Subject Idea|Ide Subjek|Prompt Idea|Concept|Subject):\s*/i, '')
+      .replace(/^(Subject Idea|Ide Subjek|Prompt Idea|Concept|Subject|Title|Topic|Judul):\s*/i, '')
       .trim();
 
     if (cleaned && cleaned.length > 5) {

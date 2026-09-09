@@ -255,7 +255,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
                     )}
                   </div>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold block">
-                    Tag as AI Asset (Adobe Stock, Freepik CSV & IPTC XMP)
+                    Tag as AI Asset (Adobe Stock, Freepik, Vecteezy CSV & IPTC XMP)
                   </span>
                 </div>
               </div>
@@ -296,7 +296,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
                 <div className="flex items-center space-x-2">
                   <span className="text-xs">⭐</span>
                   <p className="text-[10px] font-bold text-amber-800 dark:text-amber-300">
-                    Khusus Pengguna PRO: Penandaan resmi kepatuhan aset AI (Adobe Stock, Freepik CSV & XMP)!
+                    Khusus Pengguna PRO: Penandaan resmi kepatuhan aset AI (Adobe Stock, Freepik, Vecteezy & XMP)!
                   </p>
                 </div>
                 <span className="text-[9px] font-black uppercase text-amber-600 dark:text-amber-400 group-hover:underline flex items-center gap-0.5 shrink-0">
@@ -310,7 +310,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({
                     AI Generator / Model Source:
                   </label>
                   <span className="text-[8px] font-bold text-violet-600 dark:text-violet-400">
-                    Auto-fills Freepik CSV & XMP
+                    Auto-fills Freepik, Vecteezy CSV & XMP
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
