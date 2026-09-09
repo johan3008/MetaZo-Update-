@@ -52,8 +52,6 @@ export const TopicMatrixModal: React.FC<TopicMatrixModalProps> = ({
     }
   }, [isOpen, initialKeyword]);
 
-  if (!isOpen) return null;
-
   const handleGenerate = async () => {
     const cleanWord = keyword.trim();
     if (!cleanWord) {
@@ -217,6 +215,8 @@ export const TopicMatrixModal: React.FC<TopicMatrixModalProps> = ({
   const providerName = aiOptions?.provider === 'openai' 
     ? 'ChatGPT (OpenAI)' 
     : (aiOptions?.provider ? `${aiOptions.provider.toUpperCase()}` : 'Gemini AI');
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">

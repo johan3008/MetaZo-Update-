@@ -2374,16 +2374,18 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
         )}
       </AnimatePresence>
 
-      <TopicMatrixModal
-        isOpen={isTopicModalOpen}
-        onClose={() => setIsTopicModalOpen(false)}
-        initialKeyword={subject}
-        onSelectTopic={(topic) => setSubject(topic)}
-        styleCategory={styleCategory}
-        promptMode={promptMode}
-        aiOptions={aiOptions}
-        uiLanguage={uiLanguage}
-      />
+      {isTopicModalOpen && (
+        <TopicMatrixModal
+          isOpen={isTopicModalOpen}
+          onClose={() => setIsTopicModalOpen(false)}
+          initialKeyword={subject}
+          onSelectTopic={(topic) => setSubject(topic)}
+          styleCategory={styleCategory}
+          promptMode={promptMode}
+          aiOptions={aiOptions}
+          uiLanguage={uiLanguage}
+        />
+      )}
     </div>
   );
 };
