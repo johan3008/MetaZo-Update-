@@ -2235,7 +2235,7 @@ const App: React.FC = () => {
         }
       }
     } else {
-      if (currentPath === '/Login' || currentPath === '/' || currentPath === '') {
+      if (currentPath === '/Login' || currentPath === '/' || currentPath === '' || currentPath === '/app') {
         const savedRedirect = localStorage.getItem('mz_redirect_after_login');
         localStorage.removeItem('mz_redirect_after_login');
         const redirectTool = savedRedirect ? getToolFromPath(savedRedirect) : null;

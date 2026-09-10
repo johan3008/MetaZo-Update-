@@ -12,6 +12,14 @@
       "destination": "/api/index.js"
     },
     {
+      "source": "/",
+      "destination": "/landing.html"
+    },
+    {
+      "source": "/landing",
+      "destination": "/landing.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

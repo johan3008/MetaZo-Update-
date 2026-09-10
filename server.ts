@@ -3361,8 +3361,18 @@ app.get('/api/debug-uploads', (req, res) => {
     });
 
 async function startHosting() {
-    // Vite middleware for development
+    // Development mode
     if (process.env.NODE_ENV !== 'production') {
+        // Serve landing page on root / and /landing
+        app.get(['/', '/landing', '/landing.html'], (req, res, next) => {
+            if (req.query.spa === '1') return next();
+            const rootLanding = path.join(process.cwd(), 'landing.html');
+            if (fs.existsSync(rootLanding)) {
+                return res.sendFile(rootLanding);
+            }
+            next();
+        });
+
         const { createServer: createViteServer } = await import('vite');
         const vite = await createViteServer({
             server: { middlewareMode: true },
@@ -3370,8 +3380,19 @@ async function startHosting() {
         });
         app.use(vite.middlewares);
     } else {
-        // In production, serve static files from dist
+        // In production, serve landing page on root / and /landing
         const distPath = path.join(process.cwd(), 'dist');
+        app.get(['/', '/landing', '/landing.html'], (req, res) => {
+            const prodLanding = path.join(distPath, 'landing.html');
+            const rootLanding = path.join(process.cwd(), 'landing.html');
+            if (fs.existsSync(prodLanding)) {
+                res.sendFile(prodLanding);
+            } else if (fs.existsSync(rootLanding)) {
+                res.sendFile(rootLanding);
+            } else {
+                res.sendFile(path.join(distPath, 'index.html'));
+            }
+        });
         app.use(express.static(distPath));
         app.get('*all', (req, res) => {
             res.sendFile(path.join(distPath, 'index.html'));

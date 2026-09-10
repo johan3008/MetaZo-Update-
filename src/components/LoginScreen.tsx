@@ -644,6 +644,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
         <div className="flex items-center space-x-4">
           <a 
+            href="/" 
+            className="text-[10px] font-black uppercase text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300 tracking-wider transition-colors flex items-center gap-1"
+          >
+            <span>🌐 {language === 'id' ? 'Landing Page' : 'Product Landing Page'}</span>
+          </a>
+          <a 
             href={t?.whatsapp_link || 'https://chat.whatsapp.com/EJgcCSymQYE3724FqpFzxr'} 
             target="_blank" 
             rel="noopener noreferrer" 
