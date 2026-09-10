@@ -187,7 +187,7 @@
                 <a href="#komparasi" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Perbandingan</a>
                 <a href="#ulasan" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors flex items-center gap-1">
                     <span>Ulasan Komunitas</span>
-                    <span class="px-1.5 py-0.2 text-[9px] font-black bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md">4.9★</span>
+                    <span id="navRatingBadge" class="px-1.5 py-0.2 text-[9px] font-black bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md">5.0★</span>
                 </a>
                 <a href="#harga" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Harga Lisensi</a>
                 <a href="#faq" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">FAQ</a>
@@ -229,7 +229,7 @@
             <a href="#fitur" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Fitur Unggulan</a>
             <a href="#simulasi" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Live Demo & Simulasi</a>
             <a href="#komparasi" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Perbandingan</a>
-            <a href="#ulasan" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Ulasan Komunitas (4.9★)</a>
+            <a href="#ulasan" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Ulasan Komunitas (<span id="mobileRatingBadge">5.0★</span>)</a>
             <a href="#harga" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Harga Lisensi</a>
             <a href="#faq" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">FAQ</a>
             <div class="pt-2">
@@ -865,17 +865,17 @@
                     <!-- Left: Big Score -->
                     <div class="lg:col-span-4 flex flex-col items-center lg:items-start text-center lg:text-left border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/10 pb-6 lg:pb-0 lg:pr-8">
                         <div class="flex items-baseline gap-2">
-                            <span id="communityAvgScore" class="text-5xl sm:text-6xl font-black text-slate-900 dark:text-white">4.9</span>
+                            <span id="communityAvgScore" class="text-5xl sm:text-6xl font-black text-slate-900 dark:text-white">5.0</span>
                             <span class="text-lg font-bold text-slate-400">/ 5.0</span>
                         </div>
-                        <div class="flex items-center gap-1 text-amber-400 text-xl mt-2">
+                        <div id="communityStarsRender" class="flex items-center gap-1 text-amber-400 text-xl mt-2">
                             ★★★★★
                         </div>
                         <p class="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-2">
-                            Berdasarkan <span id="communityTotalCount" class="font-black text-slate-800 dark:text-white">1,520+</span> ulasan kontributor terverifikasi
+                            Berdasarkan <span id="communityTotalCount" class="font-black text-slate-800 dark:text-white">0</span> ulasan kontributor terverifikasi
                         </p>
                         <div class="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold">
-                            <span>🛡️ 99.4% Lolos Seleksi Agency</span>
+                            <span>🛡️ 100% Ulasan Nyata dari Database</span>
                         </div>
                     </div>
 
@@ -884,37 +884,37 @@
                         <div class="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-300">
                             <span class="w-16 shrink-0 flex items-center gap-1">5 Bintang</span>
                             <div class="flex-1 h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                                <div class="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full" style="width: 95%;"></div>
+                                <div id="barWidth5" class="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style="width: 100%;"></div>
                             </div>
-                            <span class="w-10 text-right text-slate-400 font-mono text-[11px]">95%</span>
+                            <span id="pctVal5" class="w-10 text-right text-slate-400 font-mono text-[11px]">100%</span>
                         </div>
                         <div class="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-300">
                             <span class="w-16 shrink-0 flex items-center gap-1">4 Bintang</span>
                             <div class="flex-1 h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                                <div class="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full" style="width: 4%;"></div>
+                                <div id="barWidth4" class="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style="width: 0%;"></div>
                             </div>
-                            <span class="w-10 text-right text-slate-400 font-mono text-[11px]">4%</span>
+                            <span id="pctVal4" class="w-10 text-right text-slate-400 font-mono text-[11px]">0%</span>
                         </div>
                         <div class="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-300">
                             <span class="w-16 shrink-0 flex items-center gap-1">3 Bintang</span>
                             <div class="flex-1 h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                                <div class="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full" style="width: 1%;"></div>
+                                <div id="barWidth3" class="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style="width: 0%;"></div>
                             </div>
-                            <span class="w-10 text-right text-slate-400 font-mono text-[11px]">1%</span>
+                            <span id="pctVal3" class="w-10 text-right text-slate-400 font-mono text-[11px]">0%</span>
                         </div>
                         <div class="flex items-center gap-3 text-xs font-bold text-slate-400">
                             <span class="w-16 shrink-0">2 Bintang</span>
                             <div class="flex-1 h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                                <div class="h-full bg-amber-400 rounded-full" style="width: 0%;"></div>
+                                <div id="barWidth2" class="h-full bg-amber-400 rounded-full transition-all duration-500" style="width: 0%;"></div>
                             </div>
-                            <span class="w-10 text-right text-slate-400 font-mono text-[11px]">0%</span>
+                            <span id="pctVal2" class="w-10 text-right text-slate-400 font-mono text-[11px]">0%</span>
                         </div>
                         <div class="flex items-center gap-3 text-xs font-bold text-slate-400">
                             <span class="w-16 shrink-0">1 Bintang</span>
                             <div class="flex-1 h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                                <div class="h-full bg-amber-400 rounded-full" style="width: 0%;"></div>
+                                <div id="barWidth1" class="h-full bg-amber-400 rounded-full transition-all duration-500" style="width: 0%;"></div>
                             </div>
-                            <span class="w-10 text-right text-slate-400 font-mono text-[11px]">0%</span>
+                            <span id="pctVal1" class="w-10 text-right text-slate-400 font-mono text-[11px]">0%</span>
                         </div>
                     </div>
 
@@ -941,13 +941,13 @@
                         Semua (<span id="countFilterAll">0</span>)
                     </button>
                     <button onclick="filterCommunityReviews('5', this)" class="review-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all">
-                        ⭐ 5 Bintang
+                        ⭐ 5 Bintang (<span id="countFilter5">0</span>)
                     </button>
                     <button onclick="filterCommunityReviews('photo', this)" class="review-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all">
-                        📸 Dengan Bukti
+                        📸 Dengan Bukti (<span id="countFilterPhoto">0</span>)
                     </button>
                     <button onclick="filterCommunityReviews('tag_adobe', this)" class="review-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all">
-                        ✅ Lolos Adobe Stock
+                        ✅ Lolos Adobe Stock (<span id="countFilterAdobe">0</span>)
                     </button>
                 </div>
 
@@ -1380,106 +1380,10 @@
         }
 
         // =========================================================
-        // --- 7. ULASAN & RATING KOMUNITAS (INTEGRATED SYSTEM) ---
+        // --- 7. ULASAN & RATING KOMUNITAS (REAL DATABASE SYNC) ---
         // =========================================================
-        const SEED_COMMUNITY_REVIEWS = [
-            {
-                id: 'rev-seed-1',
-                userName: 'Budi Andriyanto',
-                role: 'Adobe Stock & Freepik Contributor',
-                userAvatar: 'BA',
-                rating: 5,
-                verifiedBuyer: true,
-                isPro: true,
-                appVersion: 'v1.3 PRO',
-                createdAt: '2 hari lalu',
-                title: 'Dulu 3 jam buat 50 foto, sekarang cuma 2 menit!',
-                comment: 'Workflow saya berubah drastis setelah pakai MetaZo PRO. Batch processing-nya luar biasa stabil. Judul dan 50 keyword yang dihasilkan relevan banget sama algoritma Adobe Stock, portofolio saya langsung diapprove tanpa revisi sama sekali.',
-                tags: ['✅ 100% Lolos Adobe Stock', '🚀 AI Super Cepat', '🔥 Hemat Waktu 10x'],
-                photos: ['https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80'],
-                helpfulCount: 38
-            },
-            {
-                id: 'rev-seed-2',
-                userName: 'Reza Darmawan',
-                role: 'Vector Artist & Canva Creator',
-                userAvatar: 'RD',
-                rating: 5,
-                verifiedBuyer: true,
-                isPro: true,
-                appVersion: 'v1.3 PRO',
-                createdAt: '4 hari lalu',
-                title: 'Fitur Direct Metadata Embed-nya penyelamat hidup',
-                comment: 'Fitur Direct Embed IPTC & XMP ke file EPS dan JPG itu game changer banget. Saya gak perlu lagi pusing nyocokin baris di spreadsheet CSV. Tinggal drag file langsung ke stock dashboard, judul dan keyword langsung terbaca otomatis!',
-                tags: ['💎 Fitur PRO Sangat Berguna', '⚡ Workflow Otomatis', '🎯 Keyword SEO Akurat'],
-                photos: [],
-                helpfulCount: 29
-            },
-            {
-                id: 'rev-seed-3',
-                userName: 'Siti Lestari',
-                role: 'AI Generative & Footage Contributor',
-                userAvatar: 'SL',
-                rating: 5,
-                verifiedBuyer: true,
-                isPro: true,
-                appVersion: 'v1.3 PRO',
-                createdAt: '1 minggu lalu',
-                title: 'Penjualan bulanan naik 40% dalam 2 bulan',
-                comment: 'Paket Lifetime-nya salah satu investasi terbaik saya tahun ini. Riset keywordnya gak asal-asalan, beneran tau kata kunci yang lagi high demand di bursa foto internasional. Cocok banget buat yang main AI Midjourney.',
-                tags: ['🏆 Sangat Direkomendasikan', '🎯 Keyword SEO Akurat'],
-                photos: ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'],
-                helpfulCount: 45
-            },
-            {
-                id: 'rev-seed-4',
-                userName: 'Dimas Prasetyo',
-                role: 'Shutterstock 4K Footage Videographer',
-                userAvatar: 'DP',
-                rating: 5,
-                verifiedBuyer: true,
-                isPro: true,
-                appVersion: 'v1.3 PRO',
-                createdAt: '1 minggu lalu',
-                title: 'AI Video Analysis-nya sangat akurat membaca pergerakan',
-                comment: 'Ekstraksi multi-frame pada klip drone MP4 membaca angle kamera dan pencahayaan dengan sangat presisi. Bikin deskripsi cinematic footage jadi berkelas ala Hollywood tanpa perlu mikir kosa kata bahasa Inggris yang rumit.',
-                tags: ['🚀 AI Super Cepat', '⚡ Workflow Otomatis'],
-                photos: [],
-                helpfulCount: 19
-            },
-            {
-                id: 'rev-seed-5',
-                userName: 'Alvina Putri',
-                role: 'Microstock Graphic Designer',
-                userAvatar: 'AP',
-                rating: 5,
-                verifiedBuyer: true,
-                isPro: true,
-                appVersion: 'v1.3 PRO',
-                createdAt: '2 minggu lalu',
-                title: 'Ekspor CSV Canva & Vecteezy langsung pas',
-                comment: 'Sebelumnya sering error format kolom di Vecteezy dan Canva. Di MetaZo PRO format CSV-nya 100% compliant dan kata terlarang (seperti spam AI buzzwords) otomatis dibersihkan. Sangat recommended untuk sesama kreator!',
-                tags: ['✅ 100% Lolos Adobe Stock', '💎 Fitur PRO Sangat Berguna'],
-                photos: [],
-                helpfulCount: 22
-            },
-            {
-                id: 'rev-seed-6',
-                userName: 'Hendra Gunawan',
-                role: 'Commercial Stock Photographer',
-                userAvatar: 'HG',
-                rating: 5,
-                verifiedBuyer: true,
-                isPro: true,
-                appVersion: 'v1.3 PRO',
-                createdAt: '3 minggu lalu',
-                title: 'AI Quality Check meminimalisir rejection',
-                comment: 'Fitur QC-nya ngebantu banget nyaring foto yang ada noise halus atau kurang fokus sebelum disubmit. Rasio approval portofolio saya di Adobe Stock sekarang tembus di atas 98%.',
-                tags: ['🎯 Keyword SEO Akurat', '🔥 Hemat Waktu 10x'],
-                photos: [],
-                helpfulCount: 31
-            }
-        ];
+        const SUPABASE_URL = 'https://qhucqnkewjoihffhpatd.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFodWNxbmtld2pvaWhmZmhwYXRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyNjQ5MTUsImV4cCI6MjA5ODg0MDkxNX0.MIavu-lS1-d7KiwisOXBDEcNzoeakSIgDxz3bK0ZXLw';
 
         let allCommunityReviews = [];
         let activeReviewFilter = 'all';
@@ -1494,40 +1398,165 @@
             }
         }
 
-        function loadCommunityReviewsData() {
-            let combined = [...SEED_COMMUNITY_REVIEWS];
+        function formatReviewDate(dateStr) {
+            if (!dateStr) return 'Baru saja';
+            try {
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return dateStr;
+                return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+            } catch (e) {
+                return dateStr;
+            }
+        }
+
+        function updateCommunityStats() {
+            const total = allCommunityReviews.length;
+            const avgEl = document.getElementById('communityAvgScore');
+            const starsEl = document.getElementById('communityStarsRender');
+            const totalEl = document.getElementById('communityTotalCount');
+            const navBadge = document.getElementById('navRatingBadge');
+            const mobileBadge = document.getElementById('mobileRatingBadge');
+
+            const countFilterAll = document.getElementById('countFilterAll');
+            const countFilter5 = document.getElementById('countFilter5');
+            const countFilterPhoto = document.getElementById('countFilterPhoto');
+            const countFilterAdobe = document.getElementById('countFilterAdobe');
+
+            if (countFilterAll) countFilterAll.innerText = total;
+
+            if (total === 0) {
+                if (avgEl) avgEl.innerText = '5.0';
+                if (totalEl) totalEl.innerText = '0';
+                if (countFilter5) countFilter5.innerText = '0';
+                if (countFilterPhoto) countFilterPhoto.innerText = '0';
+                if (countFilterAdobe) countFilterAdobe.innerText = '0';
+                return;
+            }
+
+            let sum = 0;
+            let c5 = 0, c4 = 0, c3 = 0, c2 = 0, c1 = 0;
+            let cPhoto = 0, cAdobe = 0;
+
+            allCommunityReviews.forEach(r => {
+                const rat = Math.round(Number(r.rating) || 5);
+                sum += (Number(r.rating) || 5);
+                if (rat === 5) c5++;
+                else if (rat === 4) c4++;
+                else if (rat === 3) c3++;
+                else if (rat === 2) c2++;
+                else if (rat <= 1) c1++;
+
+                if (Array.isArray(r.photos) && r.photos.length > 0) cPhoto++;
+                if (Array.isArray(r.tags) && r.tags.some(t => t.toLowerCase().includes('adobe'))) cAdobe++;
+            });
+
+            const avg = (sum / total).toFixed(1);
+            if (avgEl) avgEl.innerText = avg;
+            if (totalEl) totalEl.innerText = total;
+            if (navBadge) navBadge.innerText = avg + '★';
+            if (mobileBadge) mobileBadge.innerText = avg + '★';
+
+            // Star icons
+            if (starsEl) {
+                const rounded = Math.round(Number(avg));
+                let s = '';
+                for (let i = 0; i < 5; i++) {
+                    s += i < rounded ? '★' : '☆';
+                }
+                starsEl.innerText = s;
+            }
+
+            // Filter button counts
+            if (countFilter5) countFilter5.innerText = c5;
+            if (countFilterPhoto) countFilterPhoto.innerText = cPhoto;
+            if (countFilterAdobe) countFilterAdobe.innerText = cAdobe;
+
+            // Bar percentages
+            const p5 = Math.round((c5 / total) * 100);
+            const p4 = Math.round((c4 / total) * 100);
+            const p3 = Math.round((c3 / total) * 100);
+            const p2 = Math.round((c2 / total) * 100);
+            const p1 = Math.round((c1 / total) * 100);
+
+            const b5 = document.getElementById('barWidth5');
+            const v5 = document.getElementById('pctVal5');
+            if (b5 && v5) { b5.style.width = p5 + '%'; v5.innerText = p5 + '%'; }
+
+            const b4 = document.getElementById('barWidth4');
+            const v4 = document.getElementById('pctVal4');
+            if (b4 && v4) { b4.style.width = p4 + '%'; v4.innerText = p4 + '%'; }
+
+            const b3 = document.getElementById('barWidth3');
+            const v3 = document.getElementById('pctVal3');
+            if (b3 && v3) { b3.style.width = p3 + '%'; v3.innerText = p3 + '%'; }
+
+            const b2 = document.getElementById('barWidth2');
+            const v2 = document.getElementById('pctVal2');
+            if (b2 && v2) { b2.style.width = p2 + '%'; v2.innerText = p2 + '%'; }
+
+            const b1 = document.getElementById('barWidth1');
+            const v1 = document.getElementById('pctVal1');
+            if (b1 && v1) { b1.style.width = p1 + '%'; v1.innerText = p1 + '%'; }
+        }
+
+        async function loadCommunityReviewsData() {
+            const container = document.getElementById('communityReviewsContainer');
+
+            // 1. Try local cache first for instant initial render
             try {
                 const cached = localStorage.getItem('mz_community_reviews_cache');
                 if (cached) {
                     const parsed = JSON.parse(cached);
                     if (Array.isArray(parsed) && parsed.length > 0) {
-                        // Merge cached user-submitted reviews at the top
-                        const userReviews = parsed.filter(r => !r.id?.startsWith('rev-seed-')).map(r => ({
-                            id: r.id || 'rev-' + Math.random().toString(36).substring(2, 7),
-                            userName: r.userName || 'Member MetaZo',
-                            role: r.role || 'PRO Contributor',
-                            userAvatar: r.userName ? r.userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'MZ',
-                            rating: Number(r.rating) || 5,
-                            verifiedBuyer: r.verifiedBuyer ?? true,
-                            isPro: r.isPro ?? true,
-                            appVersion: r.appVersion || 'v1.3 PRO',
-                            createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Baru saja',
-                            title: r.title || 'Pengalaman Luar Biasa dengan MetaZo',
-                            comment: r.comment || '',
-                            tags: Array.isArray(r.tags) ? r.tags : ['✅ 100% Lolos Adobe Stock'],
-                            photos: Array.isArray(r.photos) ? r.photos : [],
-                            helpfulCount: Number(r.helpfulCount) || 5
-                        }));
-                        combined = [...userReviews, ...combined];
+                        const cleanCache = parsed.filter(r => !r.id?.startsWith('rev-seed-'));
+                        if (cleanCache.length > 0) {
+                            allCommunityReviews = cleanCache;
+                            updateCommunityStats();
+                            renderCommunityReviews();
+                        }
                     }
                 }
-            } catch (e) {
-                console.warn('Error reading reviews cache:', e);
+            } catch (e) {}
+
+            // If empty, show loading skeleton
+            if (allCommunityReviews.length === 0 && container) {
+                container.innerHTML = `
+                    <div class="col-span-full py-12 flex flex-col items-center justify-center text-center">
+                        <div class="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <p class="text-xs font-bold text-slate-400">Memuat ulasan otentik kontributor langsung dari database...</p>
+                    </div>
+                `;
             }
 
-            allCommunityReviews = combined;
-            document.getElementById('countFilterAll').innerText = allCommunityReviews.length;
-            renderCommunityReviews();
+            // 2. Fetch directly from Supabase REST API
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/reviews?select=*&order=createdAt.desc`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data)) {
+                        // STRICT: Only real user reviews, no seed template items
+                        const realReviews = data.filter(r => !r.id?.startsWith('rev-seed-'));
+                        allCommunityReviews = realReviews;
+                        localStorage.setItem('mz_community_reviews_cache', JSON.stringify(realReviews));
+                        updateCommunityStats();
+                        renderCommunityReviews();
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn('[CommunityReviews] Failed fetching real database reviews:', err);
+            }
+
+            // If fetch finished and rendered
+            if (allCommunityReviews.length === 0) {
+                renderCommunityReviews();
+            }
         }
 
         function renderCommunityReviews() {
@@ -1538,12 +1567,10 @@
 
             // Filter logic
             let filtered = allCommunityReviews.filter(rev => {
-                // Star / tag filter
-                if (activeReviewFilter === '5' && rev.rating !== 5) return false;
+                if (activeReviewFilter === '5' && Math.round(Number(rev.rating) || 5) !== 5) return false;
                 if (activeReviewFilter === 'photo' && (!rev.photos || rev.photos.length === 0)) return false;
                 if (activeReviewFilter === 'tag_adobe' && (!rev.tags || !rev.tags.some(t => t.toLowerCase().includes('adobe')))) return false;
 
-                // Search query filter
                 if (currentReviewSearchQuery.trim()) {
                     const q = currentReviewSearchQuery.toLowerCase();
                     const matchName = rev.userName?.toLowerCase().includes(q);
@@ -1557,42 +1584,70 @@
             });
 
             if (filtered.length === 0) {
-                container.innerHTML = `
-                    <div class="col-span-full py-12 text-center">
-                        <p class="text-slate-400 font-bold text-sm">Tidak ada ulasan yang cocok dengan pencarian / filter Anda.</p>
-                        <button onclick="filterCommunityReviews('all', document.querySelectorAll('.review-filter-btn')[0])" class="mt-3 px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-black uppercase tracking-wider">
-                            Tampilkan Semua Ulasan
-                        </button>
-                    </div>
-                `;
+                if (allCommunityReviews.length === 0) {
+                    container.innerHTML = `
+                        <div class="col-span-full py-14 text-center glass-card rounded-3xl border border-dashed border-slate-300 dark:border-white/10 p-8 max-w-lg mx-auto">
+                            <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3 text-xl">
+                                ✨
+                            </div>
+                            <h4 class="text-sm font-black text-slate-900 dark:text-white">Belum Ada Ulasan Kontributor</h4>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                Jadilah kontributor pertama yang memberikan ulasan otentik langsung melalui aplikasi!
+                            </p>
+                            <a href="/CommunityReviews" class="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md">
+                                <span>Tulis Ulasan di Aplikasi</span>
+                            </a>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div class="col-span-full py-12 text-center">
+                            <p class="text-slate-400 font-bold text-xs">Tidak ada ulasan yang cocok dengan pencarian / filter Anda.</p>
+                            <button onclick="filterCommunityReviews('all', document.querySelectorAll('.review-filter-btn')[0])" class="mt-3 px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-black uppercase tracking-wider">
+                                Tampilkan Semua Ulasan
+                            </button>
+                        </div>
+                    `;
+                }
                 return;
             }
 
             container.innerHTML = filtered.map(rev => {
                 const isLiked = !!likedMap[rev.id];
-                const currentLikes = (rev.helpfulCount || 0) + (isLiked ? 1 : 0);
+                const currentLikes = (Number(rev.helpfulCount) || 0) + (isLiked ? 1 : 0);
+                const ratingNum = Math.round(Number(rev.rating) || 5);
 
                 // Render Stars
                 let starsHtml = '';
                 for (let i = 0; i < 5; i++) {
-                    starsHtml += `<span class="${i < rev.rating ? 'text-amber-400' : 'text-slate-300 dark:text-slate-700'}">★</span>`;
+                    starsHtml += `<span class="${i < ratingNum ? 'text-amber-400' : 'text-slate-300 dark:text-slate-700'}">★</span>`;
                 }
 
-                // Render Experience Tags
-                const tagsHtml = (rev.tags || []).map(tag => `
+                // Render Tags
+                const tagsHtml = (Array.isArray(rev.tags) ? rev.tags : []).map(tag => `
                     <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-brand-500/10 text-brand-600 dark:text-brand-300 border border-brand-500/15">
                         ${tag}
                     </span>
                 `).join('');
 
-                // Render Photos Gallery if exists
-                const photosHtml = (rev.photos && rev.photos.length > 0) ? `
+                // Render Photos Gallery
+                const photosHtml = (Array.isArray(rev.photos) && rev.photos.length > 0) ? `
                     <div class="flex items-center gap-2 mt-3 overflow-x-auto pb-1">
                         ${rev.photos.map(p => `
-                            <img src="${p}" alt="Proof" onclick="openReviewPhotoModal('${p}')" class="w-14 h-14 object-cover rounded-xl border border-slate-200 dark:border-white/10 hover:opacity-80 transition-opacity cursor-pointer shadow-sm">
+                            <img src="${p}" alt="Bukti Approval" onclick="openReviewPhotoModal('${p}')" class="w-14 h-14 object-cover rounded-xl border border-slate-200 dark:border-white/10 hover:opacity-80 transition-opacity cursor-pointer shadow-sm shrink-0">
                         `).join('')}
                     </div>
                 ` : '';
+
+                // Avatar rendering (Image if URL, otherwise initials badge)
+                const avatarUrl = rev.userAvatar && (rev.userAvatar.startsWith('http') || rev.userAvatar.startsWith('data:')) ? rev.userAvatar : null;
+                const initials = rev.userName ? rev.userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'MZ';
+
+                const avatarHtml = avatarUrl
+                    ? `<img src="${avatarUrl}" alt="${rev.userName}" class="w-11 h-11 object-cover rounded-2xl shadow-md border border-slate-200 dark:border-white/10 shrink-0" onerror="this.onerror=null; this.src='/favicon.ico';">`
+                    : `<div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white font-black text-xs shadow-md shadow-brand-500/20 shrink-0">${initials}</div>`;
+
+                const formattedDate = formatReviewDate(rev.createdAt);
 
                 return `
                     <div class="p-6 sm:p-7 rounded-3xl glass-card border border-slate-200 dark:border-white/10 hover:border-brand-500/30 transition-all flex flex-col justify-between group shadow-sm hover:shadow-xl">
@@ -1600,22 +1655,20 @@
                             <!-- User Header -->
                             <div class="flex items-start justify-between gap-3 mb-4">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white font-black text-xs shadow-md shadow-brand-500/20 shrink-0">
-                                        ${rev.userAvatar || 'MZ'}
-                                    </div>
+                                    ${avatarHtml}
                                     <div>
                                         <div class="flex items-center gap-1.5 flex-wrap">
-                                            <span class="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-none">${rev.userName}</span>
+                                            <span class="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-none">${rev.userName || 'Kontributor MetaZo'}</span>
                                             ${rev.verifiedBuyer ? `
                                                 <span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[8.5px] font-black uppercase tracking-wider" title="Terverifikasi Menggunakan MetaZo PRO">
                                                     ✓ Verified
                                                 </span>
                                             ` : ''}
                                         </div>
-                                        <span class="text-[10.5px] text-slate-400 font-medium block mt-1">${rev.role || 'Member Komunitas'}</span>
+                                        <span class="text-[10.5px] text-slate-400 font-medium block mt-1">${rev.role || 'Microstock Contributor'}</span>
                                     </div>
                                 </div>
-                                <span class="text-[9.5px] font-bold text-slate-400 dark:text-slate-500 shrink-0">${rev.createdAt}</span>
+                                <span class="text-[9.5px] font-bold text-slate-400 dark:text-slate-500 shrink-0">${formattedDate}</span>
                             </div>
 
                             <!-- Star Rating & App Version -->
@@ -1629,15 +1682,13 @@
                             </div>
 
                             <!-- Review Title & Comment -->
-                            <h4 class="text-sm font-black text-slate-900 dark:text-white mb-2 leading-snug">"${rev.title}"</h4>
+                            <h4 class="text-sm font-black text-slate-900 dark:text-white mb-2 leading-snug">"${rev.title || 'Pengalaman MetaZo PRO'}"</h4>
                             <p class="text-xs sm:text-[12.5px] text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-                                ${rev.comment}
+                                ${rev.comment || ''}
                             </p>
 
                             <!-- Tags -->
-                            <div class="flex flex-wrap gap-1.5 mt-4">
-                                ${tagsHtml}
-                            </div>
+                            ${tagsHtml ? `<div class="flex flex-wrap gap-1.5 mt-4">${tagsHtml}</div>` : ''}
 
                             <!-- Photo Proofs -->
                             ${photosHtml}
@@ -1645,7 +1696,7 @@
 
                         <!-- Footer: Helpful Like Action -->
                         <div class="mt-6 pt-4 border-t border-slate-200 dark:border-white/5 flex items-center justify-between">
-                            <span class="text-[10px] text-slate-400 font-medium">Ulasan otentik pengguna</span>
+                            <span class="text-[10px] text-slate-400 font-medium">Ulasan otentik database</span>
                             <button onclick="toggleHelpfulVote('${rev.id}')" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all ${isLiked ? 'bg-brand-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750'} cursor-pointer">
                                 <span>👍</span>
                                 <span class="text-[11px]">Membantu (${currentLikes})</span>
@@ -1672,14 +1723,32 @@
             renderCommunityReviews();
         }
 
-        function toggleHelpfulVote(reviewId) {
+        async function toggleHelpfulVote(reviewId) {
             const likedMap = getLikedReviews();
-            if (likedMap[reviewId]) {
-                delete likedMap[reviewId];
-            } else {
+            const isLiking = !likedMap[reviewId];
+            if (isLiking) {
                 likedMap[reviewId] = true;
+            } else {
+                delete likedMap[reviewId];
             }
             localStorage.setItem('mz_liked_reviews', JSON.stringify(likedMap));
+
+            // Optimistic update count
+            const rev = allCommunityReviews.find(r => r.id === reviewId);
+            if (rev) {
+                rev.helpfulCount = Math.max(0, (Number(rev.helpfulCount) || 0) + (isLiking ? 1 : -1));
+                // Sync to Supabase in background
+                fetch(`${SUPABASE_URL}/rest/v1/reviews?id=eq.${encodeURIComponent(reviewId)}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify({ helpfulCount: rev.helpfulCount })
+                }).catch(e => console.warn('Sync helpful vote failed:', e));
+            }
             renderCommunityReviews();
         }
 
