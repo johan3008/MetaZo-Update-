@@ -2225,6 +2225,10 @@ const App: React.FC = () => {
     const isIframe = typeof window !== 'undefined' && window.self !== window.top;
 
     if (!user) {
+      if (currentPath === '/' || currentPath === '/landing' || currentPath === '/landing.html') {
+        window.location.replace('/landing.html');
+        return;
+      }
       if (currentPath !== '/Login') {
         const tool = getToolFromPath(currentPath);
         if (tool && tool !== ToolType.DASHBOARD) {
