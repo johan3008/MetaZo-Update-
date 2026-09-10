@@ -72,10 +72,25 @@
     </script>
 
     <style>
+        html {
+            font-size: 13.5px;
+        }
+        @media (min-width: 640px) {
+            html {
+                font-size: 14px;
+            }
+        }
+        @media (min-width: 1024px) {
+            html {
+                font-size: 14.5px;
+            }
+        }
+
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
+            letter-spacing: -0.02em;
         }
 
         /* Glassmorphism & custom utility styles */
@@ -163,54 +178,54 @@
 
     <!-- Top Floating Navbar -->
     <header class="fixed top-0 left-0 right-0 z-50 glass-nav transition-all duration-300">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-18 flex items-center justify-between">
             <!-- Brand Logo -->
-            <a href="#" class="flex items-center gap-3 group">
-                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center p-0.5 shadow-lg shadow-brand-600/30 group-hover:scale-105 transition-transform">
-                    <img src="/src/assets/images/mz_pro_logo_1780923659277.png" alt="MetaZo Logo" class="w-full h-full object-contain rounded-xl" onerror="this.src='/favicon.ico'; this.onerror=null;">
+            <a href="#" class="flex items-center gap-2.5 group">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center p-0.5 shadow-md shadow-brand-600/25 group-hover:scale-105 transition-transform">
+                    <img src="/src/assets/images/mz_pro_logo_1780923659277.png" alt="MetaZo Logo" class="w-full h-full object-contain rounded-lg" onerror="this.src='/favicon.ico'; this.onerror=null;">
                 </div>
                 <div class="flex flex-col">
-                    <div class="flex items-center gap-2">
-                        <span class="text-xl font-black tracking-tight text-slate-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
                             METAZO <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-500">PRO</span>
                         </span>
-                        <span class="px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-300 border border-brand-500/20 rounded-full">v1.3</span>
+                        <span class="px-1.5 py-0.2 text-[8px] font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-300 border border-brand-500/20 rounded-full">v1.3</span>
                     </div>
-                    <span class="text-[10px] font-bold text-slate-400 dark:text-slate-400 tracking-wider">AI Microstock Suite</span>
+                    <span class="text-[9px] font-semibold text-slate-400 dark:text-slate-400 tracking-wider">AI Microstock Suite</span>
                 </div>
             </a>
 
             <!-- Desktop Nav Links -->
-            <nav class="hidden md:flex items-center gap-7 text-sm font-bold text-slate-600 dark:text-slate-300">
+            <nav class="hidden md:flex items-center gap-6 text-[12.5px] font-bold text-slate-600 dark:text-slate-300">
                 <a href="#fitur" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Fitur Unggulan</a>
                 <a href="#simulasi" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Live Demo</a>
                 <a href="#komparasi" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Perbandingan</a>
                 <a href="#ulasan" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors flex items-center gap-1">
                     <span>Ulasan Komunitas</span>
-                    <span class="px-1.5 py-0.2 text-[9px] font-black bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md">4.9★</span>
+                    <span id="navRatingBadge" class="px-1.5 py-0.2 text-[8.5px] font-black bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-md">5.0★</span>
                 </a>
                 <a href="#harga" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Harga Lisensi</a>
                 <a href="#faq" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">FAQ</a>
             </nav>
 
             <!-- Action Controls -->
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2.5">
                 <!-- Theme Toggle -->
-                <button id="themeToggleBtn" aria-label="Toggle Theme" class="p-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 hover:border-brand-500/30 transition-all cursor-pointer">
+                <button id="themeToggleBtn" aria-label="Toggle Theme" class="p-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 hover:border-brand-500/30 transition-all cursor-pointer">
                     <!-- Sun Icon (shown in dark mode) -->
-                    <svg id="sunIcon" class="w-4 h-4 hidden dark:block text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg id="sunIcon" class="w-3.5 h-3.5 hidden dark:block text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
                     <!-- Moon Icon (shown in light mode) -->
-                    <svg id="moonIcon" class="w-4 h-4 block dark:hidden text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg id="moonIcon" class="w-3.5 h-3.5 block dark:hidden text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                     </svg>
                 </button>
 
                 <!-- CTA Button -->
-                <a href="/app" class="relative inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-extrabold text-xs tracking-wider uppercase text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-lg shadow-brand-600/30 hover:shadow-brand-600/50 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                <a href="/app" class="relative inline-flex items-center justify-center px-4 py-2 rounded-xl font-bold text-[11px] tracking-wider uppercase text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-md shadow-brand-600/25 hover:shadow-brand-600/40 hover:scale-[1.02] active:scale-[0.98] transition-all">
                     <span>Buka Web App</span>
-                    <svg class="w-3.5 h-3.5 ml-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                     </svg>
                 </a>
@@ -229,7 +244,7 @@
             <a href="#fitur" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Fitur Unggulan</a>
             <a href="#simulasi" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Live Demo & Simulasi</a>
             <a href="#komparasi" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Perbandingan</a>
-            <a href="#ulasan" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Ulasan Komunitas (4.9★)</a>
+            <a href="#ulasan" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Ulasan Komunitas (<span id="mobileRatingBadge">5.0★</span>)</a>
             <a href="#harga" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Harga Lisensi</a>
             <a href="#faq" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">FAQ</a>
             <div class="pt-2">
@@ -241,11 +256,11 @@
     </header>
 
     <!-- HERO SECTION -->
-    <section class="relative pt-36 pb-20 md:pt-44 md:pb-28 overflow-hidden z-10">
+    <section class="relative pt-32 pb-16 md:pt-40 md:pb-24 overflow-hidden z-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             
             <!-- Announcement Badge -->
-            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-card border border-brand-500/30 text-slate-800 dark:text-slate-200 text-xs font-bold mb-8 shadow-sm">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full glass-card border border-brand-500/30 text-slate-800 dark:text-slate-200 text-[11px] font-bold mb-6 shadow-sm">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
                 <span class="text-brand-600 dark:text-brand-300 font-extrabold uppercase tracking-wider">Terobosan Terbaru</span>
                 <span class="text-slate-300 dark:text-slate-600">|</span>
@@ -253,31 +268,31 @@
             </div>
 
             <!-- Main Heading -->
-            <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.15] max-w-5xl mx-auto">
+            <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-black tracking-tight text-slate-900 dark:text-white leading-[1.18] max-w-4xl mx-auto">
                 Revolusi Workflow Microstock: 
-                <span class="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-brand-600 via-indigo-500 to-pink-500">
+                <span class="block mt-1.5 text-transparent bg-clip-text bg-gradient-to-r from-brand-600 via-indigo-500 to-pink-500">
                     Metadata Akurat & Ribuan Penjualan
                 </span>
                 dengan Kekuatan AI
             </h1>
 
             <!-- Subheading -->
-            <p class="mt-6 text-base sm:text-lg md:text-xl text-slate-600 dark:text-slate-300 font-medium max-w-3xl mx-auto leading-relaxed">
+            <p class="mt-5 text-xs sm:text-sm md:text-[14.5px] text-slate-600 dark:text-slate-300 font-medium max-w-2xl mx-auto leading-relaxed">
                 Tinggalkan riset judul manual dan 50 keyword yang membosankan. 
                 <span class="text-brand-600 dark:text-brand-400 font-bold">MetaZo PRO</span> 
                 menganalisis foto, vektor, dan klip video Anda secara presisi untuk menembus algoritma pencarian Adobe Stock, Shutterstock, Freepik, Vecteezy, dan Canva.
             </p>
 
             <!-- Hero Action Buttons -->
-            <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="/app" class="w-full sm:w-auto px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-xl shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
+                <a href="/app" class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-extrabold text-xs uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     <span>Mulai Pakai Gratis (Trial)</span>
                 </a>
-                <a href="#simulasi" class="w-full sm:w-auto px-8 py-4 rounded-2xl font-bold text-sm tracking-wide text-slate-700 dark:text-slate-200 glass-card hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all flex items-center justify-center gap-2">
-                    <svg class="w-5 h-5 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <a href="#simulasi" class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-xs tracking-wide text-slate-700 dark:text-slate-200 glass-card hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -286,22 +301,22 @@
             </div>
 
             <!-- Social Proof Numbers -->
-            <div class="mt-12 pt-8 border-t border-slate-200/80 dark:border-white/5 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+            <div class="mt-10 pt-6 border-t border-slate-200/80 dark:border-white/5 grid grid-cols-2 md:grid-cols-4 gap-5 max-w-3xl mx-auto">
                 <div class="flex flex-col items-center">
-                    <span class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">50 Keywords</span>
-                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Ranking Relevansi SEO</span>
+                    <span class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">50 Keywords</span>
+                    <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Ranking Relevansi SEO</span>
                 </div>
                 <div class="flex flex-col items-center">
-                    <span class="text-2xl sm:text-3xl font-black text-brand-600 dark:text-brand-400">&lt; 5 Detik</span>
-                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Generasi Per Aset</span>
+                    <span class="text-xl sm:text-2xl font-black text-brand-600 dark:text-brand-400">&lt; 5 Detik</span>
+                    <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Generasi Per Aset</span>
                 </div>
                 <div class="flex flex-col items-center">
-                    <span class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">100% Compliant</span>
-                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Format CSV Siap Upload</span>
+                    <span class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">100% Compliant</span>
+                    <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Format CSV Siap Upload</span>
                 </div>
                 <div class="flex flex-col items-center">
-                    <span class="text-2xl sm:text-3xl font-black text-emerald-500">1,500+</span>
-                    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Kontributor Aktif</span>
+                    <span class="text-xl sm:text-2xl font-black text-emerald-500">1,500+</span>
+                    <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Kontributor Aktif</span>
                 </div>
             </div>
 
@@ -335,34 +350,34 @@
     </section>
 
     <!-- INTERACTIVE SIMULATOR / LIVE DEMO -->
-    <section id="simulasi" class="py-20 relative z-10">
+    <section id="simulasi" class="py-16 md:py-20 relative z-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-3xl mx-auto mb-12">
-                <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
+            <div class="text-center max-w-2xl mx-auto mb-10">
+                <span class="px-3 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
                     Live Demo & Simulasi
                 </span>
-                <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white mt-4">
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-slate-900 dark:text-white mt-3">
                     Lihat Bagaimana MetaZo Mengubah Visual Menjadi Uang
                 </h2>
-                <p class="text-sm sm:text-base text-slate-600 dark:text-slate-400 mt-3">
+                <p class="text-xs sm:text-[13.5px] text-slate-600 dark:text-slate-400 mt-2.5 leading-relaxed">
                     Pilih tipe aset di bawah untuk melihat hasil analisis AI secara langsung: Judul berdaya pikat komersial, deskripsi kaya konteks, dan 50 keyword siap ranking.
                 </p>
             </div>
 
             <!-- Demo Container Box -->
-            <div class="glass-card gradient-border-glow rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl">
+            <div class="glass-card gradient-border-glow rounded-3xl p-5 sm:p-7 lg:p-9 shadow-2xl">
                 <!-- Preset Switcher Tabs -->
-                <div class="flex flex-wrap items-center justify-center gap-2.5 pb-8 border-b border-slate-200 dark:border-white/10">
-                    <button onclick="switchDemoPreset('beach')" id="btn-beach" class="demo-tab-btn px-4 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all bg-brand-600 text-white shadow-md">
+                <div class="flex flex-wrap items-center justify-center gap-2 pb-6 border-b border-slate-200 dark:border-white/10">
+                    <button onclick="switchDemoPreset('beach')" id="btn-beach" class="demo-tab-btn px-3.5 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all bg-brand-600 text-white shadow-md">
                         📸 Foto Sunset Tropis
                     </button>
-                    <button onclick="switchDemoPreset('robot')" id="btn-robot" class="demo-tab-btn px-4 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500">
+                    <button onclick="switchDemoPreset('robot')" id="btn-robot" class="demo-tab-btn px-3.5 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500">
                         🤖 AI Generative Cyberpunk
                     </button>
-                    <button onclick="switchDemoPreset('vector')" id="btn-vector" class="demo-tab-btn px-4 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500">
+                    <button onclick="switchDemoPreset('vector')" id="btn-vector" class="demo-tab-btn px-3.5 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500">
                         🎨 Vektor Infografis Bisnis
                     </button>
-                    <button onclick="switchDemoPreset('drone')" id="btn-drone" class="demo-tab-btn px-4 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500">
+                    <button onclick="switchDemoPreset('drone')" id="btn-drone" class="demo-tab-btn px-3.5 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500">
                         🎥 Video Aerial 4K Drone
                     </button>
                 </div>
@@ -477,102 +492,102 @@
     </section>
 
     <!-- BEFORE VS AFTER (COMPARISON) -->
-    <section id="komparasi" class="py-20 relative z-10">
+    <section id="komparasi" class="py-16 md:py-20 relative z-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-3xl mx-auto mb-16">
-                <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+            <div class="text-center max-w-2xl mx-auto mb-12">
+                <span class="px-3 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-widest bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
                     Bandingkan Efisiensi
                 </span>
-                <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white mt-4">
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-slate-900 dark:text-white mt-3">
                     Mengapa Kontributor Sukses Beralih ke MetaZo PRO?
                 </h2>
-                <p class="text-sm sm:text-base text-slate-600 dark:text-slate-400 mt-3">
+                <p class="text-xs sm:text-[13.5px] text-slate-600 dark:text-slate-400 mt-2.5">
                     Lihat perbedaan mencolok antara cara kuno yang membuang waktu dan otomatisasi cerdas berbasis AI.
                 </p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-7 max-w-4xl mx-auto">
                 <!-- The Old Way (Kuno / Manual) -->
-                <div class="p-8 rounded-3xl glass-card border border-rose-500/20 dark:border-rose-500/20 relative overflow-hidden">
-                    <div class="absolute top-0 right-0 px-4 py-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase tracking-widest rounded-bl-2xl">
+                <div class="p-6 sm:p-7 rounded-3xl glass-card border border-rose-500/20 dark:border-rose-500/20 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 px-3.5 py-1 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[9.5px] font-black uppercase tracking-widest rounded-bl-2xl">
                         Cara Manual (Melelahkan)
                     </div>
 
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-12 h-12 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500">
-                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500 shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-lg font-black text-slate-900 dark:text-white">Metode Konvensional</h3>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">Riset manual satu demi satu</p>
+                            <h3 class="text-base font-black text-slate-900 dark:text-white">Metode Konvensional</h3>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Riset manual satu demi satu</p>
                         </div>
                     </div>
 
-                    <ul class="space-y-4 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium">
-                        <li class="flex items-start gap-3">
-                            <span class="w-5 h-5 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 mt-0.5 font-bold">✕</span>
+                    <ul class="space-y-3 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-4 h-4 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">✕</span>
                             <span>Menghabiskan <strong>15–25 menit per aset</strong> hanya untuk memikirkan judul dan menyalin keyword.</span>
                         </li>
-                        <li class="flex items-start gap-3">
-                            <span class="w-5 h-5 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 mt-0.5 font-bold">✕</span>
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-4 h-4 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">✕</span>
                             <span>Stres mencari 50 keyword dalam bahasa Inggris yang relevan dan tidak spam.</span>
                         </li>
-                        <li class="flex items-start gap-3">
-                            <span class="w-5 h-5 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 mt-0.5 font-bold">✕</span>
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-4 h-4 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">✕</span>
                             <span>Risiko tinggi penolakan (Rejection) karena kesalahan ejaan atau tag tidak relevan.</span>
                         </li>
-                        <li class="flex items-start gap-3">
-                            <span class="w-5 h-5 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 mt-0.5 font-bold">✕</span>
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-4 h-4 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">✕</span>
                             <span>Format spreadsheet CSV sering error saat diunggah ke Adobe Stock atau Canva.</span>
                         </li>
                     </ul>
 
-                    <div class="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 text-center">
-                        <span class="text-xs font-bold text-rose-500 uppercase tracking-wider">Hasil: Portfolio lambat berkembang, energi terkuras</span>
+                    <div class="mt-6 pt-5 border-t border-slate-200 dark:border-white/5 text-center">
+                        <span class="text-[11px] font-bold text-rose-500 uppercase tracking-wider">Hasil: Portfolio lambat berkembang, energi terkuras</span>
                     </div>
                 </div>
 
                 <!-- The MetaZo PRO Way -->
-                <div class="p-8 rounded-3xl glass-card gradient-border-glow shadow-xl relative overflow-hidden bg-brand-900/5">
-                    <div class="absolute top-0 right-0 px-4 py-1.5 bg-brand-600 text-white text-[10px] font-black uppercase tracking-widest rounded-bl-2xl">
+                <div class="p-6 sm:p-7 rounded-3xl glass-card gradient-border-glow shadow-xl relative overflow-hidden bg-brand-900/5">
+                    <div class="absolute top-0 right-0 px-3.5 py-1 bg-brand-600 text-white text-[9.5px] font-black uppercase tracking-widest rounded-bl-2xl">
                         Solusi Cerdas (MetaZo PRO)
                     </div>
 
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center text-white shadow-lg shadow-brand-600/30">
-                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white shadow-md shadow-brand-600/30 shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-lg font-black text-slate-900 dark:text-white">Alur Kerja Cepat MetaZo</h3>
-                            <p class="text-xs text-brand-600 dark:text-brand-400 font-bold">Otomatisasi AI Vision Paralel</p>
+                            <h3 class="text-base font-black text-slate-900 dark:text-white">Alur Kerja Cepat MetaZo</h3>
+                            <p class="text-[11px] text-brand-600 dark:text-brand-400 font-bold">Otomatisasi AI Vision Paralel</p>
                         </div>
                     </div>
 
-                    <ul class="space-y-4 text-xs sm:text-sm text-slate-700 dark:text-slate-200 font-semibold">
-                        <li class="flex items-start gap-3">
-                            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5 font-bold">✓</span>
+                    <ul class="space-y-3 text-xs text-slate-700 dark:text-slate-200 font-semibold">
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">✓</span>
                             <span>Selesai dalam <strong>kurang dari 5 detik per aset</strong> dengan analisis visual AI mendalam.</span>
                         </li>
-                        <li class="flex items-start gap-3">
-                            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5 font-bold">✓</span>
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">✓</span>
                             <span>Otomatis menyusun 50 keyword berperingkat SEO komersial tinggi tanpa spam.</span>
                         </li>
-                        <li class="flex items-start gap-3">
-                            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5 font-bold">✓</span>
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">✓</span>
                             <span>1-Klik ekspor CSV standar 100% compliant untuk Adobe Stock, Canva, Shutterstock, dan Freepik.</span>
                         </li>
-                        <li class="flex items-start gap-3">
-                            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5 font-bold">✓</span>
-                            <span>Direct Embed IPTC / XMP: metadata langsung tertanam ke file, tanpa repot utak-atik CSV lagi!</span>
+                        <li class="flex items-start gap-2.5">
+                            <span class="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">✓</span>
+                            <span>Direct Embed IPTC / XMP: metadata langsung tertanam ke file, tanpa repot CSV lagi!</span>
                         </li>
                     </ul>
 
-                    <div class="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 text-center">
-                        <span class="text-xs font-black text-emerald-500 uppercase tracking-wider">Hasil: Hemat 90% waktu, upload ratusan aset per hari!</span>
+                    <div class="mt-6 pt-5 border-t border-slate-200 dark:border-white/5 text-center">
+                        <span class="text-[11px] font-black text-emerald-500 uppercase tracking-wider">Hasil: Hemat 90% waktu, upload ratusan aset per hari!</span>
                     </div>
                 </div>
             </div>
@@ -580,195 +595,195 @@
     </section>
 
     <!-- CORE FEATURES GRID -->
-    <section id="fitur" class="py-20 relative z-10 bg-slate-100/50 dark:bg-black/20">
+    <section id="fitur" class="py-16 md:py-20 relative z-10 bg-slate-100/50 dark:bg-black/20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-3xl mx-auto mb-16">
-                <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+            <div class="text-center max-w-2xl mx-auto mb-12">
+                <span class="px-3 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-widest bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
                     Fitur Lengkap
                 </span>
-                <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white mt-4">
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-slate-900 dark:text-white mt-3">
                     Senjata Rahasia Sukses Kontributor Modern
                 </h2>
-                <p class="text-sm sm:text-base text-slate-600 dark:text-slate-400 mt-3">
+                <p class="text-xs sm:text-[13.5px] text-slate-600 dark:text-slate-400 mt-2.5">
                     Bukan sekadar penemu keyword biasa, MetaZo PRO adalah ekosistem produktivitas lengkap dari kreasi visual hingga submission.
                 </p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 <!-- Feature 1 -->
-                <div class="p-8 rounded-3xl glass-card hover:border-brand-500/40 transition-all group flex flex-col justify-between">
+                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-brand-500/40 transition-all group flex flex-col justify-between">
                     <div>
-                        <div class="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div class="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                         </div>
-                        <h3 class="text-xl font-black text-slate-900 dark:text-white mb-2">AI Vision Recognition</h3>
-                        <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                        <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white mb-2">AI Vision Recognition</h3>
+                        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                             Membaca elemen foto, komposisi, pencahayaan, nuansa warna, dan konsep komersial secara mendalam menggunakan model AI Vision tercanggih.
                         </p>
                     </div>
-                    <span class="mt-6 text-[10px] font-extrabold text-brand-600 dark:text-brand-400 uppercase tracking-widest block">Akurasi Visual Presisi</span>
+                    <span class="mt-5 text-[9.5px] font-extrabold text-brand-600 dark:text-brand-400 uppercase tracking-widest block">Akurasi Visual Presisi</span>
                 </div>
 
                 <!-- Feature 2 -->
-                <div class="p-8 rounded-3xl glass-card hover:border-indigo-500/40 transition-all group flex flex-col justify-between">
+                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-indigo-500/40 transition-all group flex flex-col justify-between">
                     <div>
-                        <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                             </svg>
                         </div>
-                        <h3 class="text-xl font-black text-slate-900 dark:text-white mb-2">Multi-Format Asset Support</h3>
-                        <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                        <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white mb-2">Multi-Format Asset Support</h3>
+                        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                             Mendukung Raster Foto (JPG, PNG, WEBP), Klip Video (MP4, MOV multi-frame extraction), hingga Ilustrasi Vektor (EPS, SVG thumbnails).
                         </p>
                     </div>
-                    <span class="mt-6 text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest block">Photo • Video • Vector</span>
+                    <span class="mt-5 text-[9.5px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest block">Photo • Video • Vector</span>
                 </div>
 
                 <!-- Feature 3 -->
-                <div class="p-8 rounded-3xl glass-card hover:border-emerald-500/40 transition-all group flex flex-col justify-between">
+                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-emerald-500/40 transition-all group flex flex-col justify-between">
                     <div>
-                        <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                         </div>
-                        <h3 class="text-xl font-black text-slate-900 dark:text-white mb-2">Lightning Batch Processing</h3>
-                        <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                        <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white mb-2">Lightning Batch Processing</h3>
+                        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                             Proses 50 hingga 200 file sekaligus secara paralel dengan fitur auto-resume jika browser ter-refresh atau terputus koneksi.
                         </p>
                     </div>
-                    <span class="mt-6 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest block">Hemat 90% Jam Kerja</span>
+                    <span class="mt-5 text-[9.5px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest block">Hemat 90% Jam Kerja</span>
                 </div>
 
                 <!-- Feature 4 -->
-                <div class="p-8 rounded-3xl glass-card hover:border-amber-500/40 transition-all group flex flex-col justify-between">
+                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-amber-500/40 transition-all group flex flex-col justify-between">
                     <div>
-                        <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                         </div>
-                        <h3 class="text-xl font-black text-slate-900 dark:text-white mb-2">1-Klik Multi-Agency CSV</h3>
-                        <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                        <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white mb-2">1-Klik Multi-Agency CSV</h3>
+                        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                             Ekspor otomatis dalam format baku CSV untuk Adobe Stock, Canva, Shutterstock, Vecteezy, dan Freepik. Zero formatting errors!
                         </p>
                     </div>
-                    <span class="mt-6 text-[10px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-widest block">100% Format Compliant</span>
+                    <span class="mt-5 text-[9.5px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-widest block">100% Format Compliant</span>
                 </div>
 
                 <!-- Feature 5 -->
-                <div class="p-8 rounded-3xl glass-card hover:border-fuchsia-500/40 transition-all group flex flex-col justify-between">
+                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-fuchsia-500/40 transition-all group flex flex-col justify-between">
                     <div>
-                        <div class="w-12 h-12 rounded-2xl bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div class="w-10 h-10 rounded-xl bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                             </svg>
                         </div>
-                        <h3 class="text-xl font-black text-slate-900 dark:text-white mb-2">Direct In-File Metadata Embed</h3>
-                        <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                        <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white mb-2">Direct In-File Metadata Embed</h3>
+                        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                             Tanamkan judul, deskripsi, dan tag langsung ke dalam header EXIF, IPTC, dan XMP file JPG, PNG, SVG, EPS, atau MP4 Anda secara otomatis.
                         </p>
                     </div>
-                    <span class="mt-6 text-[10px] font-extrabold text-fuchsia-600 dark:text-fuchsia-400 uppercase tracking-widest block">Bebas Upload Tanpa CSV</span>
+                    <span class="mt-5 text-[9.5px] font-extrabold text-fuchsia-600 dark:text-fuchsia-400 uppercase tracking-widest block">Bebas Upload Tanpa CSV</span>
                 </div>
 
                 <!-- Feature 6 -->
-                <div class="p-8 rounded-3xl glass-card hover:border-cyan-500/40 transition-all group flex flex-col justify-between">
+                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-cyan-500/40 transition-all group flex flex-col justify-between">
                     <div>
-                        <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                             </svg>
                         </div>
-                        <h3 class="text-xl font-black text-slate-900 dark:text-white mb-2">Pre-Flight AI Quality Check</h3>
-                        <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                        <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white mb-2">Pre-Flight AI Quality Check</h3>
+                        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                             Cek gambar dan video sebelum diunggah. AI mendeteksi artefak generatif, noise, blur, atau cacat visual yang berpotensi ditolak tim reviewer.
                         </p>
                     </div>
-                    <span class="mt-6 text-[10px] font-extrabold text-cyan-600 dark:text-cyan-400 uppercase tracking-widest block">Minimalkan Angka Rejection</span>
+                    <span class="mt-5 text-[9.5px] font-extrabold text-cyan-600 dark:text-cyan-400 uppercase tracking-widest block">Minimalkan Angka Rejection</span>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- PRICING & LICENSING SECTION -->
-    <section id="harga" class="py-20 relative z-10">
+    <section id="harga" class="py-16 md:py-20 relative z-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-3xl mx-auto mb-14">
-                <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
+            <div class="text-center max-w-2xl mx-auto mb-12">
+                <span class="px-3 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
                     Investasi Terjangkau
                 </span>
-                <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white mt-4">
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-slate-900 dark:text-white mt-3">
                     Pilihan Paket Lisensi MetaZo PRO
                 </h2>
-                <p class="text-sm sm:text-base text-slate-600 dark:text-slate-400 mt-3">
+                <p class="text-xs sm:text-[13.5px] text-slate-600 dark:text-slate-400 mt-2.5">
                     Hemat puluhan jam per bulan dengan biaya yang kembali hanya dari 1–2 penjualan aset microstock Anda!
                 </p>
 
                 <!-- Currency Switcher Toggle -->
-                <div class="inline-flex items-center gap-1.5 p-1 rounded-2xl glass-card border border-slate-200 dark:border-white/10 mt-8">
-                    <button onclick="setCurrency('IDR')" id="currBtnIdr" class="px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-brand-600 text-white shadow-sm transition-all">
+                <div class="inline-flex items-center gap-1.5 p-1 rounded-2xl glass-card border border-slate-200 dark:border-white/10 mt-6">
+                    <button onclick="setCurrency('IDR')" id="currBtnIdr" class="px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-brand-600 text-white shadow-sm transition-all">
                         Rupiah (IDR)
                     </button>
-                    <button onclick="setCurrency('USD')" id="currBtnUsd" class="px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all">
+                    <button onclick="setCurrency('USD')" id="currBtnUsd" class="px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all">
                         US Dollar (USD)
                     </button>
                 </div>
             </div>
 
             <!-- Pricing Cards Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-stretch">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-7 max-w-4xl mx-auto items-stretch">
                 
                 <!-- Plan 1: 30 Days Access -->
-                <div class="p-8 sm:p-10 rounded-3xl glass-card hover:border-slate-300 dark:hover:border-white/20 transition-all flex flex-col justify-between">
+                <div class="p-6 sm:p-8 rounded-3xl glass-card hover:border-slate-300 dark:hover:border-white/20 transition-all flex flex-col justify-between">
                     <div>
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">Paket Bulanan</span>
-                            <span class="px-3 py-1 rounded-full bg-slate-200 dark:bg-slate-800 text-[10px] font-black uppercase text-slate-700 dark:text-slate-300">
+                            <span class="text-[10.5px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">Paket Bulanan</span>
+                            <span class="px-2.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-[9.5px] font-black uppercase text-slate-700 dark:text-slate-300">
                                 30 Hari
                             </span>
                         </div>
 
-                        <h3 class="text-2xl font-black text-slate-900 dark:text-white mt-3">30 Days Pro Access</h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Sangat cocok untuk kejar target upload musiman.</p>
+                        <h3 class="text-xl font-black text-slate-900 dark:text-white mt-2.5">30 Days Pro Access</h3>
+                        <p class="text-[11.5px] text-slate-500 dark:text-slate-400 mt-1">Sangat cocok untuk kejar target upload musiman.</p>
 
-                        <div class="mt-6 flex items-baseline gap-1">
-                            <span id="price30Val" class="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white">Rp 50.000</span>
-                            <span class="text-xs font-bold text-slate-400">/ 30 hari</span>
+                        <div class="mt-5 flex items-baseline gap-1">
+                            <span id="price30Val" class="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">Rp 50.000</span>
+                            <span class="text-[11px] font-bold text-slate-400">/ 30 hari</span>
                         </div>
 
-                        <ul class="mt-8 space-y-3.5 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium">
-                            <li class="flex items-center gap-2.5">
+                        <ul class="mt-7 space-y-3 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                            <li class="flex items-center gap-2">
                                 <span class="text-emerald-500 font-bold">✓</span>
                                 <span>Akses penuh seluruh fitur AI Vision Engine</span>
                             </li>
-                            <li class="flex items-center gap-2.5">
+                            <li class="flex items-center gap-2">
                                 <span class="text-emerald-500 font-bold">✓</span>
                                 <span>Unlimited kuota generasi harian</span>
                             </li>
-                            <li class="flex items-center gap-2.5">
+                            <li class="flex items-center gap-2">
                                 <span class="text-emerald-500 font-bold">✓</span>
                                 <span>Ekspor CSV All Stock Agencies & Direct Embed</span>
                             </li>
-                            <li class="flex items-center gap-2.5">
+                            <li class="flex items-center gap-2">
                                 <span class="text-emerald-500 font-bold">✓</span>
                                 <span>Image & Video Quality Checker (QC)</span>
                             </li>
-                            <li class="flex items-center gap-2.5">
+                            <li class="flex items-center gap-2">
                                 <span class="text-emerald-500 font-bold">✓</span>
                                 <span>Dukungan update versi selama masa aktif</span>
                             </li>
                         </ul>
                     </div>
 
-                    <div class="mt-10">
-                        <a id="waBtn30" href="https://wa.me/6281234567890?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%2030%20Hari." target="_blank" class="w-full py-3.5 rounded-2xl font-extrabold text-xs uppercase tracking-wider text-slate-800 dark:text-white glass-card hover:bg-slate-200 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+                    <div class="mt-8">
+                        <a id="waBtn30" href="https://wa.me/6281234567890?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%2030%20Hari." target="_blank" class="w-full py-3 rounded-xl font-extrabold text-[11px] uppercase tracking-wider text-slate-800 dark:text-white glass-card hover:bg-slate-200 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
                             <span>Pesan via WhatsApp</span>
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
                             </svg>
                         </a>
@@ -776,55 +791,55 @@
                 </div>
 
                 <!-- Plan 2: Lifetime Access (BEST DEAL) -->
-                <div class="p-8 sm:p-10 rounded-3xl glass-card gradient-border-glow shadow-2xl relative flex flex-col justify-between bg-gradient-to-b from-brand-950/20 to-transparent">
-                    <div class="absolute -top-3.5 right-8 px-4 py-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 text-[10px] font-black uppercase tracking-widest shadow-lg">
+                <div class="p-6 sm:p-8 rounded-3xl glass-card gradient-border-glow shadow-2xl relative flex flex-col justify-between bg-gradient-to-b from-brand-950/20 to-transparent">
+                    <div class="absolute -top-3 right-6 px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 text-[9px] font-black uppercase tracking-widest shadow-md">
                         ⭐ BEST DEAL & POPULER
                     </div>
 
                     <div>
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-extrabold uppercase tracking-widest text-brand-600 dark:text-brand-400">Sekali Bayar Selamanya</span>
-                            <span class="px-3 py-1 rounded-full bg-brand-500/20 text-[10px] font-black uppercase text-brand-600 dark:text-brand-300">
+                            <span class="text-[10.5px] font-extrabold uppercase tracking-widest text-brand-600 dark:text-brand-400">Sekali Bayar Selamanya</span>
+                            <span class="px-2.5 py-0.5 rounded-full bg-brand-500/20 text-[9.5px] font-black uppercase text-brand-600 dark:text-brand-300">
                                 LIFETIME
                             </span>
                         </div>
 
-                        <h3 class="text-2xl font-black text-slate-900 dark:text-white mt-3">Lifetime Unlimited Access</h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Asisten pribadi metadata Anda seumur hidup.</p>
+                        <h3 class="text-xl font-black text-slate-900 dark:text-white mt-2.5">Lifetime Unlimited Access</h3>
+                        <p class="text-[11.5px] text-slate-500 dark:text-slate-400 mt-1">Asisten pribadi metadata Anda seumur hidup.</p>
 
-                        <div class="mt-6 flex items-baseline gap-1">
-                            <span id="priceLifeVal" class="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-500 dark:from-brand-400 dark:to-indigo-400">Rp 250.000</span>
-                            <span class="text-xs font-bold text-slate-400">/ sekali bayar</span>
+                        <div class="mt-5 flex items-baseline gap-1">
+                            <span id="priceLifeVal" class="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-500 dark:from-brand-400 dark:to-indigo-400">Rp 250.000</span>
+                            <span class="text-[11px] font-bold text-slate-400">/ sekali bayar</span>
                         </div>
 
-                        <ul class="mt-8 space-y-3.5 text-xs sm:text-sm text-slate-700 dark:text-slate-200 font-semibold">
-                            <li class="flex items-center gap-2.5">
+                        <ul class="mt-7 space-y-3 text-xs text-slate-700 dark:text-slate-200 font-semibold">
+                            <li class="flex items-center gap-2">
                                 <span class="text-emerald-500 font-bold">✓</span>
-                                <span><strong>Akses Seumur Hidup (Lifetime)</strong> tanpa biaya perpanjangan</span>
+                                <span><strong>Akses Seumur Hidup (Lifetime)</strong> tanpa perpanjangan</span>
                             </li>
-                            <li class="flex items-center gap-2.5">
+                            <li class="flex items-center gap-2">
                                 <span class="text-emerald-500 font-bold">✓</span>
                                 <span>Unlimited generasi tanpa batasan kuota harian</span>
                             </li>
-                            <li class="flex items-center gap-2.5">
+                            <li class="flex items-center gap-2">
                                 <span class="text-emerald-500 font-bold">✓</span>
                                 <span>Prioritas antrean server & kecepatan maksimal</span>
                             </li>
-                            <li class="flex items-center gap-2.5">
+                            <li class="flex items-center gap-2">
                                 <span class="text-emerald-500 font-bold">✓</span>
-                                <span>Gratis seluruh update fitur mendatang (Auto-Upload, dsb)</span>
+                                <span>Gratis seluruh update fitur mendatang (Auto-Upload)</span>
                             </li>
-                            <li class="flex items-center gap-2.5">
+                            <li class="flex items-center gap-2">
                                 <span class="text-emerald-500 font-bold">✓</span>
                                 <span>Priority 1-on-1 WhatsApp Support</span>
                             </li>
                         </ul>
                     </div>
 
-                    <div class="mt-10">
-                        <a id="waBtnLife" href="https://wa.me/6281234567890?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%20LIFETIME%20sekarang." target="_blank" class="w-full py-4 rounded-2xl font-black text-xs uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-xl shadow-brand-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                    <div class="mt-8">
+                        <a id="waBtnLife" href="https://wa.me/6281234567890?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%20LIFETIME%20sekarang." target="_blank" class="w-full py-3.5 rounded-xl font-extrabold text-[11px] uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-lg shadow-brand-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
                             <span>Ambil Promo Lifetime Sekarang</span>
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                             </svg>
                         </a>
@@ -843,90 +858,90 @@
     </section>
 
     <!-- ULASAN & RATING KOMUNITAS (COMMUNITY REVIEWS) -->
-    <section id="ulasan" class="py-24 relative z-10 bg-slate-100/60 dark:bg-black/25">
+    <section id="ulasan" class="py-16 md:py-20 relative z-10 bg-slate-100/60 dark:bg-black/25">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <!-- Header -->
-            <div class="text-center max-w-3xl mx-auto mb-14">
-                <div class="inline-flex items-center gap-2 px-4 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+            <div class="text-center max-w-2xl mx-auto mb-12">
+                <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-widest bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                     <span class="text-amber-500">★</span>
                     <span>Ulasan & Rating Komunitas</span>
                 </div>
-                <h2 class="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white mt-4">
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-slate-900 dark:text-white mt-3">
                     Suara Asli Kontributor MetaZo PRO
                 </h2>
-                <p class="text-sm sm:text-base text-slate-600 dark:text-slate-400 mt-3">
+                <p class="text-xs sm:text-[13.5px] text-slate-600 dark:text-slate-400 mt-2.5">
                     Transparan, terverifikasi, dan langsung dari kreator microstock aktif (Adobe Stock, Shutterstock, Freepik, Canva, & AI Artists).
                 </p>
             </div>
 
             <!-- COMMUNITY RATING SUMMARY DASHBOARD -->
-            <div class="glass-card gradient-border-glow rounded-3xl p-6 sm:p-8 lg:p-10 mb-10 shadow-xl">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <div class="glass-card gradient-border-glow rounded-3xl p-5 sm:p-7 lg:p-8 mb-8 shadow-xl">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
                     <!-- Left: Big Score -->
-                    <div class="lg:col-span-4 flex flex-col items-center lg:items-start text-center lg:text-left border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/10 pb-6 lg:pb-0 lg:pr-8">
+                    <div class="lg:col-span-4 flex flex-col items-center lg:items-start text-center lg:text-left border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/10 pb-5 lg:pb-0 lg:pr-6">
                         <div class="flex items-baseline gap-2">
-                            <span id="communityAvgScore" class="text-5xl sm:text-6xl font-black text-slate-900 dark:text-white">4.9</span>
-                            <span class="text-lg font-bold text-slate-400">/ 5.0</span>
+                            <span id="communityAvgScore" class="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white">5.0</span>
+                            <span class="text-base font-bold text-slate-400">/ 5.0</span>
                         </div>
-                        <div class="flex items-center gap-1 text-amber-400 text-xl mt-2">
+                        <div id="communityStarsRender" class="flex items-center gap-1 text-amber-400 text-lg mt-1.5">
                             ★★★★★
                         </div>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-2">
-                            Berdasarkan <span id="communityTotalCount" class="font-black text-slate-800 dark:text-white">1,520+</span> ulasan kontributor terverifikasi
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mt-1.5">
+                            Berdasarkan <span id="communityTotalCount" class="font-black text-slate-800 dark:text-white">0</span> ulasan kontributor terverifikasi
                         </p>
-                        <div class="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold">
-                            <span>🛡️ 99.4% Lolos Seleksi Agency</span>
+                        <div class="mt-3 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
+                            <span>🛡️ 100% Ulasan Nyata dari Database</span>
                         </div>
                     </div>
 
                     <!-- Center: Star Rating Breakdown Bars -->
-                    <div class="lg:col-span-5 space-y-2.5">
-                        <div class="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-300">
-                            <span class="w-16 shrink-0 flex items-center gap-1">5 Bintang</span>
-                            <div class="flex-1 h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                                <div class="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full" style="width: 95%;"></div>
+                    <div class="lg:col-span-5 space-y-2">
+                        <div class="flex items-center gap-2.5 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                            <span class="w-14 shrink-0 flex items-center gap-1">5 Bintang</span>
+                            <div class="flex-1 h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                                <div id="barWidth5" class="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style="width: 100%;"></div>
                             </div>
-                            <span class="w-10 text-right text-slate-400 font-mono text-[11px]">95%</span>
+                            <span id="pctVal5" class="w-9 text-right text-slate-400 font-mono text-[10px]">100%</span>
                         </div>
-                        <div class="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-300">
-                            <span class="w-16 shrink-0 flex items-center gap-1">4 Bintang</span>
-                            <div class="flex-1 h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                                <div class="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full" style="width: 4%;"></div>
+                        <div class="flex items-center gap-2.5 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                            <span class="w-14 shrink-0 flex items-center gap-1">4 Bintang</span>
+                            <div class="flex-1 h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                                <div id="barWidth4" class="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style="width: 0%;"></div>
                             </div>
-                            <span class="w-10 text-right text-slate-400 font-mono text-[11px]">4%</span>
+                            <span id="pctVal4" class="w-9 text-right text-slate-400 font-mono text-[10px]">0%</span>
                         </div>
-                        <div class="flex items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-300">
-                            <span class="w-16 shrink-0 flex items-center gap-1">3 Bintang</span>
-                            <div class="flex-1 h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                                <div class="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full" style="width: 1%;"></div>
+                        <div class="flex items-center gap-2.5 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                            <span class="w-14 shrink-0 flex items-center gap-1">3 Bintang</span>
+                            <div class="flex-1 h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                                <div id="barWidth3" class="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500" style="width: 0%;"></div>
                             </div>
-                            <span class="w-10 text-right text-slate-400 font-mono text-[11px]">1%</span>
+                            <span id="pctVal3" class="w-9 text-right text-slate-400 font-mono text-[10px]">0%</span>
                         </div>
-                        <div class="flex items-center gap-3 text-xs font-bold text-slate-400">
-                            <span class="w-16 shrink-0">2 Bintang</span>
-                            <div class="flex-1 h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                                <div class="h-full bg-amber-400 rounded-full" style="width: 0%;"></div>
+                        <div class="flex items-center gap-2.5 text-[11px] font-bold text-slate-400">
+                            <span class="w-14 shrink-0">2 Bintang</span>
+                            <div class="flex-1 h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                                <div id="barWidth2" class="h-full bg-amber-400 rounded-full transition-all duration-500" style="width: 0%;"></div>
                             </div>
-                            <span class="w-10 text-right text-slate-400 font-mono text-[11px]">0%</span>
+                            <span id="pctVal2" class="w-9 text-right text-slate-400 font-mono text-[10px]">0%</span>
                         </div>
-                        <div class="flex items-center gap-3 text-xs font-bold text-slate-400">
-                            <span class="w-16 shrink-0">1 Bintang</span>
-                            <div class="flex-1 h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                                <div class="h-full bg-amber-400 rounded-full" style="width: 0%;"></div>
+                        <div class="flex items-center gap-2.5 text-[11px] font-bold text-slate-400">
+                            <span class="w-14 shrink-0">1 Bintang</span>
+                            <div class="flex-1 h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                                <div id="barWidth1" class="h-full bg-amber-400 rounded-full transition-all duration-500" style="width: 0%;"></div>
                             </div>
-                            <span class="w-10 text-right text-slate-400 font-mono text-[11px]">0%</span>
+                            <span id="pctVal1" class="w-9 text-right text-slate-400 font-mono text-[10px]">0%</span>
                         </div>
                     </div>
 
                     <!-- Right: Write Review & Live App Community CTA -->
-                    <div class="lg:col-span-3 flex flex-col justify-center items-center lg:items-end gap-3 text-center lg:text-right">
-                        <a href="/CommunityReviews" class="w-full sm:w-auto px-5 py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="lg:col-span-3 flex flex-col justify-center items-center lg:items-end gap-2.5 text-center lg:text-right">
+                        <a href="/CommunityReviews" class="w-full sm:w-auto px-4 py-3 rounded-xl font-black text-[11px] uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-md shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
                             <span>Tulis Ulasan di Aplikasi</span>
                         </a>
-                        <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                        <p class="text-[9.5px] text-slate-400 dark:text-slate-500 font-medium">
                             1 User = 1 Ulasan Otentik Terverifikasi
                         </p>
                     </div>
@@ -941,13 +956,13 @@
                         Semua (<span id="countFilterAll">0</span>)
                     </button>
                     <button onclick="filterCommunityReviews('5', this)" class="review-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all">
-                        ⭐ 5 Bintang
+                        ⭐ 5 Bintang (<span id="countFilter5">0</span>)
                     </button>
                     <button onclick="filterCommunityReviews('photo', this)" class="review-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all">
-                        📸 Dengan Bukti
+                        📸 Dengan Bukti (<span id="countFilterPhoto">0</span>)
                     </button>
                     <button onclick="filterCommunityReviews('tag_adobe', this)" class="review-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all">
-                        ✅ Lolos Adobe Stock
+                        ✅ Lolos Adobe Stock (<span id="countFilterAdobe">0</span>)
                     </button>
                 </div>
 
@@ -994,79 +1009,79 @@
     </div>
 
     <!-- FREQUENTLY ASKED QUESTIONS (FAQ) -->
-    <section id="faq" class="py-20 relative z-10">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-14">
-                <span class="px-3.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
+    <section id="faq" class="py-16 md:py-20 relative z-10">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-10">
+                <span class="px-3 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
                     Pertanyaan Umum
                 </span>
-                <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white mt-4">
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-slate-900 dark:text-white mt-3">
                     Pertanyaan yang Sering Diajukan (FAQ)
                 </h2>
             </div>
 
-            <div class="space-y-4">
+            <div class="space-y-3.5">
                 <!-- FAQ Item 1 -->
                 <div class="rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
-                    <button onclick="toggleFaq(this)" class="w-full p-5 text-left flex items-center justify-between font-bold text-sm sm:text-base text-slate-900 dark:text-white cursor-pointer">
+                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer">
                         <span>Apakah hasil metadata MetaZo aman dan mematuhi aturan Adobe Stock & Shutterstock?</span>
-                        <svg class="w-5 h-5 text-slate-400 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    <div class="faq-content hidden px-5 pb-5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
+                    <div class="faq-content hidden px-4 sm:px-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
                         Sangat aman. MetaZo PRO dirancang khusus mengikuti *guideline* resmi stock agency internasional. AI kami menyusun judul deskriptif tanpa spam *trademark*, melarang kata terlarang (seperti 'photo', 'vector' di agensi tertentu), serta mengurutkan keyword berdasarkan tingkat relevansi tertinggi agar portofolio Anda tidak kena penalti.
                     </div>
                 </div>
 
                 <!-- FAQ Item 2 -->
                 <div class="rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
-                    <button onclick="toggleFaq(this)" class="w-full p-5 text-left flex items-center justify-between font-bold text-sm sm:text-base text-slate-900 dark:text-white cursor-pointer">
+                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer">
                         <span>Apakah saya wajib memiliki API Key sendiri untuk menggunakannya?</span>
-                        <svg class="w-5 h-5 text-slate-400 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    <div class="faq-content hidden px-5 pb-5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
+                    <div class="faq-content hidden px-4 sm:px-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
                         Tidak wajib! MetaZo PRO sudah dilengkapi dengan server backend engine bawaan yang siap pakai langsung setelah login. Namun, bagi pengguna tingkat lanjut yang ingin menggunakan API Key pribadi (Google Gemini, Groq, Mistral, Nvidia NIM, atau Z.AI) untuk rotasi multi-key kustom, aplikasi kami juga menyediakan panel pengaturan API yang sangat fleksibel.
                     </div>
                 </div>
 
                 <!-- FAQ Item 3 -->
                 <div class="rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
-                    <button onclick="toggleFaq(this)" class="w-full p-5 text-left flex items-center justify-between font-bold text-sm sm:text-base text-slate-900 dark:text-white cursor-pointer">
+                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer">
                         <span>Bagaimana cara kerja fitur Direct Embed Metadata ke file?</span>
-                        <svg class="w-5 h-5 text-slate-400 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    <div class="faq-content hidden px-5 pb-5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
+                    <div class="faq-content hidden px-4 sm:px-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
                         Setelah AI menghasilkan metadata, Anda cukup menekan tombol "Download Embedded ZIP". Sistem akan menyuntikkan judul, deskripsi, dan 50 keyword ke dalam header metadata file Anda (EXIF, IPTC Core, dan Adobe XMP) secara loss-less (kualitas gambar tidak berkurang sedikit pun). Saat Anda mengunggah file tersebut ke Adobe Stock atau Shutterstock, agensi akan otomatis membaca judul dan keyword langsung dari file Anda.
                     </div>
                 </div>
 
                 <!-- FAQ Item 4 -->
                 <div class="rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
-                    <button onclick="toggleFaq(this)" class="w-full p-5 text-left flex items-center justify-between font-bold text-sm sm:text-base text-slate-900 dark:text-white cursor-pointer">
+                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer">
                         <span>Bagaimana proses aktivasi lisensi setelah saya melakukan pembelian?</span>
-                        <svg class="w-5 h-5 text-slate-400 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    <div class="faq-content hidden px-5 pb-5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
+                    <div class="faq-content hidden px-4 sm:px-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
                         Sangat mudah dan cepat. Hubungi admin kami melalui WhatsApp, lakukan pembayaran, dan Anda akan menerima kode lisensi resmi (Serial Key). Buka aplikasi MetaZo PRO, klik menu "Aktivasi PRO", masukkan kode Anda, dan seluruh fitur premium akan aktif seketika tanpa perlu instalasi ulang.
                     </div>
                 </div>
 
                 <!-- FAQ Item 5 -->
                 <div class="rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
-                    <button onclick="toggleFaq(this)" class="w-full p-5 text-left flex items-center justify-between font-bold text-sm sm:text-base text-slate-900 dark:text-white cursor-pointer">
+                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer">
                         <span>Apakah MetaZo bisa digunakan di HP / Tablet?</span>
-                        <svg class="w-5 h-5 text-slate-400 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    <div class="faq-content hidden px-5 pb-5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
+                    <div class="faq-content hidden px-4 sm:px-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
                         Ya! MetaZo PRO adalah aplikasi berbasis Progressive Web App (PWA) yang 100% responsif. Anda dapat mengaksesnya melalui browser di Laptop (Windows / macOS / Linux), iPad, Tablet Android, maupun Smartphone Anda dengan tampilan yang tetap rapi dan nyaman.
                     </div>
                 </div>
@@ -1075,31 +1090,31 @@
     </section>
 
     <!-- FINAL CALL TO ACTION BANNER -->
-    <section class="py-20 relative z-10">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="rounded-3xl p-8 sm:p-12 lg:p-16 text-center relative overflow-hidden bg-gradient-to-r from-brand-700 via-indigo-700 to-purple-700 text-white shadow-2xl">
+    <section class="py-16 md:py-20 relative z-10">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="rounded-3xl p-6 sm:p-10 lg:p-12 text-center relative overflow-hidden bg-gradient-to-r from-brand-700 via-indigo-700 to-purple-700 text-white shadow-2xl">
                 <!-- Background ambient decorative circles -->
                 <div class="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-white/10 blur-3xl"></div>
                 <div class="absolute -bottom-24 -right-24 w-72 h-72 rounded-full bg-white/15 blur-3xl"></div>
 
-                <div class="relative z-10 max-w-2xl mx-auto">
-                    <span class="px-3.5 py-1 rounded-full bg-white/15 backdrop-blur-md text-[10px] font-black uppercase tracking-widest text-amber-300 border border-white/20">
+                <div class="relative z-10 max-w-xl mx-auto">
+                    <span class="px-3 py-0.5 rounded-full bg-white/15 backdrop-blur-md text-[9.5px] font-black uppercase tracking-widest text-amber-300 border border-white/20">
                         ⚡ Siap Meningkatkan Penjualan Stock Anda?
                     </span>
 
-                    <h2 class="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight mt-6 leading-tight">
+                    <h2 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight mt-4 leading-tight">
                         Mulai Hemat Waktu & Meroketkan Portfolio Anda Sekarang
                     </h2>
 
-                    <p class="mt-4 text-sm sm:text-base text-brand-100 font-medium leading-relaxed">
+                    <p class="mt-3 text-xs sm:text-sm text-brand-100 font-medium leading-relaxed">
                         Bergabunglah dengan ribuan kontributor yang telah mengubah pekerjaan melelahkan berjam-jam menjadi beberapa menit saja.
                     </p>
 
-                    <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                        <a href="/app" class="w-full sm:w-auto px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-wider text-brand-900 bg-white hover:bg-slate-100 shadow-xl transition-all hover:scale-105 active:scale-95">
+                    <div class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+                        <a href="/app" class="w-full sm:w-auto px-6 py-3 rounded-xl font-black text-[11px] uppercase tracking-wider text-brand-900 bg-white hover:bg-slate-100 shadow-xl transition-all hover:scale-105 active:scale-95">
                             Buka Web App Sekarang
                         </a>
-                        <a href="#harga" class="w-full sm:w-auto px-8 py-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider text-white bg-white/15 hover:bg-white/25 border border-white/20 backdrop-blur-md transition-all">
+                        <a href="#harga" class="w-full sm:w-auto px-6 py-3 rounded-xl font-extrabold text-[11px] uppercase tracking-wider text-white bg-white/15 hover:bg-white/25 border border-white/20 backdrop-blur-md transition-all">
                             Lihat Opsi Lisensi
                         </a>
                     </div>
@@ -1107,6 +1122,7 @@
             </div>
         </div>
     </section>
+
 
     <!-- FOOTER -->
     <footer class="py-12 border-t border-slate-200 dark:border-white/10 relative z-10 bg-white/40 dark:bg-slate-950/40 backdrop-blur-md text-xs">
@@ -1380,106 +1396,10 @@
         }
 
         // =========================================================
-        // --- 7. ULASAN & RATING KOMUNITAS (INTEGRATED SYSTEM) ---
+        // --- 7. ULASAN & RATING KOMUNITAS (REAL DATABASE SYNC) ---
         // =========================================================
-        const SEED_COMMUNITY_REVIEWS = [
-            {
-                id: 'rev-seed-1',
-                userName: 'Budi Andriyanto',
-                role: 'Adobe Stock & Freepik Contributor',
-                userAvatar: 'BA',
-                rating: 5,
-                verifiedBuyer: true,
-                isPro: true,
-                appVersion: 'v1.3 PRO',
-                createdAt: '2 hari lalu',
-                title: 'Dulu 3 jam buat 50 foto, sekarang cuma 2 menit!',
-                comment: 'Workflow saya berubah drastis setelah pakai MetaZo PRO. Batch processing-nya luar biasa stabil. Judul dan 50 keyword yang dihasilkan relevan banget sama algoritma Adobe Stock, portofolio saya langsung diapprove tanpa revisi sama sekali.',
-                tags: ['✅ 100% Lolos Adobe Stock', '🚀 AI Super Cepat', '🔥 Hemat Waktu 10x'],
-                photos: ['https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80'],
-                helpfulCount: 38
-            },
-            {
-                id: 'rev-seed-2',
-                userName: 'Reza Darmawan',
-                role: 'Vector Artist & Canva Creator',
-                userAvatar: 'RD',
-                rating: 5,
-                verifiedBuyer: true,
-                isPro: true,
-                appVersion: 'v1.3 PRO',
-                createdAt: '4 hari lalu',
-                title: 'Fitur Direct Metadata Embed-nya penyelamat hidup',
-                comment: 'Fitur Direct Embed IPTC & XMP ke file EPS dan JPG itu game changer banget. Saya gak perlu lagi pusing nyocokin baris di spreadsheet CSV. Tinggal drag file langsung ke stock dashboard, judul dan keyword langsung terbaca otomatis!',
-                tags: ['💎 Fitur PRO Sangat Berguna', '⚡ Workflow Otomatis', '🎯 Keyword SEO Akurat'],
-                photos: [],
-                helpfulCount: 29
-            },
-            {
-                id: 'rev-seed-3',
-                userName: 'Siti Lestari',
-                role: 'AI Generative & Footage Contributor',
-                userAvatar: 'SL',
-                rating: 5,
-                verifiedBuyer: true,
-                isPro: true,
-                appVersion: 'v1.3 PRO',
-                createdAt: '1 minggu lalu',
-                title: 'Penjualan bulanan naik 40% dalam 2 bulan',
-                comment: 'Paket Lifetime-nya salah satu investasi terbaik saya tahun ini. Riset keywordnya gak asal-asalan, beneran tau kata kunci yang lagi high demand di bursa foto internasional. Cocok banget buat yang main AI Midjourney.',
-                tags: ['🏆 Sangat Direkomendasikan', '🎯 Keyword SEO Akurat'],
-                photos: ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'],
-                helpfulCount: 45
-            },
-            {
-                id: 'rev-seed-4',
-                userName: 'Dimas Prasetyo',
-                role: 'Shutterstock 4K Footage Videographer',
-                userAvatar: 'DP',
-                rating: 5,
-                verifiedBuyer: true,
-                isPro: true,
-                appVersion: 'v1.3 PRO',
-                createdAt: '1 minggu lalu',
-                title: 'AI Video Analysis-nya sangat akurat membaca pergerakan',
-                comment: 'Ekstraksi multi-frame pada klip drone MP4 membaca angle kamera dan pencahayaan dengan sangat presisi. Bikin deskripsi cinematic footage jadi berkelas ala Hollywood tanpa perlu mikir kosa kata bahasa Inggris yang rumit.',
-                tags: ['🚀 AI Super Cepat', '⚡ Workflow Otomatis'],
-                photos: [],
-                helpfulCount: 19
-            },
-            {
-                id: 'rev-seed-5',
-                userName: 'Alvina Putri',
-                role: 'Microstock Graphic Designer',
-                userAvatar: 'AP',
-                rating: 5,
-                verifiedBuyer: true,
-                isPro: true,
-                appVersion: 'v1.3 PRO',
-                createdAt: '2 minggu lalu',
-                title: 'Ekspor CSV Canva & Vecteezy langsung pas',
-                comment: 'Sebelumnya sering error format kolom di Vecteezy dan Canva. Di MetaZo PRO format CSV-nya 100% compliant dan kata terlarang (seperti spam AI buzzwords) otomatis dibersihkan. Sangat recommended untuk sesama kreator!',
-                tags: ['✅ 100% Lolos Adobe Stock', '💎 Fitur PRO Sangat Berguna'],
-                photos: [],
-                helpfulCount: 22
-            },
-            {
-                id: 'rev-seed-6',
-                userName: 'Hendra Gunawan',
-                role: 'Commercial Stock Photographer',
-                userAvatar: 'HG',
-                rating: 5,
-                verifiedBuyer: true,
-                isPro: true,
-                appVersion: 'v1.3 PRO',
-                createdAt: '3 minggu lalu',
-                title: 'AI Quality Check meminimalisir rejection',
-                comment: 'Fitur QC-nya ngebantu banget nyaring foto yang ada noise halus atau kurang fokus sebelum disubmit. Rasio approval portofolio saya di Adobe Stock sekarang tembus di atas 98%.',
-                tags: ['🎯 Keyword SEO Akurat', '🔥 Hemat Waktu 10x'],
-                photos: [],
-                helpfulCount: 31
-            }
-        ];
+        const SUPABASE_URL = 'https://qhucqnkewjoihffhpatd.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFodWNxbmtld2pvaWhmZmhwYXRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyNjQ5MTUsImV4cCI6MjA5ODg0MDkxNX0.MIavu-lS1-d7KiwisOXBDEcNzoeakSIgDxz3bK0ZXLw';
 
         let allCommunityReviews = [];
         let activeReviewFilter = 'all';
@@ -1494,40 +1414,165 @@
             }
         }
 
-        function loadCommunityReviewsData() {
-            let combined = [...SEED_COMMUNITY_REVIEWS];
+        function formatReviewDate(dateStr) {
+            if (!dateStr) return 'Baru saja';
+            try {
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return dateStr;
+                return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+            } catch (e) {
+                return dateStr;
+            }
+        }
+
+        function updateCommunityStats() {
+            const total = allCommunityReviews.length;
+            const avgEl = document.getElementById('communityAvgScore');
+            const starsEl = document.getElementById('communityStarsRender');
+            const totalEl = document.getElementById('communityTotalCount');
+            const navBadge = document.getElementById('navRatingBadge');
+            const mobileBadge = document.getElementById('mobileRatingBadge');
+
+            const countFilterAll = document.getElementById('countFilterAll');
+            const countFilter5 = document.getElementById('countFilter5');
+            const countFilterPhoto = document.getElementById('countFilterPhoto');
+            const countFilterAdobe = document.getElementById('countFilterAdobe');
+
+            if (countFilterAll) countFilterAll.innerText = total;
+
+            if (total === 0) {
+                if (avgEl) avgEl.innerText = '5.0';
+                if (totalEl) totalEl.innerText = '0';
+                if (countFilter5) countFilter5.innerText = '0';
+                if (countFilterPhoto) countFilterPhoto.innerText = '0';
+                if (countFilterAdobe) countFilterAdobe.innerText = '0';
+                return;
+            }
+
+            let sum = 0;
+            let c5 = 0, c4 = 0, c3 = 0, c2 = 0, c1 = 0;
+            let cPhoto = 0, cAdobe = 0;
+
+            allCommunityReviews.forEach(r => {
+                const rat = Math.round(Number(r.rating) || 5);
+                sum += (Number(r.rating) || 5);
+                if (rat === 5) c5++;
+                else if (rat === 4) c4++;
+                else if (rat === 3) c3++;
+                else if (rat === 2) c2++;
+                else if (rat <= 1) c1++;
+
+                if (Array.isArray(r.photos) && r.photos.length > 0) cPhoto++;
+                if (Array.isArray(r.tags) && r.tags.some(t => t.toLowerCase().includes('adobe'))) cAdobe++;
+            });
+
+            const avg = (sum / total).toFixed(1);
+            if (avgEl) avgEl.innerText = avg;
+            if (totalEl) totalEl.innerText = total;
+            if (navBadge) navBadge.innerText = avg + '★';
+            if (mobileBadge) mobileBadge.innerText = avg + '★';
+
+            // Star icons
+            if (starsEl) {
+                const rounded = Math.round(Number(avg));
+                let s = '';
+                for (let i = 0; i < 5; i++) {
+                    s += i < rounded ? '★' : '☆';
+                }
+                starsEl.innerText = s;
+            }
+
+            // Filter button counts
+            if (countFilter5) countFilter5.innerText = c5;
+            if (countFilterPhoto) countFilterPhoto.innerText = cPhoto;
+            if (countFilterAdobe) countFilterAdobe.innerText = cAdobe;
+
+            // Bar percentages
+            const p5 = Math.round((c5 / total) * 100);
+            const p4 = Math.round((c4 / total) * 100);
+            const p3 = Math.round((c3 / total) * 100);
+            const p2 = Math.round((c2 / total) * 100);
+            const p1 = Math.round((c1 / total) * 100);
+
+            const b5 = document.getElementById('barWidth5');
+            const v5 = document.getElementById('pctVal5');
+            if (b5 && v5) { b5.style.width = p5 + '%'; v5.innerText = p5 + '%'; }
+
+            const b4 = document.getElementById('barWidth4');
+            const v4 = document.getElementById('pctVal4');
+            if (b4 && v4) { b4.style.width = p4 + '%'; v4.innerText = p4 + '%'; }
+
+            const b3 = document.getElementById('barWidth3');
+            const v3 = document.getElementById('pctVal3');
+            if (b3 && v3) { b3.style.width = p3 + '%'; v3.innerText = p3 + '%'; }
+
+            const b2 = document.getElementById('barWidth2');
+            const v2 = document.getElementById('pctVal2');
+            if (b2 && v2) { b2.style.width = p2 + '%'; v2.innerText = p2 + '%'; }
+
+            const b1 = document.getElementById('barWidth1');
+            const v1 = document.getElementById('pctVal1');
+            if (b1 && v1) { b1.style.width = p1 + '%'; v1.innerText = p1 + '%'; }
+        }
+
+        async function loadCommunityReviewsData() {
+            const container = document.getElementById('communityReviewsContainer');
+
+            // 1. Try local cache first for instant initial render
             try {
                 const cached = localStorage.getItem('mz_community_reviews_cache');
                 if (cached) {
                     const parsed = JSON.parse(cached);
                     if (Array.isArray(parsed) && parsed.length > 0) {
-                        // Merge cached user-submitted reviews at the top
-                        const userReviews = parsed.filter(r => !r.id?.startsWith('rev-seed-')).map(r => ({
-                            id: r.id || 'rev-' + Math.random().toString(36).substring(2, 7),
-                            userName: r.userName || 'Member MetaZo',
-                            role: r.role || 'PRO Contributor',
-                            userAvatar: r.userName ? r.userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'MZ',
-                            rating: Number(r.rating) || 5,
-                            verifiedBuyer: r.verifiedBuyer ?? true,
-                            isPro: r.isPro ?? true,
-                            appVersion: r.appVersion || 'v1.3 PRO',
-                            createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Baru saja',
-                            title: r.title || 'Pengalaman Luar Biasa dengan MetaZo',
-                            comment: r.comment || '',
-                            tags: Array.isArray(r.tags) ? r.tags : ['✅ 100% Lolos Adobe Stock'],
-                            photos: Array.isArray(r.photos) ? r.photos : [],
-                            helpfulCount: Number(r.helpfulCount) || 5
-                        }));
-                        combined = [...userReviews, ...combined];
+                        const cleanCache = parsed.filter(r => !r.id?.startsWith('rev-seed-'));
+                        if (cleanCache.length > 0) {
+                            allCommunityReviews = cleanCache;
+                            updateCommunityStats();
+                            renderCommunityReviews();
+                        }
                     }
                 }
-            } catch (e) {
-                console.warn('Error reading reviews cache:', e);
+            } catch (e) {}
+
+            // If empty, show loading skeleton
+            if (allCommunityReviews.length === 0 && container) {
+                container.innerHTML = `
+                    <div class="col-span-full py-12 flex flex-col items-center justify-center text-center">
+                        <div class="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <p class="text-xs font-bold text-slate-400">Memuat ulasan otentik kontributor langsung dari database...</p>
+                    </div>
+                `;
             }
 
-            allCommunityReviews = combined;
-            document.getElementById('countFilterAll').innerText = allCommunityReviews.length;
-            renderCommunityReviews();
+            // 2. Fetch directly from Supabase REST API
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/reviews?select=*&order=createdAt.desc`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data)) {
+                        // STRICT: Only real user reviews, no seed template items
+                        const realReviews = data.filter(r => !r.id?.startsWith('rev-seed-'));
+                        allCommunityReviews = realReviews;
+                        localStorage.setItem('mz_community_reviews_cache', JSON.stringify(realReviews));
+                        updateCommunityStats();
+                        renderCommunityReviews();
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn('[CommunityReviews] Failed fetching real database reviews:', err);
+            }
+
+            // If fetch finished and rendered
+            if (allCommunityReviews.length === 0) {
+                renderCommunityReviews();
+            }
         }
 
         function renderCommunityReviews() {
@@ -1538,12 +1583,10 @@
 
             // Filter logic
             let filtered = allCommunityReviews.filter(rev => {
-                // Star / tag filter
-                if (activeReviewFilter === '5' && rev.rating !== 5) return false;
+                if (activeReviewFilter === '5' && Math.round(Number(rev.rating) || 5) !== 5) return false;
                 if (activeReviewFilter === 'photo' && (!rev.photos || rev.photos.length === 0)) return false;
                 if (activeReviewFilter === 'tag_adobe' && (!rev.tags || !rev.tags.some(t => t.toLowerCase().includes('adobe')))) return false;
 
-                // Search query filter
                 if (currentReviewSearchQuery.trim()) {
                     const q = currentReviewSearchQuery.toLowerCase();
                     const matchName = rev.userName?.toLowerCase().includes(q);
@@ -1557,98 +1600,122 @@
             });
 
             if (filtered.length === 0) {
-                container.innerHTML = `
-                    <div class="col-span-full py-12 text-center">
-                        <p class="text-slate-400 font-bold text-sm">Tidak ada ulasan yang cocok dengan pencarian / filter Anda.</p>
-                        <button onclick="filterCommunityReviews('all', document.querySelectorAll('.review-filter-btn')[0])" class="mt-3 px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-black uppercase tracking-wider">
-                            Tampilkan Semua Ulasan
-                        </button>
-                    </div>
-                `;
+                if (allCommunityReviews.length === 0) {
+                    container.innerHTML = `
+                        <div class="col-span-full py-14 text-center glass-card rounded-3xl border border-dashed border-slate-300 dark:border-white/10 p-8 max-w-lg mx-auto">
+                            <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3 text-xl">
+                                ✨
+                            </div>
+                            <h4 class="text-sm font-black text-slate-900 dark:text-white">Belum Ada Ulasan Kontributor</h4>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                Jadilah kontributor pertama yang memberikan ulasan otentik langsung melalui aplikasi!
+                            </p>
+                            <a href="/CommunityReviews" class="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md">
+                                <span>Tulis Ulasan di Aplikasi</span>
+                            </a>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div class="col-span-full py-12 text-center">
+                            <p class="text-slate-400 font-bold text-xs">Tidak ada ulasan yang cocok dengan pencarian / filter Anda.</p>
+                            <button onclick="filterCommunityReviews('all', document.querySelectorAll('.review-filter-btn')[0])" class="mt-3 px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-black uppercase tracking-wider">
+                                Tampilkan Semua Ulasan
+                            </button>
+                        </div>
+                    `;
+                }
                 return;
             }
 
             container.innerHTML = filtered.map(rev => {
                 const isLiked = !!likedMap[rev.id];
-                const currentLikes = (rev.helpfulCount || 0) + (isLiked ? 1 : 0);
+                const currentLikes = (Number(rev.helpfulCount) || 0) + (isLiked ? 1 : 0);
+                const ratingNum = Math.round(Number(rev.rating) || 5);
 
                 // Render Stars
                 let starsHtml = '';
                 for (let i = 0; i < 5; i++) {
-                    starsHtml += `<span class="${i < rev.rating ? 'text-amber-400' : 'text-slate-300 dark:text-slate-700'}">★</span>`;
+                    starsHtml += `<span class="${i < ratingNum ? 'text-amber-400' : 'text-slate-300 dark:text-slate-700'}">★</span>`;
                 }
 
-                // Render Experience Tags
-                const tagsHtml = (rev.tags || []).map(tag => `
+                // Render Tags
+                const tagsHtml = (Array.isArray(rev.tags) ? rev.tags : []).map(tag => `
                     <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-brand-500/10 text-brand-600 dark:text-brand-300 border border-brand-500/15">
                         ${tag}
                     </span>
                 `).join('');
 
-                // Render Photos Gallery if exists
-                const photosHtml = (rev.photos && rev.photos.length > 0) ? `
+                // Render Photos Gallery
+                const photosHtml = (Array.isArray(rev.photos) && rev.photos.length > 0) ? `
                     <div class="flex items-center gap-2 mt-3 overflow-x-auto pb-1">
                         ${rev.photos.map(p => `
-                            <img src="${p}" alt="Proof" onclick="openReviewPhotoModal('${p}')" class="w-14 h-14 object-cover rounded-xl border border-slate-200 dark:border-white/10 hover:opacity-80 transition-opacity cursor-pointer shadow-sm">
+                            <img src="${p}" alt="Bukti Approval" onclick="openReviewPhotoModal('${p}')" class="w-14 h-14 object-cover rounded-xl border border-slate-200 dark:border-white/10 hover:opacity-80 transition-opacity cursor-pointer shadow-sm shrink-0">
                         `).join('')}
                     </div>
                 ` : '';
 
+                // Avatar rendering (Image if URL, otherwise initials badge)
+                const avatarUrl = rev.userAvatar && (rev.userAvatar.startsWith('http') || rev.userAvatar.startsWith('data:')) ? rev.userAvatar : null;
+                const initials = rev.userName ? rev.userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'MZ';
+
+                const avatarHtml = avatarUrl
+                    ? `<img src="${avatarUrl}" alt="${rev.userName}" class="w-11 h-11 object-cover rounded-2xl shadow-md border border-slate-200 dark:border-white/10 shrink-0" onerror="this.onerror=null; this.src='/favicon.ico';">`
+                    : `<div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white font-black text-xs shadow-md shadow-brand-500/20 shrink-0">${initials}</div>`;
+
+                const formattedDate = formatReviewDate(rev.createdAt);
+
                 return `
-                    <div class="p-6 sm:p-7 rounded-3xl glass-card border border-slate-200 dark:border-white/10 hover:border-brand-500/30 transition-all flex flex-col justify-between group shadow-sm hover:shadow-xl">
+                    <div class="p-5 sm:p-6 rounded-3xl glass-card border border-slate-200 dark:border-white/10 hover:border-brand-500/30 transition-all flex flex-col justify-between group shadow-sm hover:shadow-lg">
                         <div>
                             <!-- User Header -->
-                            <div class="flex items-start justify-between gap-3 mb-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white font-black text-xs shadow-md shadow-brand-500/20 shrink-0">
-                                        ${rev.userAvatar || 'MZ'}
-                                    </div>
+                            <div class="flex items-start justify-between gap-3 mb-3.5">
+                                <div class="flex items-center gap-2.5">
+                                    ${avatarHtml}
                                     <div>
                                         <div class="flex items-center gap-1.5 flex-wrap">
-                                            <span class="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-none">${rev.userName}</span>
+                                            <span class="text-xs font-black text-slate-900 dark:text-white leading-none">${rev.userName || 'Kontributor MetaZo'}</span>
                                             ${rev.verifiedBuyer ? `
-                                                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[8.5px] font-black uppercase tracking-wider" title="Terverifikasi Menggunakan MetaZo PRO">
+                                                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[8px] font-black uppercase tracking-wider" title="Terverifikasi Menggunakan MetaZo PRO">
                                                     ✓ Verified
                                                 </span>
                                             ` : ''}
                                         </div>
-                                        <span class="text-[10.5px] text-slate-400 font-medium block mt-1">${rev.role || 'Member Komunitas'}</span>
+                                        <span class="text-[10px] text-slate-400 font-medium block mt-1">${rev.role || 'Microstock Contributor'}</span>
                                     </div>
                                 </div>
-                                <span class="text-[9.5px] font-bold text-slate-400 dark:text-slate-500 shrink-0">${rev.createdAt}</span>
+                                <span class="text-[9px] font-bold text-slate-400 dark:text-slate-500 shrink-0">${formattedDate}</span>
                             </div>
 
                             <!-- Star Rating & App Version -->
-                            <div class="flex items-center justify-between mb-3">
-                                <div class="flex items-center gap-0.5 text-base leading-none">
+                            <div class="flex items-center justify-between mb-2.5">
+                                <div class="flex items-center gap-0.5 text-sm leading-none">
                                     ${starsHtml}
                                 </div>
-                                <span class="text-[9px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                <span class="text-[8.5px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                                     ${rev.appVersion || 'v1.3 PRO'}
                                 </span>
                             </div>
 
                             <!-- Review Title & Comment -->
-                            <h4 class="text-sm font-black text-slate-900 dark:text-white mb-2 leading-snug">"${rev.title}"</h4>
-                            <p class="text-xs sm:text-[12.5px] text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-                                ${rev.comment}
+                            <h4 class="text-xs sm:text-[13px] font-black text-slate-900 dark:text-white mb-1.5 leading-snug">"${rev.title || 'Pengalaman MetaZo PRO'}"</h4>
+                            <p class="text-[11.5px] text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
+                                ${rev.comment || ''}
                             </p>
 
                             <!-- Tags -->
-                            <div class="flex flex-wrap gap-1.5 mt-4">
-                                ${tagsHtml}
-                            </div>
+                            ${tagsHtml ? `<div class="flex flex-wrap gap-1 mt-3">${tagsHtml}</div>` : ''}
 
                             <!-- Photo Proofs -->
                             ${photosHtml}
                         </div>
 
                         <!-- Footer: Helpful Like Action -->
-                        <div class="mt-6 pt-4 border-t border-slate-200 dark:border-white/5 flex items-center justify-between">
-                            <span class="text-[10px] text-slate-400 font-medium">Ulasan otentik pengguna</span>
-                            <button onclick="toggleHelpfulVote('${rev.id}')" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all ${isLiked ? 'bg-brand-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750'} cursor-pointer">
+                        <div class="mt-5 pt-3.5 border-t border-slate-200 dark:border-white/5 flex items-center justify-between">
+                            <span class="text-[9.5px] text-slate-400 font-medium">Ulasan otentik database</span>
+                            <button onclick="toggleHelpfulVote('${rev.id}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${isLiked ? 'bg-brand-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750'} cursor-pointer">
                                 <span>👍</span>
-                                <span class="text-[11px]">Membantu (${currentLikes})</span>
+                                <span class="text-[10px]">Membantu (${currentLikes})</span>
                             </button>
                         </div>
                     </div>
@@ -1672,14 +1739,32 @@
             renderCommunityReviews();
         }
 
-        function toggleHelpfulVote(reviewId) {
+        async function toggleHelpfulVote(reviewId) {
             const likedMap = getLikedReviews();
-            if (likedMap[reviewId]) {
-                delete likedMap[reviewId];
-            } else {
+            const isLiking = !likedMap[reviewId];
+            if (isLiking) {
                 likedMap[reviewId] = true;
+            } else {
+                delete likedMap[reviewId];
             }
             localStorage.setItem('mz_liked_reviews', JSON.stringify(likedMap));
+
+            // Optimistic update count
+            const rev = allCommunityReviews.find(r => r.id === reviewId);
+            if (rev) {
+                rev.helpfulCount = Math.max(0, (Number(rev.helpfulCount) || 0) + (isLiking ? 1 : -1));
+                // Sync to Supabase in background
+                fetch(`${SUPABASE_URL}/rest/v1/reviews?id=eq.${encodeURIComponent(reviewId)}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify({ helpfulCount: rev.helpfulCount })
+                }).catch(e => console.warn('Sync helpful vote failed:', e));
+            }
             renderCommunityReviews();
         }
 
