@@ -12,16 +12,24 @@
       "destination": "/api/index.js"
     },
     {
-      "source": "/",
-      "destination": "/landing.html"
-    },
-    {
       "source": "/landing",
-      "destination": "/landing.html"
+      "destination": "/index.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/landing.html",
       "destination": "/index.html"
+    },
+    {
+      "source": "/app",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/app/(.*)",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/((?!api|assets|src|favicon|.*\\..*).*)",
+      "destination": "/app.html"
     }
   ]
 }

@@ -3363,10 +3363,10 @@ app.get('/api/debug-uploads', (req, res) => {
 async function startHosting() {
     // Development mode
     if (process.env.NODE_ENV !== 'production') {
+        const rootLanding = path.join(process.cwd(), 'index.html');
         // Serve landing page on root / and /landing
         app.get(['/', '/landing', '/landing.html'], (req, res, next) => {
             if (req.query.spa === '1') return next();
-            const rootLanding = path.join(process.cwd(), 'landing.html');
             if (fs.existsSync(rootLanding)) {
                 return res.sendFile(rootLanding);
             }
@@ -3376,26 +3376,37 @@ async function startHosting() {
         const { createServer: createViteServer } = await import('vite');
         const vite = await createViteServer({
             server: { middlewareMode: true },
-            appType: 'spa',
+            appType: 'custom',
         });
         app.use(vite.middlewares);
+
+        // Fallback for all other SPA routes (like /app, /Login, /Dashboard)
+        app.get('*', async (req, res, next) => {
+            if (req.path.startsWith('/api') || req.path.includes('.')) {
+                return next();
+            }
+            try {
+                const appHtmlPath = path.join(process.cwd(), 'app.html');
+                let template = fs.readFileSync(appHtmlPath, 'utf-8');
+                template = await vite.transformIndexHtml(req.originalUrl || req.url, template);
+                res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+            } catch (e) {
+                next(e);
+            }
+        });
     } else {
         // In production, serve landing page on root / and /landing
         const distPath = path.join(process.cwd(), 'dist');
         app.get(['/', '/landing', '/landing.html'], (req, res) => {
-            const prodLanding = path.join(distPath, 'landing.html');
-            const rootLanding = path.join(process.cwd(), 'landing.html');
+            const prodLanding = path.join(distPath, 'index.html');
             if (fs.existsSync(prodLanding)) {
-                res.sendFile(prodLanding);
-            } else if (fs.existsSync(rootLanding)) {
-                res.sendFile(rootLanding);
-            } else {
-                res.sendFile(path.join(distPath, 'index.html'));
+                return res.sendFile(prodLanding);
             }
+            res.sendFile(path.join(distPath, 'app.html'));
         });
         app.use(express.static(distPath));
-        app.get('*all', (req, res) => {
-            res.sendFile(path.join(distPath, 'index.html'));
+        app.get('*', (req, res) => {
+            res.sendFile(path.join(distPath, 'app.html'));
         });
     }
 
