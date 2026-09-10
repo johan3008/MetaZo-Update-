@@ -2240,20 +2240,10 @@ const App: React.FC = () => {
       }
     } else {
       if (currentPath === '/Login' || currentPath === '/' || currentPath === '' || currentPath === '/app') {
-        const savedRedirect = localStorage.getItem('mz_redirect_after_login');
         localStorage.removeItem('mz_redirect_after_login');
-        const redirectTool = savedRedirect ? getToolFromPath(savedRedirect) : null;
-        
-        if (redirectTool) {
-          setActiveTool(redirectTool);
-          if (!isIframe) {
-            window.history.replaceState(null, '', toolToPath[redirectTool]);
-          }
-        } else {
-          setActiveTool(ToolType.DASHBOARD);
-          if (!isIframe) {
-            window.history.replaceState(null, '', '/Dashboard');
-          }
+        setActiveTool(ToolType.DASHBOARD);
+        if (!isIframe) {
+          window.history.replaceState(null, '', '/Dashboard');
         }
       } else {
         const tool = getToolFromPath(currentPath);
@@ -4857,7 +4847,12 @@ const App: React.FC = () => {
     return (
       <LoginScreen 
         onLoginSuccess={(loggedInUser) => {
-          // no promo trigger
+          // Explicitly set activeTool to DASHBOARD on user login
+          setActiveTool(ToolType.DASHBOARD);
+          localStorage.removeItem('mz_redirect_after_login');
+          if (typeof window !== 'undefined') {
+            window.history.replaceState(null, '', '/Dashboard');
+          }
           setUser(loggedInUser);
         }} 
         theme={theme} 
