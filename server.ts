@@ -251,6 +251,38 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     next();
 });
 
+// SEO SITEMAP & ROBOTS.TXT
+app.get('/robots.txt', (req: express.Request, res: express.Response) => {
+    res.type('text/plain');
+    res.send(`User-agent: *\nAllow: /\n\nSitemap: https://meta-zo-update.vercel.app/sitemap.xml\n`);
+});
+
+app.get('/sitemap.xml', (req: express.Request, res: express.Response) => {
+    res.type('application/xml');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://meta-zo-update.vercel.app/</loc>
+    <lastmod>2026-09-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://meta-zo-update.vercel.app/app</loc>
+    <lastmod>2026-09-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://meta-zo-update.vercel.app/landing</loc>
+    <lastmod>2026-09-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+</urlset>`);
+});
+
+
 // TRICK: Throttle Quota / Concurrency Limit Middleware
 // We place this BEFORE multer upload.single() so that we reject the request
 // instantly and gracefully before Node.js even starts buffering the massive file to disk/RAM.

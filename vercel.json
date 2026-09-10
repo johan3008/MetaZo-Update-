@@ -12,6 +12,14 @@
       "destination": "/api/index.js"
     },
     {
+      "source": "/robots.txt",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/index.js"
+    },
+    {
       "source": "/landing",
       "destination": "/index.html"
     },
