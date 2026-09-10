@@ -724,6 +724,18 @@
                     Hemat puluhan jam per bulan dengan biaya yang kembali hanya dari 1–2 penjualan aset microstock Anda!
                 </p>
 
+                <!-- Dynamic Promo Banner (Populated via Database) -->
+                <div id="promoBannerContainer" class="hidden max-w-xl mx-auto mt-5">
+                    <div class="inline-flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-rose-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-black shadow-sm">
+                        <span class="flex h-2 w-2 relative">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                        </span>
+                        <span id="promoBannerText">🔥 Promo Spesial Aktif: Diskon 30%</span>
+                        <span id="promoBannerCode" class="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-800 dark:text-amber-200 font-mono text-[10px] tracking-wider uppercase">SEPT04</span>
+                    </div>
+                </div>
+
                 <!-- Currency Switcher Toggle -->
                 <div class="inline-flex items-center gap-1.5 p-1 rounded-2xl glass-card border border-slate-200 dark:border-white/10 mt-6">
                     <button onclick="setCurrency('IDR')" id="currBtnIdr" class="px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-brand-600 text-white shadow-sm transition-all">
@@ -739,7 +751,12 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-7 max-w-4xl mx-auto items-stretch">
                 
                 <!-- Plan 1: 30 Days Access -->
-                <div class="p-6 sm:p-8 rounded-3xl glass-card hover:border-slate-300 dark:hover:border-white/20 transition-all flex flex-col justify-between">
+                <div class="p-6 sm:p-8 rounded-3xl glass-card hover:border-slate-300 dark:hover:border-white/20 transition-all flex flex-col justify-between relative overflow-hidden">
+                    <!-- Discount Badge if active -->
+                    <div id="badgeDiscount30" class="hidden absolute top-4 right-4 px-2.5 py-0.5 rounded-full bg-rose-500 text-white text-[9.5px] font-black uppercase tracking-wider shadow-md animate-pulse">
+                        Hemat 30%
+                    </div>
+
                     <div>
                         <div class="flex items-center justify-between">
                             <span class="text-[10.5px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">Paket Bulanan</span>
@@ -751,9 +768,16 @@
                         <h3 class="text-xl font-black text-slate-900 dark:text-white mt-2.5">30 Days Pro Access</h3>
                         <p class="text-[11.5px] text-slate-500 dark:text-slate-400 mt-1">Sangat cocok untuk kejar target upload musiman.</p>
 
-                        <div class="mt-5 flex items-baseline gap-1">
-                            <span id="price30Val" class="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">Rp 50.000</span>
-                            <span class="text-[11px] font-bold text-slate-400">/ 30 hari</span>
+                        <!-- Price display with optional strikethrough -->
+                        <div class="mt-5">
+                            <div id="origPrice30Row" class="hidden items-center gap-2 mb-0.5">
+                                <span id="origPrice30Val" class="text-xs line-through text-slate-400 dark:text-slate-500 font-bold">Rp 50.000</span>
+                                <span id="discountTag30" class="px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[9px] font-black">-30%</span>
+                            </div>
+                            <div class="flex items-baseline gap-1">
+                                <span id="price30Val" class="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">Rp 50.000</span>
+                                <span class="text-[11px] font-bold text-slate-400">/ 30 hari</span>
+                            </div>
                         </div>
 
                         <ul class="mt-7 space-y-3 text-xs text-slate-600 dark:text-slate-300 font-medium">
@@ -781,7 +805,7 @@
                     </div>
 
                     <div class="mt-8">
-                        <a id="waBtn30" href="https://wa.me/6281234567890?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%2030%20Hari." target="_blank" class="w-full py-3 rounded-xl font-extrabold text-[11px] uppercase tracking-wider text-slate-800 dark:text-white glass-card hover:bg-slate-200 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+                        <a id="waBtn30" href="https://wa.me/6282275408171?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%2030%20Hari." target="_blank" class="w-full py-3 rounded-xl font-extrabold text-[11px] uppercase tracking-wider text-slate-800 dark:text-white glass-card hover:bg-slate-200 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
                             <span>Pesan via WhatsApp</span>
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
@@ -796,6 +820,11 @@
                         ⭐ BEST DEAL & POPULER
                     </div>
 
+                    <!-- Discount Badge if active -->
+                    <div id="badgeDiscountLife" class="hidden absolute top-4 right-4 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-rose-500 to-pink-500 text-white text-[9.5px] font-black uppercase tracking-wider shadow-md animate-pulse">
+                        Hemat 30%
+                    </div>
+
                     <div>
                         <div class="flex items-center justify-between">
                             <span class="text-[10.5px] font-extrabold uppercase tracking-widest text-brand-600 dark:text-brand-400">Sekali Bayar Selamanya</span>
@@ -807,9 +836,16 @@
                         <h3 class="text-xl font-black text-slate-900 dark:text-white mt-2.5">Lifetime Unlimited Access</h3>
                         <p class="text-[11.5px] text-slate-500 dark:text-slate-400 mt-1">Asisten pribadi metadata Anda seumur hidup.</p>
 
-                        <div class="mt-5 flex items-baseline gap-1">
-                            <span id="priceLifeVal" class="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-500 dark:from-brand-400 dark:to-indigo-400">Rp 250.000</span>
-                            <span class="text-[11px] font-bold text-slate-400">/ sekali bayar</span>
+                        <!-- Price display with optional strikethrough -->
+                        <div class="mt-5">
+                            <div id="origPriceLifeRow" class="hidden items-center gap-2 mb-0.5">
+                                <span id="origPriceLifeVal" class="text-xs line-through text-slate-400 dark:text-slate-500 font-bold">Rp 250.000</span>
+                                <span id="discountTagLife" class="px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[9px] font-black">-30%</span>
+                            </div>
+                            <div class="flex items-baseline gap-1">
+                                <span id="priceLifeVal" class="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-500 dark:from-brand-400 dark:to-indigo-400">Rp 250.000</span>
+                                <span class="text-[11px] font-bold text-slate-400">/ sekali bayar</span>
+                            </div>
                         </div>
 
                         <ul class="mt-7 space-y-3 text-xs text-slate-700 dark:text-slate-200 font-semibold">
@@ -837,7 +873,7 @@
                     </div>
 
                     <div class="mt-8">
-                        <a id="waBtnLife" href="https://wa.me/6281234567890?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%20LIFETIME%20sekarang." target="_blank" class="w-full py-3.5 rounded-xl font-extrabold text-[11px] uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-lg shadow-brand-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                        <a id="waBtnLife" href="https://wa.me/6282275408171?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%20LIFETIME%20sekarang." target="_blank" class="w-full py-3.5 rounded-xl font-extrabold text-[11px] uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-lg shadow-brand-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
                             <span>Ambil Promo Lifetime Sekarang</span>
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -1194,32 +1230,198 @@
             mobileMenu.classList.toggle('hidden');
         });
 
-        // --- 3. CURRENCY SWITCHER (IDR vs USD) ---
+        // --- 3. DYNAMIC PRICING & DATABASE DISCOUNT SYSTEM ---
         let currentCurrency = 'IDR';
+        let activeDiscountPercent = 0;
+        let activePromoCode = '';
+        let activePromoDesc = '';
+
+        const BASE_PRICES = {
+            IDR: {
+                monthly: 50000,
+                lifetime: 250000
+            },
+            USD: {
+                monthly: 2,
+                lifetime: 14
+            }
+        };
+
         const currBtnIdr = document.getElementById('currBtnIdr');
         const currBtnUsd = document.getElementById('currBtnUsd');
         const price30El = document.getElementById('price30Val');
         const priceLifeEl = document.getElementById('priceLifeVal');
+        const origPrice30Val = document.getElementById('origPrice30Val');
+        const origPriceLifeVal = document.getElementById('origPriceLifeVal');
+        const origPrice30Row = document.getElementById('origPrice30Row');
+        const origPriceLifeRow = document.getElementById('origPriceLifeRow');
+        const discountTag30 = document.getElementById('discountTag30');
+        const discountTagLife = document.getElementById('discountTagLife');
+        const badgeDiscount30 = document.getElementById('badgeDiscount30');
+        const badgeDiscountLife = document.getElementById('badgeDiscountLife');
+        const promoBannerContainer = document.getElementById('promoBannerContainer');
+        const promoBannerText = document.getElementById('promoBannerText');
+        const promoBannerCode = document.getElementById('promoBannerCode');
         const waBtn30 = document.getElementById('waBtn30');
         const waBtnLife = document.getElementById('waBtnLife');
 
+        function formatCurrencyDisplay(amount, currency) {
+            if (currency === 'IDR') {
+                return 'Rp ' + new Intl.NumberFormat('id-ID').format(amount);
+            } else {
+                return '$' + amount + ' USD';
+            }
+        }
+
+        function updatePricingDisplay() {
+            const baseMonthly = BASE_PRICES[currentCurrency].monthly;
+            const baseLifetime = BASE_PRICES[currentCurrency].lifetime;
+
+            if (currentCurrency === 'IDR') {
+                currBtnIdr.className = "px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-brand-600 text-white shadow-sm transition-all";
+                currBtnUsd.className = "px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all";
+            } else {
+                currBtnUsd.className = "px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-brand-600 text-white shadow-sm transition-all";
+                currBtnIdr.className = "px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all";
+            }
+
+            if (activeDiscountPercent > 0) {
+                // Calculate discounted values
+                const discFactor = 1 - (activeDiscountPercent / 100);
+                const discountedMonthly = currentCurrency === 'IDR' 
+                    ? Math.round(baseMonthly * discFactor)
+                    : Math.max(1, Math.round(baseMonthly * discFactor));
+                const discountedLifetime = currentCurrency === 'IDR'
+                    ? Math.round(baseLifetime * discFactor)
+                    : Math.max(1, Math.round(baseLifetime * discFactor));
+
+                // Show Strikethrough & Badges
+                if (origPrice30Row) {
+                    origPrice30Row.classList.remove('hidden');
+                    origPrice30Row.classList.add('flex');
+                }
+                if (origPriceLifeRow) {
+                    origPriceLifeRow.classList.remove('hidden');
+                    origPriceLifeRow.classList.add('flex');
+                }
+                if (origPrice30Val) origPrice30Val.innerText = formatCurrencyDisplay(baseMonthly, currentCurrency);
+                if (origPriceLifeVal) origPriceLifeVal.innerText = formatCurrencyDisplay(baseLifetime, currentCurrency);
+                if (discountTag30) discountTag30.innerText = `-${activeDiscountPercent}%`;
+                if (discountTagLife) discountTagLife.innerText = `-${activeDiscountPercent}%`;
+
+                if (badgeDiscount30) {
+                    badgeDiscount30.classList.remove('hidden');
+                    badgeDiscount30.innerText = `Hemat ${activeDiscountPercent}%`;
+                }
+                if (badgeDiscountLife) {
+                    badgeDiscountLife.classList.remove('hidden');
+                    badgeDiscountLife.innerText = `Hemat ${activeDiscountPercent}%`;
+                }
+
+                if (price30El) price30El.innerText = formatCurrencyDisplay(discountedMonthly, currentCurrency);
+                if (priceLifeEl) priceLifeEl.innerText = formatCurrencyDisplay(discountedLifetime, currentCurrency);
+
+                // Update WhatsApp links with discount mention & code
+                const waText30 = currentCurrency === 'IDR'
+                    ? `Halo Admin MetaZo, saya ingin membeli Lisensi MetaZo PRO 30 Hari dengan diskon ${activeDiscountPercent}% (Kupon: ${activePromoCode}) seharga ${formatCurrencyDisplay(discountedMonthly, 'IDR')}.`
+                    : `Hello MetaZo Admin, I would like to purchase MetaZo PRO 30 Days with ${activeDiscountPercent}% discount (Promo: ${activePromoCode}) for ${formatCurrencyDisplay(discountedMonthly, 'USD')}.`;
+                
+                const waTextLife = currentCurrency === 'IDR'
+                    ? `Halo Admin MetaZo, saya ingin membeli Lisensi MetaZo PRO LIFETIME dengan diskon ${activeDiscountPercent}% (Kupon: ${activePromoCode}) seharga ${formatCurrencyDisplay(discountedLifetime, 'IDR')}.`
+                    : `Hello MetaZo Admin, I would like to purchase MetaZo PRO LIFETIME with ${activeDiscountPercent}% discount (Promo: ${activePromoCode}) for ${formatCurrencyDisplay(discountedLifetime, 'USD')}.`;
+
+                if (waBtn30) waBtn30.href = `https://wa.me/6282275408171?text=${encodeURIComponent(waText30)}`;
+                if (waBtnLife) waBtnLife.href = `https://wa.me/6282275408171?text=${encodeURIComponent(waTextLife)}`;
+            } else {
+                // No Discount active: Normal Price
+                if (origPrice30Row) {
+                    origPrice30Row.classList.add('hidden');
+                    origPrice30Row.classList.remove('flex');
+                }
+                if (origPriceLifeRow) {
+                    origPriceLifeRow.classList.add('hidden');
+                    origPriceLifeRow.classList.remove('flex');
+                }
+                if (badgeDiscount30) badgeDiscount30.classList.add('hidden');
+                if (badgeDiscountLife) badgeDiscountLife.classList.add('hidden');
+
+                if (price30El) price30El.innerText = formatCurrencyDisplay(baseMonthly, currentCurrency);
+                if (priceLifeEl) priceLifeEl.innerText = formatCurrencyDisplay(baseLifetime, currentCurrency);
+
+                const waText30 = currentCurrency === 'IDR'
+                    ? `Halo Admin MetaZo, saya ingin membeli Lisensi MetaZo PRO 30 Hari (${formatCurrencyDisplay(baseMonthly, 'IDR')}).`
+                    : `Hello MetaZo Admin, I would like to purchase MetaZo PRO 30 Days Access (${formatCurrencyDisplay(baseMonthly, 'USD')}).`;
+                
+                const waTextLife = currentCurrency === 'IDR'
+                    ? `Halo Admin MetaZo, saya ingin membeli Lisensi MetaZo PRO LIFETIME (${formatCurrencyDisplay(baseLifetime, 'IDR')}).`
+                    : `Hello MetaZo Admin, I would like to purchase MetaZo PRO LIFETIME Access (${formatCurrencyDisplay(baseLifetime, 'USD')}).`;
+
+                if (waBtn30) waBtn30.href = `https://wa.me/6282275408171?text=${encodeURIComponent(waText30)}`;
+                if (waBtnLife) waBtnLife.href = `https://wa.me/6282275408171?text=${encodeURIComponent(waTextLife)}`;
+            }
+        }
+
         function setCurrency(curr) {
             currentCurrency = curr;
-            if (curr === 'IDR') {
-                currBtnIdr.className = "px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-brand-600 text-white shadow-sm transition-all";
-                currBtnUsd.className = "px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all";
-                price30El.innerText = "Rp 50.000";
-                priceLifeEl.innerText = "Rp 250.000";
-                waBtn30.href = "https://wa.me/6281234567890?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%2030%20Hari%20(Rp%2050.000).";
-                waBtnLife.href = "https://wa.me/6281234567890?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%20Lifetime%20(Rp%20250.000).";
-            } else {
-                currBtnUsd.className = "px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-brand-600 text-white shadow-sm transition-all";
-                currBtnIdr.className = "px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all";
-                price30El.innerText = "$2 USD";
-                priceLifeEl.innerText = "$14 USD";
-                waBtn30.href = "https://wa.me/6281234567890?text=Hello%20MetaZo%20Admin%2C%20I%20would%20like%20to%20buy%20MetaZo%20PRO%2030%20Days%20Access%20($2).";
-                waBtnLife.href = "https://wa.me/6281234567890?text=Hello%20MetaZo%20Admin%2C%20I%20would%20like%20to%20buy%20MetaZo%20PRO%20Lifetime%20Access%20($14).";
+            updatePricingDisplay();
+        }
+
+        // Fetch discounts from Supabase Database promos table
+        async function loadDatabaseDiscounts() {
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/promos?select=*&type=eq.discount`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                });
+                if (res.ok) {
+                    const promos = await res.json();
+                    if (Array.isArray(promos) && promos.length > 0) {
+                        const now = new Date();
+                        // Find highest active discount promo
+                        const validPromos = promos.filter(p => {
+                            if (p.maxUses && p.usedCount >= p.maxUses) return false;
+                            if (p.startDate) {
+                                const start = new Date(p.startDate.includes('T') ? p.startDate : p.startDate + 'T00:00:00');
+                                if (now < start) return false;
+                            }
+                            if (p.endDate) {
+                                const end = new Date(p.endDate.includes('T') ? p.endDate : p.endDate + 'T23:59:59');
+                                if (now > end) return false;
+                            }
+                            return Number(p.value) > 0;
+                        });
+
+                        if (validPromos.length > 0) {
+                            // Sort by highest discount value
+                            validPromos.sort((a, b) => Number(b.value) - Number(a.value));
+                            const bestPromo = validPromos[0];
+                            activeDiscountPercent = Number(bestPromo.value);
+                            activePromoCode = bestPromo.code || bestPromo.id;
+                            activePromoDesc = bestPromo.description || `Diskon ${activeDiscountPercent}% Spesial`;
+
+                            // Show top Promo Banner
+                            if (promoBannerContainer) {
+                                promoBannerContainer.classList.remove('hidden');
+                                if (promoBannerText) {
+                                    promoBannerText.innerText = `🔥 Promo Aktif: Diskon ${activeDiscountPercent}% (${bestPromo.description || 'Terbatas'})`;
+                                }
+                                if (promoBannerCode) {
+                                    promoBannerCode.innerText = activePromoCode;
+                                }
+                            }
+                            updatePricingDisplay();
+                            return;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('[Discounts] Failed to fetch database discounts:', err);
             }
+
+            // If no active discount from database, update standard display
+            updatePricingDisplay();
         }
 
         // --- 4. FAQ ACCORDION TOGGLE ---
@@ -1786,7 +1988,8 @@
             }
         }
 
-        // Initialize Community Reviews
+        // Initialize Community Reviews & Database Discounts
+        loadDatabaseDiscounts();
         loadCommunityReviewsData();
     </script>
 </body>
