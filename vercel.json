@@ -36,6 +36,10 @@
       "destination": "/app.html"
     },
     {
+      "source": "/",
+      "destination": "/app.html"
+    },
+    {
       "source": "/((?!api|assets|src|favicon|.*\\..*).*)",
       "destination": "/app.html"
     }

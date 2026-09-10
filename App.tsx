@@ -1764,6 +1764,14 @@ const App: React.FC = () => {
     // Purge any legacy offline guest session
     localStorage.removeItem('mz_offline_user');
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const path = window.location.pathname;
+        // If user is on landing page, login page, or root, redirect to Dashboard
+        if (path === '/' || path === '' || path === '/Login' || path === '/app' || path === '/landing' || path === '/landing.html') {
+          setActiveTool(ToolType.DASHBOARD);
+          window.history.replaceState(null, '', '/Dashboard');
+        }
+      }
       setUser(firebaseUser || null);
       setIsCheckingAuth(false);
     });
@@ -2225,10 +2233,6 @@ const App: React.FC = () => {
     const isIframe = typeof window !== 'undefined' && window.self !== window.top;
 
     if (!user) {
-      if (currentPath === '/' || currentPath === '/landing' || currentPath === '/landing.html') {
-        window.location.replace('/landing.html');
-        return;
-      }
       if (currentPath !== '/Login') {
         const tool = getToolFromPath(currentPath);
         if (tool && tool !== ToolType.DASHBOARD) {
@@ -2239,7 +2243,7 @@ const App: React.FC = () => {
         }
       }
     } else {
-      if (currentPath === '/Login' || currentPath === '/' || currentPath === '' || currentPath === '/app') {
+      if (currentPath === '/Login' || currentPath === '/' || currentPath === '' || currentPath === '/app' || currentPath === '/landing' || currentPath === '/landing.html') {
         localStorage.removeItem('mz_redirect_after_login');
         setActiveTool(ToolType.DASHBOARD);
         if (!isIframe) {

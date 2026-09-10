@@ -16,10 +16,41 @@
     <link rel="icon" type="image/png" href="/src/assets/images/mz_pro_logo_1780923659277.png">
     <link rel="shortcut icon" type="image/png" href="/src/assets/images/mz_pro_logo_1780923659277.png">
 
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,700&display=swap" rel="stylesheet">
+    <!-- Immediate OAuth callback & session forwarder -->
+    <script>
+        (function() {
+            try {
+                var h = window.location.hash || '';
+                var s = window.location.search || '';
+                if (h.indexOf('access_token=') !== -1 || h.indexOf('refresh_token=') !== -1 || s.indexOf('code=') !== -1) {
+                    window.location.replace('/app' + s + h);
+                    return;
+                }
+                for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    if (k && k.indexOf('sb-') === 0 && k.indexOf('-auth-token') !== -1) {
+                        var val = localStorage.getItem(k);
+                        if (val && val.indexOf('access_token') !== -1) {
+                            if (window.location.href.indexOf('stay=1') === -1) {
+                                window.location.replace('/app');
+                                return;
+                            }
+                        }
+                    }
+                }
+                // Also check Firebase auth session
+                var allKeys = Object.keys(localStorage);
+                for (var j = 0; j < allKeys.length; j++) {
+                    if (allKeys[j].indexOf('firebase:authUser:') === 0) {
+                        if (window.location.href.indexOf('stay=1') === -1) {
+                            window.location.replace('/app');
+                            return;
+                        }
+                    }
+                }
+            } catch(e) {}
+        })();
+    </script>
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -1245,6 +1276,37 @@
 
     <!-- INTERACTIVE JAVASCRIPT LOGIC -->
     <script>
+        // --- 0. OAUTH CALLBACK & ACTIVE SESSION FORWARDER ---
+        // If user returns from Google OAuth or already has a valid session, forward immediately to /app
+        (function() {
+            try {
+                const hash = window.location.hash || '';
+                const search = window.location.search || '';
+                // Supabase OAuth returns access_token / error in URL hash or code in search
+                if (hash.includes('access_token=') || hash.includes('refresh_token=') || search.includes('code=')) {
+                    window.location.replace('/app' + window.location.search + window.location.hash);
+                    return;
+                }
+                
+                // If user already logged in previously
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && (key.startsWith('sb-') && key.endsWith('-auth-token'))) {
+                        const tokenData = localStorage.getItem(key);
+                        if (tokenData && tokenData.includes('access_token')) {
+                            // Don't auto-redirect if user explicitly clicked landing link with ?stay=1 or #stay
+                            if (!window.location.href.includes('stay=1')) {
+                                window.location.replace('/app');
+                                return;
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[Landing] Auth check error:', e);
+            }
+        })();
+
         // --- 1. THEME TOGGLE (DARK / LIGHT) ---
         const htmlEl = document.documentElement;
         const themeBtn = document.getElementById('themeToggleBtn');
