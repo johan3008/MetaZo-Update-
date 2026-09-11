@@ -4,7 +4,7 @@ import { copyToClipboard as robustCopy } from '../utils';
 import { getHeaders } from '../../services/geminiService';
 import { 
   Wand2, Type, Copy, Check, Info, Trash2, Sliders, Play, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Download, AlignLeft, Search, Sparkles, X, Loader2,
-  FileSpreadsheet, CheckCheck, FileText, SlidersHorizontal, Layers, ShieldCheck, Filter
+  FileSpreadsheet, CheckCheck, FileText, SlidersHorizontal, Layers, ShieldCheck, Filter, Lock
 } from 'lucide-react';
 
 import { FeatureGuideButton } from './FeatureGuideModal';
@@ -15,6 +15,7 @@ interface PromptGenViewProps {
   prefilledSubject?: string;
   onPrefillConsumed?: () => void;
   isLicensed?: boolean;
+  setShowActivationModal?: (show: boolean) => void;
   dailyGenCount?: number;
   incrementDailyCount?: () => void;
   aiOptions?: any;
@@ -146,6 +147,7 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   prefilledSubject, 
   onPrefillConsumed,
   isLicensed = false,
+  setShowActivationModal,
   dailyGenCount = 0,
   incrementDailyCount,
   aiOptions,
@@ -197,22 +199,43 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
   };
 
   const triggerAutoSubject = async () => {
+    if (!isLicensed) {
+      if (setShowActivationModal) {
+        setShowActivationModal(true);
+      } else {
+        setError(uiLanguage === 'id' ? 'Fitur Ide Subject AI khusus untuk pengguna PRO. Silakan aktivasi lisensi Anda.' : 'AI Subject Idea is an exclusive PRO feature. Please activate your license.');
+      }
+      return;
+    }
     setIsAutoGeneratingSubject(true);
+    const fallbacks = [
+      "Cute Kitten Sipping Hot Morning Espresso in Cafe",
+      "Corporate Business Team Analyzing Market Growth",
+      "Golden AI Microchip Processor with Digital Security",
+      "Sustainable Rooftop Community Garden Harvest",
+      "Minimalist Modern Architecture Villa in Nature",
+      "Cybersecurity Biometric Security Shield Concept"
+    ];
     try {
       const response = await fetch('/api/auto-subject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getHeaders(aiOptions) },
-        body: JSON.stringify({ styleCategory, currentSubject: subject })
+        body: JSON.stringify({ styleCategory, currentSubject: subject, promptMode })
       });
       if (response.ok) {
         const data = await response.json();
         if (data.subject) {
           setSubject(data.subject);
           setError(null);
+          return;
         }
       }
+      const fallback = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+      setSubject(fallback);
     } catch (err) {
       console.warn("Auto subject generation failed:", err);
+      const fallback = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+      setSubject(fallback);
     } finally {
       setIsAutoGeneratingSubject(false);
     }
@@ -759,12 +782,34 @@ export const PromptGenView: React.FC<PromptGenViewProps> = ({
                     </label>
                     <button
                       type="button"
-                      onClick={triggerAutoSubject}
-                      disabled={isAutoGeneratingSubject}
-                      className="p-1.5 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 hover:from-purple-500/20 hover:to-indigo-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20 rounded-full transition-all active:scale-95 flex items-center justify-center cursor-pointer group"
-                      title="AI Auto Ide Subject"
+                      onClick={() => {
+                        if (!isLicensed) {
+                          if (setShowActivationModal) {
+                            setShowActivationModal(true);
+                          } else {
+                            setError(uiLanguage === 'id' ? 'Fitur Ide Subject AI khusus untuk pengguna PRO. Silakan aktivasi lisensi Anda.' : 'AI Subject Idea is an exclusive PRO feature. Please activate your license.');
+                          }
+                          return;
+                        }
+                        triggerAutoSubject();
+                      }}
+                      disabled={!isLicensed || isAutoGeneratingSubject}
+                      className={`p-1.5 rounded-full transition-all flex items-center justify-center ${
+                        !isLicensed
+                          ? 'bg-slate-100 dark:bg-slate-800/70 border border-slate-300/80 dark:border-slate-700/80 text-amber-500 dark:text-amber-400 cursor-not-allowed opacity-75'
+                          : 'bg-gradient-to-r from-purple-500/10 to-indigo-500/10 hover:from-purple-500/20 hover:to-indigo-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20 active:scale-95 cursor-pointer group'
+                      }`}
+                      title={
+                        !isLicensed
+                          ? (uiLanguage === 'id' ? "Fitur Ide Subject AI Terkunci (Khusus Akun Pro)" : "AI Subject Idea Feature Locked (Pro Only)")
+                          : "AI Auto Ide Subject"
+                      }
                     >
-                      <Wand2 size={13} className={`${isAutoGeneratingSubject ? 'animate-spin text-purple-500' : 'group-hover:rotate-12 transition-transform'}`} />
+                      {!isLicensed ? (
+                        <Lock size={13} className="text-amber-500 dark:text-amber-400" />
+                      ) : (
+                        <Wand2 size={13} className={`${isAutoGeneratingSubject ? 'animate-spin text-purple-500' : 'group-hover:rotate-12 transition-transform'}`} />
+                      )}
                     </button>
                   </div>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full">Bilingual Support</span>

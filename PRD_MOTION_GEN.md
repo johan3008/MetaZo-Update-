@@ -105,7 +105,7 @@ flowchart TD
   - Tombol sidebar menampilkan icon `Video`, label `"Motion Gen"`, serta indikator aktif bergaris aksen indigo/ungu.
   - Klik pada tombol langsung memindahkan `activeTool` ke `ToolType.MOTION_GEN` tanpa memanggil modal *Coming Soon*.
 - **License & Kuota Handling**:
-  - **Akun Gratis (*Free User*)**: Dibatasi 25 kali generate per hari (`FREE_DAILY_LIMIT = 25`). Jika kuota habis, modal limit aktivasi ditampilkan.
+  - **Akun Gratis (*Free User*)**: Dibatasi 50 kali generate per hari (`FREE_DAILY_LIMIT = 50`). Jika kuota habis, modal limit aktivasi ditampilkan.
   - **Akun PRO (*Licensed*)**: Bebas kuota harian (*Unlimited Generation*).
   - Status pemakaian ditampilkan di header bar Studio (`dailyGenCount / FREE_DAILY_LIMIT`).
 
@@ -309,7 +309,7 @@ Untuk membuat fitur Motion Gen berfungsi kembali 100%, berikut 5 langkah perbaik
 | **TC-03** | Pengguna mengetik prompt kustom di Chat Studio dan menekan Enter. | Asisten AI merespons, status generating aktif, dan kode animasi baru ditampilkan di player. |
 | **TC-04** | Pengguna mengubah rasio dari 16:9 ke 9:16 (Vertikal). | Viewport player berubah ukuran aspek secara mulus dan animasi menyesuaikan layout. |
 | **TC-05** | Pengguna menekan tombol **Ekspor Video**. | Progress bar rendering berjalan dari 0% ke 100% (Preparing -> Rendering Frames -> Encoding -> Done), lalu file `.mp4` terunduh otomatis. |
-| **TC-06** | Pengguna dengan akun gratis mencapai 25 kali generate. | Modal limit muncul menginformasikan kuota harian tercapai dan menawarkan aktivasi lisensi PRO. |
+| **TC-06** | Pengguna dengan akun gratis mencapai 50 kali generate. | Modal limit muncul menginformasikan kuota harian tercapai dan menawarkan aktivasi lisensi PRO. |
 
 ---
 

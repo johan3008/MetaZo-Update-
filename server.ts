@@ -3392,6 +3392,8 @@ app.get('/api/debug-uploads', (req, res) => {
         }
     });
 
+
+
 async function startHosting() {
     // Development mode
     if (process.env.NODE_ENV !== 'production') {
