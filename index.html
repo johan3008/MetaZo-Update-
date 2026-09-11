@@ -377,8 +377,29 @@
             }
         }
 
+        .hidden {
+            display: none !important;
+        }
+
+        #mobileMenu.hidden {
+            display: none !important;
+        }
+
+        /* Hero content must ALWAYS be 100% visible immediately without blank white areas */
+        section:first-of-type,
+        #heroBadge,
+        #heroH1,
+        #heroSubtitle,
+        #heroButtons,
+        #heroStatsGrid {
+            opacity: 1 !important;
+            transform: none !important;
+            visibility: visible !important;
+        }
+
         /* Above-the-fold Hero content must always be visible immediately on mobile (prevent white/blank area) */
         @media (max-width: 768px) {
+            section:first-of-type *,
             section:first-of-type .reveal-on-scroll,
             section:first-of-type .reveal-left,
             section:first-of-type .reveal-right,
@@ -388,6 +409,7 @@
             section:first-of-type .stagger-3 {
                 opacity: 1 !important;
                 transform: none !important;
+                visibility: visible !important;
             }
         }
     </style>
@@ -549,19 +571,19 @@
     </header>
 
     <!-- HERO SECTION -->
-    <section class="relative pt-32 pb-16 md:pt-40 md:pb-24 overflow-hidden z-10">
+    <section class="relative pt-24 pb-14 sm:pt-32 sm:pb-16 md:pt-40 md:pb-24 overflow-hidden z-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             
             <!-- Announcement Badge -->
-            <div class="reveal-on-scroll inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-card border border-brand-500/30 text-slate-800 dark:text-slate-200 text-[11px] sm:text-xs font-bold mb-6 shadow-sm">
+            <div id="heroBadge" class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-card border border-brand-500/30 text-slate-800 dark:text-slate-200 text-[11px] sm:text-xs font-bold mb-6 shadow-sm">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
                 <span class="text-brand-600 dark:text-brand-300 font-extrabold uppercase tracking-wider">Terobosan Terbaru</span>
                 <span class="text-slate-300 dark:text-slate-600">|</span>
                 <span class="text-slate-600 dark:text-slate-300">AI Vision Engine untuk Microstock Contributor</span>
             </div>
 
-            <!-- Main Heading with Dynamic Gradient & Reveal -->
-            <h1 class="reveal-on-scroll stagger-1 text-2.5xl sm:text-4xl md:text-5xl lg:text-[54px] font-black tracking-tight text-slate-900 dark:text-white leading-[1.18] max-w-4xl mx-auto">
+            <!-- Main Heading with Dynamic Gradient -->
+            <h1 id="heroH1" class="text-2.5xl sm:text-4xl md:text-5xl lg:text-[54px] font-black tracking-tight text-slate-900 dark:text-white leading-[1.18] max-w-4xl mx-auto">
                 Revolusi Workflow Microstock: 
                 <span class="block mt-1 sm:mt-2 text-transparent bg-clip-text metazo-pro-gradient font-black">
                     Metadata Akurat & Ribuan Penjualan
@@ -570,7 +592,7 @@
             </h1>
 
             <!-- Subheading with Interactive Animated Brand Mention -->
-            <p class="reveal-on-scroll stagger-2 mt-4 sm:mt-5 text-xs sm:text-sm md:text-[14.5px] text-slate-600 dark:text-slate-300 font-medium max-w-2xl mx-auto leading-relaxed">
+            <p id="heroSubtitle" class="mt-4 sm:mt-5 text-xs sm:text-sm md:text-[14.5px] text-slate-600 dark:text-slate-300 font-medium max-w-2xl mx-auto leading-relaxed">
                 Tinggalkan riset judul manual dan 50 keyword yang membosankan. 
                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-brand-500/10 dark:bg-brand-500/20 border border-brand-500/25 font-black text-brand-600 dark:text-brand-300 shadow-sm hover:scale-105 transition-all cursor-pointer">
                     <span class="metazo-pro-gradient font-black">MetaZo PRO</span>
@@ -580,7 +602,7 @@
             </p>
 
             <!-- Hero Action Buttons -->
-            <div class="reveal-on-scroll stagger-3 mt-7 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-3.5">
+            <div id="heroButtons" class="mt-7 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-3.5">
                 <a href="/app" class="w-full sm:w-auto px-6 py-3.5 sm:py-4 rounded-xl font-extrabold text-xs uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 min-h-[44px]">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -597,7 +619,7 @@
             </div>
 
             <!-- Social Proof Numbers with Counters & Mobile Grid Styling -->
-            <div class="reveal-on-scroll stagger-4 mt-10 pt-6 border-t border-slate-200/80 dark:border-white/5 grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-5 max-w-3xl mx-auto">
+            <div id="heroStatsGrid" class="mt-10 pt-6 border-t border-slate-200/80 dark:border-white/5 grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-5 max-w-3xl mx-auto">
                 <div class="flex flex-col items-center p-3 sm:p-0 rounded-2xl sm:rounded-none bg-white/40 dark:bg-slate-900/30 sm:bg-transparent border border-slate-200/60 sm:border-0 dark:border-white/5">
                     <span class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white" data-counter="50" data-suffix=" Keywords">50 Keywords</span>
                     <span class="text-[10.5px] sm:text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 text-center">Ranking Relevansi SEO</span>
@@ -1836,31 +1858,31 @@
             if (mobileCta) mobileCta.innerText = tr.mobileCta;
 
             // Hero Announcement Badge
-            const heroBadgeTag = document.querySelector('section:first-of-type .reveal-on-scroll span.text-brand-600');
+            const heroBadgeTag = document.querySelector('#heroBadge span.text-brand-600') || document.querySelector('section:first-of-type span.text-brand-600');
             if (heroBadgeTag) heroBadgeTag.innerText = tr.heroBadgeTag;
-            const heroBadgeText = document.querySelector('section:first-of-type .reveal-on-scroll span.text-slate-600');
+            const heroBadgeText = document.querySelector('#heroBadge span.text-slate-600') || document.querySelector('section:first-of-type span.text-slate-600');
             if (heroBadgeText) heroBadgeText.innerText = tr.heroBadgeText;
 
             // Hero Headlines
-            const heroH1 = document.querySelector('section:first-of-type h1');
+            const heroH1 = document.getElementById('heroH1') || document.querySelector('section:first-of-type h1');
             if (heroH1) {
                 heroH1.innerHTML = `${tr.heroTitle1} <span class="block mt-1 sm:mt-2 text-transparent bg-clip-text metazo-pro-gradient font-black">${tr.heroTitle2}</span> ${tr.heroTitle3}`;
             }
 
             // Hero Subtitle
-            const heroSub = document.querySelector('section:first-of-type p.reveal-on-scroll.stagger-2');
+            const heroSub = document.getElementById('heroSubtitle') || document.querySelector('section:first-of-type p');
             if (heroSub) {
                 heroSub.innerHTML = `${tr.heroSubtitle1} <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-brand-500/10 dark:bg-brand-500/20 border border-brand-500/25 font-black text-brand-600 dark:text-brand-300 shadow-sm hover:scale-105 transition-all cursor-pointer"><span class="metazo-pro-gradient font-black">MetaZo PRO</span> <span class="text-xs">✨</span></span> ${tr.heroSubtitle2}`;
             }
 
             // Hero Buttons
-            const heroBtnCta = document.querySelector('section:first-of-type a[href="/app"].stagger-3, section:first-of-type div.stagger-3 a[href="/app"] span');
+            const heroBtnCta = document.querySelector('#heroButtons a[href="/app"] span') || document.querySelector('section:first-of-type a[href="/app"] span');
             if (heroBtnCta) heroBtnCta.innerText = tr.heroBtnCta;
-            const heroBtnDemo = document.querySelector('section:first-of-type a[href="#simulasi"] span');
+            const heroBtnDemo = document.querySelector('#heroButtons a[href="#simulasi"] span') || document.querySelector('section:first-of-type a[href="#simulasi"] span');
             if (heroBtnDemo) heroBtnDemo.innerText = tr.heroBtnDemo;
 
             // Hero Stats Subtitles
-            const statsCards = document.querySelectorAll('section:first-of-type div.stagger-4 div');
+            const statsCards = document.querySelectorAll('#heroStatsGrid > div') || document.querySelectorAll('section:first-of-type div.grid div');
             if (statsCards.length >= 4) {
                 const sub0 = statsCards[0].querySelectorAll('span')[1];
                 if (sub0) sub0.innerText = tr.statKeywordsSub;
