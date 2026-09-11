@@ -16,6 +16,10 @@ interface FtpUploaderViewProps {
   onNavigateToMetadata?: () => void;
   uiLanguage?: 'id' | 'en';
   setShowActivationModal?: (show: boolean) => void;
+  initialQueueFiles?: File[];
+  autoStart?: boolean;
+  targetAgencies?: string[];
+  onClearInitialQueue?: () => void;
 }
 
 export const DEFAULT_FTP_ACCOUNTS: FtpAccountConfig[] = [
@@ -162,7 +166,11 @@ export const FtpUploaderView: React.FC<FtpUploaderViewProps> = ({
   isLicensed = false,
   onNavigateToMetadata,
   uiLanguage = 'id',
-  setShowActivationModal
+  setShowActivationModal,
+  initialQueueFiles,
+  autoStart = false,
+  targetAgencies: propTargetAgencies,
+  onClearInitialQueue
 }) => {
   const isIndo = uiLanguage === 'id';
   
@@ -283,16 +291,28 @@ export const FtpUploaderView: React.FC<FtpUploaderViewProps> = ({
     }
   };
 
-  // File Drop & Select Handler
-  const handleFilesAdded = (filesList: FileList | File[]) => {
+  // File Drop & Select Handler (Strictly filters out CSV files, only accepting embedded media files)
+  const handleFilesAdded = (filesList: FileList | File[], overrideAgencies?: string[]) => {
+    const rawFiles = Array.isArray(filesList) ? filesList : Array.from(filesList);
+    // Microstock FTP strictly accepts media files (JPG, PNG, EPS, SVG, MP4, etc.), NEVER CSV
+    const mediaFiles = rawFiles.filter(f => !f.name.toLowerCase().endsWith('.csv'));
+
+    if (rawFiles.length > mediaFiles.length) {
+      console.warn('[FTP Uploader] Ignored CSV file(s) - Microstock FTP is strictly for embedded media files (images, vectors, videos).');
+    }
+
+    if (mediaFiles.length === 0) return [];
+
     const newItems: FtpUploadJobItem[] = [];
     const enabledAgencies = accounts.filter(a => a.enabled && a.username && a.password).map(a => a.agencyKey);
-    const targetAgencies = selectedAgenciesForUpload.length > 0 
-      ? selectedAgenciesForUpload 
-      : (enabledAgencies.length > 0 ? enabledAgencies : ['adobestock']);
+    const targetAgencies = overrideAgencies && overrideAgencies.length > 0 
+      ? overrideAgencies 
+      : (selectedAgenciesForUpload.length > 0 
+          ? selectedAgenciesForUpload 
+          : (enabledAgencies.length > 0 ? enabledAgencies : ['adobestock']));
 
-    for (let i = 0; i < filesList.length; i++) {
-      const file = filesList[i];
+    for (let i = 0; i < mediaFiles.length; i++) {
+      const file = mediaFiles[i];
       const agencyStatusMap: Record<string, 'pending' | 'uploading' | 'success' | 'error'> = {};
       const agencyErrorsMap: Record<string, string> = {};
 
@@ -301,7 +321,7 @@ export const FtpUploaderView: React.FC<FtpUploaderViewProps> = ({
       });
 
       newItems.push({
-        id: `job_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        id: `job_${Date.now()}_${Math.random().toString(36).substring(2, 8)}_${i}`,
         file,
         filename: file.name,
         fileSize: file.size,
@@ -315,7 +335,34 @@ export const FtpUploaderView: React.FC<FtpUploaderViewProps> = ({
     }
 
     setUploadQueue(prev => [...prev, ...newItems]);
+    return newItems;
   };
+
+  const [triggerAutoStart, setTriggerAutoStart] = useState(false);
+
+  // Auto Pilot / External queue loader: strictly embeds only media files (no CSV)
+  useEffect(() => {
+    if (initialQueueFiles && initialQueueFiles.length > 0) {
+      const validMediaFiles = initialQueueFiles.filter(f => !f.name.toLowerCase().endsWith('.csv'));
+      if (validMediaFiles.length > 0) {
+        if (propTargetAgencies && propTargetAgencies.length > 0) {
+          setSelectedAgenciesForUpload(propTargetAgencies);
+        }
+        handleFilesAdded(validMediaFiles, propTargetAgencies);
+        if (autoStart) {
+          setTriggerAutoStart(true);
+        }
+      }
+      onClearInitialQueue?.();
+    }
+  }, [initialQueueFiles]);
+
+  useEffect(() => {
+    if (triggerAutoStart && uploadQueue.length > 0 && !isUploading) {
+      setTriggerAutoStart(false);
+      startUploadQueue();
+    }
+  }, [triggerAutoStart, uploadQueue, isUploading]);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -394,6 +441,14 @@ export const FtpUploaderView: React.FC<FtpUploaderViewProps> = ({
         try {
           const formData = new FormData();
           formData.append('file', job.file);
+          formData.append('accountConfig', JSON.stringify({
+            host: account.host,
+            port: account.port,
+            protocol: account.protocol,
+            username: account.username,
+            password: account.password,
+            remoteDir: account.remoteDir || '/'
+          }));
           formData.append('host', account.host);
           formData.append('port', String(account.port));
           formData.append('protocol', account.protocol);

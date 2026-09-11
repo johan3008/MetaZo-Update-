@@ -3348,13 +3348,32 @@ app.get('/api/debug-uploads', (req, res) => {
                 return res.status(400).json({ success: false, error: 'No file uploaded.' });
             }
 
+            const originalFilename = uploadedFile.originalname || path.basename(uploadedFile.path);
+            if (originalFilename.toLowerCase().endsWith('.csv')) {
+                if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
+                return res.status(400).json({ success: false, error: 'Microstock FTP strictly accepts embedded media files (images, vectors, videos), not CSV files.' });
+            }
+
             const accountConfigRaw = req.body.accountConfig;
-            if (!accountConfigRaw) {
+            let accountConfig: any = null;
+            if (accountConfigRaw) {
+                accountConfig = typeof accountConfigRaw === 'string' ? JSON.parse(accountConfigRaw) : accountConfigRaw;
+            } else if (req.body.host && req.body.username && req.body.password) {
+                accountConfig = {
+                    host: req.body.host,
+                    port: req.body.port,
+                    protocol: req.body.protocol,
+                    username: req.body.username,
+                    password: req.body.password,
+                    remoteDir: req.body.remoteDir
+                };
+            }
+
+            if (!accountConfig) {
                 if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
                 return res.status(400).json({ success: false, error: 'Target FTP account configuration is missing.' });
             }
 
-            const accountConfig = typeof accountConfigRaw === 'string' ? JSON.parse(accountConfigRaw) : accountConfigRaw;
             const { host, port, protocol, username, password, remoteDir } = accountConfig;
 
             if (!host || !username || !password) {

@@ -10,9 +10,10 @@ export const ImageCheckView: React.FC<{
   setShowLimitModal?: (show: boolean) => void;
   setShowActivationModal?: (show: boolean) => void;
   onSendToMetadataGen?: (files: File[]) => void;
+  autoPilotConfig?: any;
   user?: any;
   db?: any;
-}> = ({ t, aiOptions, isLicensed, dailyGenCount, incrementDailyCount, setShowLimitModal, setShowActivationModal, onSendToMetadataGen, user, db }) => {
+}> = ({ t, aiOptions, isLicensed, dailyGenCount, incrementDailyCount, setShowLimitModal, setShowActivationModal, onSendToMetadataGen, autoPilotConfig, user, db }) => {
   return (
     <div className="w-full">
       <ImageQualityCheck 
@@ -24,6 +25,7 @@ export const ImageCheckView: React.FC<{
         setShowLimitModal={setShowLimitModal}
         setShowActivationModal={setShowActivationModal}
         onSendToMetadataGen={onSendToMetadataGen}
+        autoPilotConfig={autoPilotConfig}
         user={user}
         db={db}
       />

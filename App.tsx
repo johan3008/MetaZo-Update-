@@ -1397,8 +1397,13 @@ const App: React.FC = () => {
     }
     return DEFAULT_AUTOPILOT_CONFIG;
   });
+  const autoPilotConfigRef = useRef<AutoPilotConfig>(autoPilotConfig);
+  useEffect(() => {
+    autoPilotConfigRef.current = autoPilotConfig;
+  }, [autoPilotConfig]);
 
   const handleSaveAutoPilotConfig = (newConfig: AutoPilotConfig) => {
+    autoPilotConfigRef.current = newConfig;
     setAutoPilotConfig(newConfig);
     try {
       localStorage.setItem('mz_autopilot_config', JSON.stringify(newConfig));
@@ -2242,9 +2247,12 @@ const App: React.FC = () => {
     activeToolRef.current = tool;
     setActiveTool(tool);
     const path = toolToPath[tool] || '/Dashboard';
-    const isIframe = typeof window !== 'undefined' && window.self !== window.top;
-    if (!isIframe && window.location.pathname !== path) {
-      window.history.pushState(null, '', path);
+    try {
+      if (typeof window !== 'undefined' && window.location.pathname !== path) {
+        window.history.pushState(null, '', path);
+      }
+    } catch (e) {
+      // Ignore security errors in restricted iframes
     }
     
     // Interactive: Scroll to top smoothly when changing tabs
@@ -2271,20 +2279,16 @@ const App: React.FC = () => {
           localStorage.setItem('mz_redirect_after_login', currentPath);
         }
         if (!isIframe) {
-          window.history.replaceState(null, '', '/Login');
+          try { window.history.replaceState(null, '', '/Login'); } catch (e) {}
         }
       }
     } else {
       if (currentPath === '/Login' || currentPath === '/' || currentPath === '' || currentPath === '/app' || currentPath === '/landing' || currentPath === '/landing.html') {
         localStorage.removeItem('mz_redirect_after_login');
+        activeToolRef.current = ToolType.DASHBOARD;
         setActiveTool(ToolType.DASHBOARD);
         if (!isIframe) {
-          window.history.replaceState(null, '', '/Dashboard');
-        }
-      } else {
-        const tool = getToolFromPath(currentPath);
-        if (tool && tool !== activeTool) {
-          setActiveTool(tool);
+          try { window.history.replaceState(null, '', '/Dashboard'); } catch (e) {}
         }
       }
     }
@@ -2292,17 +2296,19 @@ const App: React.FC = () => {
     const handlePopState = () => {
       if (!user) {
         if (!isIframe && window.location.pathname !== '/Login') {
-          window.history.replaceState(null, '', '/Login');
+          try { window.history.replaceState(null, '', '/Login'); } catch (e) {}
         }
         return;
       }
       const tool = getToolFromPath(window.location.pathname);
       if (tool) {
+        activeToolRef.current = tool;
         setActiveTool(tool);
       } else {
+        activeToolRef.current = ToolType.DASHBOARD;
         setActiveTool(ToolType.DASHBOARD);
         if (!isIframe && window.location.pathname !== '/Dashboard') {
-          window.history.replaceState(null, '', '/Dashboard');
+          try { window.history.replaceState(null, '', '/Dashboard'); } catch (e) {}
         }
       }
     };
@@ -2311,7 +2317,7 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [activeTool, user, isCheckingAuth]);
+  }, [user, isCheckingAuth]);
 
   useEffect(() => {
     
@@ -3058,6 +3064,7 @@ const App: React.FC = () => {
   const [embedDownloading, setEmbedDownloading] = useState(false);
   const [embedNamingMode, setEmbedNamingMode] = useState<'matching_csv' | 'seo_title'>('matching_csv');
   const [embedProgress, setEmbedProgress] = useState<{ current: number; total: number } | null>(null);
+  const [ftpInitialFiles, setFtpInitialFiles] = useState<{ files: File[]; autoStart: boolean; targetAgencies?: string[] } | null>(null);
 
   const handleSelectAllPlatforms = (enableAll: boolean) => {
     setExportAdobe(enableAll);
@@ -3158,10 +3165,10 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-      if (triggerAutoDownload > 0 && autoDownloadCSVRef.current) {
+      if (triggerAutoDownload > 0 && autoDownloadCSVRef.current && !autoPilotConfig.enabled) {
           handleExport();
       }
-  }, [triggerAutoDownload]);
+  }, [triggerAutoDownload, autoPilotConfig.enabled]);
 
   useEffect(() => {
     try {
@@ -3955,7 +3962,8 @@ const App: React.FC = () => {
     }
 
     // Initial check to see if there's anything to do at all
-    const currentFilesForCheck = getFilesForTool(filesRef.current, activeTool);
+    const currentTool = activeToolRef.current || activeTool;
+    const currentFilesForCheck = getFilesForTool(filesRef.current, currentTool);
     const initialPending = isRetry 
         ? currentFilesForCheck.filter(f => f.error) 
         : currentFilesForCheck.filter(f => !f.title && !f.error);
@@ -3986,7 +3994,8 @@ const App: React.FC = () => {
 
         try {
             while (!stopGenerationRef.current) {
-                const currentFiles = getFilesForTool(filesRef.current, activeTool);
+                const activeLoopTool = activeToolRef.current || activeTool;
+                const currentFiles = getFilesForTool(filesRef.current, activeLoopTool);
                 
                 // What needs processing?
                 const pending = isRetry
@@ -4008,8 +4017,8 @@ const App: React.FC = () => {
 
             // Reduce batch size to avoid hitting aggressive 429 TPM/RPM quota limits
             let maxBatch = 5;
-            if (activeTool === ToolType.VIDEO) maxBatch = 2;
-            else if (activeTool === ToolType.VECTOR) maxBatch = 3;
+            if (activeLoopTool === ToolType.VIDEO) maxBatch = 2;
+            else if (activeLoopTool === ToolType.VECTOR) maxBatch = 3;
             
             const chunkSize = generationMode === GenerationMode.BATCH ? maxBatch : 1;
             const chunk = ready.slice(0, chunkSize);
@@ -4034,7 +4043,7 @@ const App: React.FC = () => {
             }
             
             // Update progress info
-            const latestFiles = getFilesForTool(filesRef.current, activeTool);
+            const latestFiles = getFilesForTool(filesRef.current, activeLoopTool);
             const totalToProcess = isRetry 
                 ? latestFiles.filter(f => f.error).length + processedInThisRun
                 : latestFiles.filter(f => !f.title && !f.error).length + processedInThisRun;
@@ -4047,30 +4056,75 @@ const App: React.FC = () => {
         }
 
         if (!stopGenerationRef.current && processedInThisRun > 0) {
-            setTriggerAutoDownload(Date.now());
+            // Trigger auto download CSV legacy hanya jika BUKAN Auto Pilot
+            if (!autoPilotConfig.enabled) {
+              setTriggerAutoDownload(Date.now());
+            }
 
-            // 🚀 AUTO PILOT GEN: Jika aktif, eksekusi pipeline tahap akhir (FTP Upload atau Auto-Download Embedded Files & CSV)
+            // 🚀 AUTO PILOT GEN: Jika aktif, eksekusi pipeline tahap akhir (FTP Upload atau Auto-Download File Embedded, TANPA CSV)
             if (autoPilotConfig.enabled) {
               setTimeout(async () => {
-                console.log('[Auto Pilot Gen] Batch metadata finished. Executing finale pipeline...');
+                console.log('[Auto Pilot Gen] Batch metadata finished. Executing finale pipeline (Embedded media files only, NO CSV)...');
+                const latestFiles = filesRef.current;
+                const tool = activeToolRef.current || activeTool;
+                const completed = getFilesForTool(latestFiles, tool).filter(f => (f.title || f.description) && f.file);
+
+                if (completed.length === 0) {
+                  console.warn('[Auto Pilot Gen] No completed files with metadata to process.');
+                  return;
+                }
+
                 if (autoPilotConfig.enableFtp) {
-                  // Arahkan ke FTP Uploader agar pengguna melihat progres unggah ke agensi terpilih
-                  handleSetActiveTool(ToolType.FTP_UPLOADER);
-                } else {
-                  // Unduh otomatis file embedded dan CSV
+                  // Arahkan ke FTP Uploader: embed metadata ke file media terlebih dahulu (BUKAN CSV), lalu kirim ke antrian FTP
                   try {
-                    console.log('[Auto Pilot Gen] Auto-downloading embedded files & multi-platform CSV...');
-                    const latestFiles = filesRef.current;
-                    const tool = activeToolRef.current || activeTool;
-                    const completed = getFilesForTool(latestFiles, tool).filter(f => (f.title || f.description) && f.file);
-                    if (completed.length > 0) {
-                      await handleDownloadEmbedded(latestFiles);
-                      handleExport(latestFiles);
-                    } else {
-                      console.warn('[Auto Pilot Gen] No completed files with metadata to download yet.');
+                    console.log(`[Auto Pilot Gen] Embedding metadata into ${completed.length} file(s) for FTP upload...`);
+                    setEmbedDownloading(true);
+                    setEmbedProgress({ current: 0, total: completed.length });
+
+                    const embeddedFiles: File[] = [];
+                    for (let i = 0; i < completed.length; i++) {
+                      setEmbedProgress({ current: i + 1, total: completed.length });
+                      const item = completed[i];
+                      if (!item) continue;
+                      const res = await getEmbeddedBlobForItem(item, embedNamingMode);
+                      if (res && res.blob) {
+                        // Pastikan BUKAN CSV, microstock FTP hanya menerima file gambar, vektor, atau video
+                        if (!res.exportName.toLowerCase().endsWith('.csv')) {
+                          const embeddedFile = new File([res.blob], res.exportName, {
+                            type: res.blob.type || item.file?.type || 'application/octet-stream',
+                            lastModified: Date.now()
+                          });
+                          embeddedFiles.push(embeddedFile);
+                        }
+                      }
                     }
+                    setEmbedDownloading(false);
+                    setEmbedProgress(null);
+
+                    if (embeddedFiles.length > 0) {
+                      console.log(`[Auto Pilot Gen] Successfully prepared ${embeddedFiles.length} embedded media file(s). Forwarding to FTP Uploader...`);
+                      setFtpInitialFiles({
+                        files: embeddedFiles,
+                        autoStart: true,
+                        targetAgencies: autoPilotConfig.targetAgencies
+                      });
+                      handleSetActiveTool(ToolType.FTP_UPLOADER);
+                    } else {
+                      console.warn('[Auto Pilot Gen] No valid embedded files generated for FTP.');
+                    }
+                  } catch (ftpErr) {
+                    console.error('[Auto Pilot Gen] Error preparing embedded files for FTP:', ftpErr);
+                    setEmbedDownloading(false);
+                    setEmbedProgress(null);
+                  }
+                } else {
+                  // Unduh otomatis HANYA file embedded (BUKAN CSV)
+                  try {
+                    console.log('[Auto Pilot Gen] Auto-downloading embedded files (JPG/PNG/EPS/SVG/MP4)...');
+                    await handleDownloadEmbedded(latestFiles);
+                    // CATATAN: handleExport() TIDAK dipanggil karena Auto Pilot hanya mengunduh file embedded, bukan CSV.
                   } catch (dlErr) {
-                    console.warn('[Auto Pilot Gen] Auto-download error:', dlErr);
+                    console.warn('[Auto Pilot Gen] Auto-download embedded error:', dlErr);
                   }
                 }
               }, 1500);
@@ -5211,17 +5265,28 @@ const App: React.FC = () => {
               incrementDailyCount={(amount = 1) => incrementDailyCount(ToolType.PROMPT_IMAGE_CHECK, amount)}
               setShowLimitModal={setShowLimitModal}
               setShowActivationModal={setShowActivationModal}
+              autoPilotConfig={autoPilotConfig}
               onSendToMetadataGen={(passedFiles) => {
                 if (passedFiles && passedFiles.length > 0) {
-                  handleFileChange({ target: { files: passedFiles } });
+                  // Pindah ke modul MetadataGen Gambar terlebih dahulu
                   handleSetActiveTool(ToolType.IMAGE);
+                  handleFileChange({ target: { files: passedFiles } });
                   
-                  // Jika Auto Pilot Gen aktif, langsung jalankan pembuatan metadata secara otomatis
-                  if (autoPilotConfig.enabled) {
+                  // Periksa status Auto Pilot dari Ref atau localStorage
+                  let isApActive = autoPilotConfigRef.current?.enabled;
+                  if (!isApActive) {
+                    try {
+                      const raw = localStorage.getItem('mz_autopilot_config');
+                      if (raw) isApActive = JSON.parse(raw).enabled;
+                    } catch (e) {}
+                  }
+
+                  // Jika Auto Pilot aktif, langsung jalankan pembuatan metadata secara otomatis
+                  if (isApActive) {
                     setTimeout(() => {
                       console.log('[Auto Pilot Gen] Auto-triggering handleGenerateAll for incoming files...');
                       handleGenerateAll(false);
-                    }, 1200);
+                    }, 1000);
                   }
                 }
               }}
@@ -5318,6 +5383,10 @@ const App: React.FC = () => {
               onNavigateToMetadata={() => handleSetActiveTool(ToolType.IMAGE)}
               uiLanguage={uiLanguage}
               setShowActivationModal={setShowActivationModal}
+              initialQueueFiles={ftpInitialFiles?.files}
+              autoStart={ftpInitialFiles?.autoStart}
+              targetAgencies={ftpInitialFiles?.targetAgencies}
+              onClearInitialQueue={() => setFtpInitialFiles(null)}
             />
           ) : (
             <>

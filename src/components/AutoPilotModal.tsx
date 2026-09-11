@@ -16,7 +16,7 @@ export interface AutoPilotConfig {
   aiModelSource: string;
   qcMinScore: number; // 70 - 95 (Passing threshold for QC)
   autoForwardQC: boolean; // false: stay on QC tab, true: auto-forward to MetadataGen after countdown
-  enableFtp: boolean; // true: upload to FTP, false: auto download embedded & CSV
+  enableFtp: boolean; // true: upload to FTP, false: auto download embedded media files (no CSV)
   targetAgencies: string[]; // ['adobestock', 'shutterstock', 'freepik']
 }
 
@@ -30,7 +30,7 @@ export const DEFAULT_AUTOPILOT_CONFIG: AutoPilotConfig = {
   isGenerativeAI: true,
   aiModelSource: 'Midjourney',
   qcMinScore: 75,
-  autoForwardQC: false,
+  autoForwardQC: true,
   enableFtp: false,
   targetAgencies: ['adobestock', 'shutterstock', 'freepik']
 };
@@ -66,7 +66,10 @@ export const AutoPilotModal: React.FC<AutoPilotModalProps> = ({
   if (!isOpen) return null;
 
   const handleSave = () => {
-    const configToSave = !isLicensed ? { ...localConfig, enabled: false } : localConfig;
+    let configToSave = !isLicensed ? { ...localConfig, enabled: false } : localConfig;
+    if (configToSave.enabled && (configToSave.autoForwardQC === undefined || configToSave.autoForwardQC === null)) {
+      configToSave = { ...configToSave, autoForwardQC: true };
+    }
     onSaveConfig(configToSave);
     setSavedToast(true);
     setTimeout(() => {
@@ -421,8 +424,8 @@ export const AutoPilotModal: React.FC<AutoPilotModalProps> = ({
                     </div>
                     <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-medium mt-1 leading-relaxed">
                       {isIndo 
-                        ? 'Jika NONAKTIF (Rekomendasi), Anda tetap di Tab Quality Issues untuk meninjau audit & detail skor. Anda dapat klik "Kirim Semua Lolos ke MetadataGen" secara manual.' 
-                        : 'If DISABLED (Recommended), you remain on Quality Issues to inspect audit details. You can still manually click "Send Passed to MetadataGen".'}
+                        ? 'Jika AKTIF (Rekomendasi), setelah seluruh antrean selesai diaudit, file yang berstatus Lolos akan otomatis dialihkan ke Tab MetadataGen.' 
+                        : 'If ENABLED (Recommended), once all queue items finish audit, passed files automatically transfer to MetadataGen tab.'}
                     </p>
                   </div>
 
@@ -460,8 +463,8 @@ export const AutoPilotModal: React.FC<AutoPilotModalProps> = ({
                     </p>
                     <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
                       {isIndo 
-                        ? 'Matikan jika FTP Adobe Stock Anda belum aktif (sistem akan mengunduh ZIP embedded & CSV otomatis)'
-                        : 'Disable if your Adobe Stock SFTP is not yet unlocked (system will auto-download embedded ZIP & CSV instead)'}
+                        ? 'Matikan jika FTP agensi Anda belum siap (sistem akan mengunduh file media yang sudah di-embed IPTC/XMP tanpa CSV)'
+                        : 'Disable if your agency FTP is not configured (system will auto-download embedded media files with IPTC/XMP metadata, no CSV)'}
                     </p>
                   </div>
 
@@ -514,8 +517,8 @@ export const AutoPilotModal: React.FC<AutoPilotModalProps> = ({
                   <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
                     <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
                       💡 {isIndo 
-                        ? 'Mode Unduhan: Setelah AI menyelesaikan pembuatan metadata dan embedding, file siap upload beserta file CSV multi-agensi akan otomatis terunduh ke perangkat Anda.'
-                        : 'Download Mode: Once AI completes metadata generation and embedding, files and multi-agency CSVs will auto-download directly to your computer.'}
+                        ? 'Mode Unduhan: Setelah AI selesai membuat metadata dan embedding, file dengan metadata ter-embed (JPG/PNG/EPS/SVG/MP4) akan otomatis terunduh ke perangkat Anda (tanpa file CSV).'
+                        : 'Download Mode: Once AI completes metadata generation and embedding, files with embedded metadata (JPG/PNG/EPS/SVG/MP4) will auto-download directly to your computer (no CSV files).'}
                     </p>
                   </div>
                 )}

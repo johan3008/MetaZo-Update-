@@ -106,17 +106,19 @@ export const ImageQualityCheck: React.FC<{
   setShowLimitModal?: (show: boolean) => void;
   setShowActivationModal?: (show: boolean) => void;
   onSendToMetadataGen?: (files: File[]) => void;
+  autoPilotConfig?: any;
   user?: any;
   db?: any;
 }> = ({ 
   t, 
-  aiOptions,
-  isLicensed = false,
-  dailyGenCount = 0,
-  incrementDailyCount,
-  setShowLimitModal,
-  setShowActivationModal,
+  aiOptions, 
+  isLicensed = false, 
+  dailyGenCount = 0, 
+  incrementDailyCount, 
+  setShowLimitModal, 
+  setShowActivationModal, 
   onSendToMetadataGen,
+  autoPilotConfig,
   user,
   db
 }) => {
@@ -618,8 +620,8 @@ export const ImageQualityCheck: React.FC<{
 
   // 📋 Memproses Antrean Secara Berurutan Satu Per Satu (Sequential Queue)
   const processQueue = async (itemsList?: QCQueueItem[]) => {
-    const currentList = itemsList || queueRef.current;
-    const pendingItems = currentList.filter(it => it.status === 'pending' || it.status === 'error');
+    let workingQueue = itemsList ? [...itemsList] : [...queueRef.current];
+    const pendingItems = workingQueue.filter(it => it.status === 'pending' || it.status === 'error');
     if (pendingItems.length === 0) return;
 
     if (!isLicensed && dailyGenCount + pendingItems.length > getDailyLimit()) {
@@ -638,71 +640,81 @@ export const ImageQualityCheck: React.FC<{
       const targetItem = pendingItems[i];
       setCurrentProcessingId(targetItem.id);
 
-      setQueue(prev => prev.map(it => it.id === targetItem.id ? {
+      workingQueue = workingQueue.map(it => it.id === targetItem.id ? {
         ...it,
         status: 'processing',
         error: null,
         currentStep: 'Memulai audit...'
-      } : it));
+      } : it);
+      queueRef.current = workingQueue;
+      setQueue(workingQueue);
 
       try {
         const updateStep = (stepText: string) => {
-          setQueue(prev => prev.map(it => it.id === targetItem.id ? { ...it, currentStep: stepText } : it));
+          workingQueue = workingQueue.map(it => it.id === targetItem.id ? { ...it, currentStep: stepText } : it);
+          queueRef.current = workingQueue;
+          setQueue(workingQueue);
         };
 
         const report = await analyzeSingleFile(targetItem, updateStep);
 
         if (isStoppingRef.current) break;
 
-        setQueue(prev => prev.map(it => it.id === targetItem.id ? {
+        workingQueue = workingQueue.map(it => it.id === targetItem.id ? {
           ...it,
           status: 'done',
           report,
           error: null,
           currentStep: undefined
-        } : it));
+        } : it);
+        queueRef.current = workingQueue;
+        setQueue(workingQueue);
 
         if (incrementDailyCount) {
           incrementDailyCount(1);
         }
       } catch (err: any) {
         console.error(`QC Error for ${targetItem.name}:`, err);
-        setQueue(prev => prev.map(it => it.id === targetItem.id ? {
+        workingQueue = workingQueue.map(it => it.id === targetItem.id ? {
           ...it,
           status: 'error',
           error: err.message || 'Gagal memproses audit gambar.',
           currentStep: undefined
-        } : it));
+        } : it);
+        queueRef.current = workingQueue;
+        setQueue(workingQueue);
       }
     }
 
     setCurrentProcessingId(null);
     setIsProcessing(false);
 
-    // 🚀 AUTO PILOT GEN: Hanya teruskan jika aktif, akun PRO (isLicensed), autoForwardQC diaktifkan, dan SELURUH antrean telah selesai diproses!
-    try {
-      const savedAp = localStorage.getItem('mz_autopilot_config');
-      if (isLicensed && savedAp && onSendToMetadataGen && !isStoppingRef.current) {
-        // Validasi: Pastikan SEMUA file di antrean sudah selesai diproses (tidak ada yang pending atau processing)
-        const currentQueue = queueRef.current;
-        const totalItems = currentQueue.length;
-        const hasUnfinished = currentQueue.some(it => it.status === 'pending' || it.status === 'processing');
+    // 🚀 AUTO PILOT GEN: Hanya teruskan jika aktif dan seluruh antrean selesai diproses!
+    if (!isStoppingRef.current && onSendToMetadataGen) {
+      try {
+        let activeApConfig = autoPilotConfig;
+        if (!activeApConfig) {
+          const savedAp = localStorage.getItem('mz_autopilot_config');
+          if (savedAp) activeApConfig = JSON.parse(savedAp);
+        }
 
-        if (totalItems > 0 && !hasUnfinished) {
-          const apConfig = JSON.parse(savedAp);
-          // Default autoForwardQC adalah FALSE agar pengguna tetap bisa melihat hasil audit di Tab Quality Issues
-          if (apConfig && apConfig.enabled && apConfig.autoForwardQC) {
-            const minScore = typeof apConfig.qcMinScore === 'number' ? apConfig.qcMinScore : 75;
-            const passedItems = currentQueue.filter(it => 
-              it.status === 'done' && 
-              it.report && 
-              (it.report.recommendation === 'PASS' || (typeof it.report.overall_score === 'number' && it.report.overall_score >= minScore))
-            );
-            if (passedItems.length > 0) {
-              console.log(`[Auto Pilot Gen] All ${totalItems} items finished. autoForwardQC active. Starting 5s countdown for ${passedItems.length} passed files...`);
-              const filesToForward = passedItems.map(it => it.file);
-              cancelAutoPilotForward();
-              let remaining = 5;
+        // Jika Auto Pilot diaktifkan, otomatis alihkan ke MetadataGen
+        if (activeApConfig && activeApConfig.enabled) {
+          const minScore = typeof activeApConfig.qcMinScore === 'number' ? activeApConfig.qcMinScore : 75;
+          const passedItems = workingQueue.filter(it => {
+            if (it.status !== 'done' || !it.report) return false;
+            const rec = (it.report.recommendation || '').toString().trim().toUpperCase();
+            const score = Number(it.report.overall_score);
+            return rec === 'PASS' || (!isNaN(score) && score >= minScore);
+          });
+
+          if (passedItems.length > 0) {
+            console.log(`[Auto Pilot Gen] All ${workingQueue.length} items finished. Auto-forwarding ${passedItems.length} passed file(s) to MetadataGen...`);
+            const filesToForward = passedItems.map(it => it.file);
+            cancelAutoPilotForward();
+
+            if (activeApConfig.autoForwardQC !== false) {
+              let remaining = 3;
               setAutoPilotForwardCountdown({ seconds: remaining, files: filesToForward });
 
               autoPilotTimerRef.current = setInterval(() => {
@@ -719,14 +731,13 @@ export const ImageQualityCheck: React.FC<{
                 }
               }, 1000);
             }
-          } else if (apConfig && apConfig.enabled && !apConfig.autoForwardQC) {
-            // Tetap di Tab Quality Issues! Pengguna dapat meninjau hasil audit secara leluasa.
-            console.log('[Auto Pilot Gen] All items finished, autoForwardQC is disabled (default). Staying on Quality Issues tab.');
+          } else {
+            console.warn('[Auto Pilot Gen] All items finished QC, but no items passed the score threshold.');
           }
         }
+      } catch (apErr) {
+        console.warn('[Auto Pilot Gen] QC auto-forward error:', apErr);
       }
-    } catch (apErr) {
-      console.warn('[Auto Pilot Gen] QC auto-forward error:', apErr);
     }
   };
 
@@ -791,6 +802,7 @@ export const ImageQualityCheck: React.FC<{
     }
 
     const updatedQueue = [...queueRef.current, ...newItems];
+    queueRef.current = updatedQueue;
     setQueue(updatedQueue);
 
     // Otomatis mulai memproses antrean baru secara satu per satu
@@ -1244,7 +1256,13 @@ export const ImageQualityCheck: React.FC<{
                   {passCount > 0 && onSendToMetadataGen && (
                     <button
                       onClick={() => {
-                        const passedFiles = queue.filter(q => q.status === 'done' && q.report?.recommendation === 'PASS').map(q => q.file);
+                        const minScore = autoPilotConfig?.qcMinScore || 75;
+                        const passedFiles = queue.filter(q => {
+                          if (q.status !== 'done' || !q.report) return false;
+                          const rec = (q.report.recommendation || '').toString().trim().toUpperCase();
+                          const score = Number(q.report.overall_score);
+                          return rec === 'PASS' || (!isNaN(score) && score >= minScore);
+                        }).map(q => q.file);
                         if (passedFiles.length > 0) {
                           onSendToMetadataGen(passedFiles);
                         }
