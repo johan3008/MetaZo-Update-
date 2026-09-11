@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Search, Sun, Moon, Info, Heart, ShieldAlert, Settings, Globe, LogOut, Plus } from 'lucide-react';
+import { Menu, Search, Sun, Moon, Info, Heart, ShieldAlert, Settings, Globe, LogOut, Plus, Zap, Lock } from 'lucide-react';
 import { AppLanguage } from '@/constants';
 
 interface TopbarProps {
@@ -11,6 +11,8 @@ interface TopbarProps {
   setSidebarOpen: (o: boolean) => void;
   setShowInfoModal: (s: boolean) => void;
   setShowSettingsModal: (s: boolean) => void;
+  setShowAutoPilotModal?: (s: boolean) => void;
+  autoPilotEnabled?: boolean;
   t: any;
   setShowActivation?: (show: boolean) => void;
   isLicensed?: boolean;
@@ -32,6 +34,8 @@ export const Topbar: React.FC<TopbarProps> = ({
   setSidebarOpen,
   setShowInfoModal,
   setShowSettingsModal,
+  setShowAutoPilotModal,
+  autoPilotEnabled = false,
   t,
   setShowActivation,
   isLicensed,
@@ -319,6 +323,35 @@ export const Topbar: React.FC<TopbarProps> = ({
                   >
                     <Settings size={14} className="text-slate-400" />
                     <span>{t.topbar_settings_api || (uiLanguage === 'id' ? 'Kunci API & Akses' : 'API License Keys')}</span>
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      if (setShowAutoPilotModal) setShowAutoPilotModal(true);
+                      setMenuOpen(false);
+                    }}
+                    className="w-full px-4 py-1.5 text-left hover:bg-amber-500/10 dark:hover:bg-amber-500/15 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors group"
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <Zap size={14} className="text-amber-500 fill-amber-500/20 group-hover:scale-110 transition-transform" />
+                      <span className="font-extrabold text-amber-600 dark:text-amber-400">Auto Pilot Gen</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      {!isLicensed ? (
+                        <span className="text-[8.5px] px-1.5 py-0.5 font-black rounded-md tracking-wider uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center gap-0.5">
+                          <Lock size={9} /> PRO
+                        </span>
+                      ) : (
+                        <span className={`text-[8.5px] px-1.5 py-0.5 font-black rounded-md tracking-wider uppercase ${
+                          autoPilotEnabled 
+                            ? 'bg-amber-500 text-white animate-pulse' 
+                            : 'bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400'
+                        }`}>
+                          {autoPilotEnabled ? 'ON' : 'OFF'}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 </div>
 

@@ -228,9 +228,10 @@ ${suppCatItems}
       </photoshop:SupplementalCategories>` : ''}
       <photoshop:Credit>${escapeXml(creator)}</photoshop:Credit>
       <photoshop:Source>${escapeXml(metadata.aiModelSource ? `${metadata.aiModelSource} via MetaZo` : 'MetaZo AI Assistant')}</photoshop:Source>
-      ${metadata.isGenerativeAI ? `<Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType>` : ''}
-      ${metadata.isGenerativeAI && metadata.fictionalPeopleProperty ? `<plus:ModelReleaseStatus>http://ns.useplus.org/ldf/vocab/MR-NON</plus:ModelReleaseStatus>
-      <plus:PropertyReleaseStatus>http://ns.useplus.org/ldf/vocab/PR-NON</plus:PropertyReleaseStatus>` : ''}
+      ${metadata.isGenerativeAI ? `<Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType>
+      <Iptc4xmpCore:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpCore:DigitalSourceType>
+      <plus:ModelReleaseStatus>${metadata.fictionalPeopleProperty ? 'http://ns.useplus.org/ldf/vocab/MR-NON' : 'http://ns.useplus.org/ldf/vocab/MR-NAP'}</plus:ModelReleaseStatus>
+      <plus:PropertyReleaseStatus>${metadata.fictionalPeopleProperty ? 'http://ns.useplus.org/ldf/vocab/PR-NON' : 'http://ns.useplus.org/ldf/vocab/PR-NAP'}</plus:PropertyReleaseStatus>` : ''}
       <xmp:CreateDate>${escapeXml(isoDate)}</xmp:CreateDate>
       <xmp:ModifyDate>${escapeXml(isoDate)}</xmp:ModifyDate>
       <xmp:MetadataDate>${escapeXml(isoDate)}</xmp:MetadataDate>

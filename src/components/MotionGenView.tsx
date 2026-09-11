@@ -162,7 +162,7 @@ interface MotionGenViewProps {
     aiOptions?: ServiceOptions;
 }
 
-const FREE_DAILY_LIMIT = 25;
+const FREE_DAILY_LIMIT = 50;
 
 export function MotionGenView({
     isLicensed = false,

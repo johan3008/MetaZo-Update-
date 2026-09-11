@@ -652,6 +652,30 @@ export const ImageQualityCheck: React.FC<{
 
     setCurrentProcessingId(null);
     setIsProcessing(false);
+
+    // 🚀 AUTO PILOT GEN: Jika aktif & akun PRO (isLicensed), periksa apakah ada file lolos (PASS) dan teruskan langsung ke MetadataGen
+    try {
+      const savedAp = localStorage.getItem('mz_autopilot_config');
+      if (isLicensed && savedAp && onSendToMetadataGen && !isStoppingRef.current) {
+        const apConfig = JSON.parse(savedAp);
+        if (apConfig && apConfig.enabled) {
+          const minScore = typeof apConfig.qcMinScore === 'number' ? apConfig.qcMinScore : 75;
+          const passedItems = queueRef.current.filter(it => 
+            it.status === 'done' && 
+            it.report && 
+            (it.report.recommendation === 'PASS' || (typeof it.report.overallScore === 'number' && it.report.overallScore >= minScore))
+          );
+          if (passedItems.length > 0) {
+            console.log(`[Auto Pilot Gen] Forwarding ${passedItems.length} passed files to MetadataGen...`);
+            setTimeout(() => {
+              onSendToMetadataGen(passedItems.map(it => it.file));
+            }, 300);
+          }
+        }
+      }
+    } catch (apErr) {
+      console.warn('[Auto Pilot Gen] QC auto-forward error:', apErr);
+    }
   };
 
   const handleStopQueue = () => {

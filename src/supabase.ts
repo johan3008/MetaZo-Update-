@@ -261,11 +261,12 @@ export async function signInWithTokens(accessToken: string, refreshToken: string
 export async function signInWithPopup(authInstance: any, provider: any): Promise<{ user: User }> {
   if (supabase) {
     try {
-      // Use standard redirect instead of popup to avoid popup blockers and cross-origin issues on Vercel
+      // Redirect to /app so user enters the application directly after Google OAuth callback
+      const appRedirectUrl = window.location.origin + '/app';
       await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: appRedirectUrl,
         }
       });
       
