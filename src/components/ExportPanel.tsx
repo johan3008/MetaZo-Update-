@@ -366,7 +366,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
 
           {handleDownloadEmbedded && (
             <button
-              onClick={handleDownloadEmbedded}
+              onClick={() => handleDownloadEmbedded()}
               disabled={!canDownload || embedDownloading}
               className={`px-5 py-3 text-xs font-black uppercase tracking-wider rounded-[1.5rem] transition-all flex items-center justify-center gap-2 cursor-pointer shadow active:scale-[0.98] ${
                 canDownload && !embedDownloading 
@@ -388,7 +388,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           )}
 
           <button
-            onClick={handleExport}
+            onClick={() => handleExport()}
             disabled={!canDownload}
             className={`px-6 py-3 text-xs font-black uppercase tracking-wider rounded-[1.5rem] text-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow active:scale-[0.98] ${
               canDownload 

@@ -1050,12 +1050,13 @@ const toSentenceCase = (text: string) => {
 };
 
 const getFilesForTool = (allFiles: FileItem[], tool: ToolType) => {
+  if (!Array.isArray(allFiles)) return [];
   const allowedImageExts = ['jpg', 'jpeg', 'png', 'webp'];
   const allowedVideoExts = ['mp4', 'mov', 'webm'];
   const allowedVectorExts = ['svg', 'eps', 'ai'];
 
   return allFiles.filter(f => {
-    if (!f.file || !f.file.name) return false;
+    if (!f || !f.file || !f.file.name) return false;
     const ext = f.file.name.split('.').pop()?.toLowerCase() || '';
     if (tool === ToolType.IMAGE) return allowedImageExts.includes(ext);
     if (tool === ToolType.VIDEO) return allowedVideoExts.includes(ext);
@@ -4410,9 +4411,9 @@ const App: React.FC = () => {
       return `${originalName}.${origExt}`;
   };
 
-  const handleExport = (explicitFiles?: FileItem[]) => {
+  const handleExport = (explicitFiles?: FileItem[] | any) => {
     const currentTool = activeToolRef.current || activeTool;
-    const currentFiles = explicitFiles || filesRef.current;
+    const currentFiles = Array.isArray(explicitFiles) ? explicitFiles : filesRef.current;
     const toolFiles = getFilesForTool(currentFiles, currentTool);
     if (!toolFiles.length) return;
 
@@ -4652,7 +4653,7 @@ const App: React.FC = () => {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    setTimeout(() => URL.revokeObjectURL(url), 40000);
   };
 
   const getEmbeddedBlobForItem = async (
@@ -4664,7 +4665,9 @@ const App: React.FC = () => {
     const description = item.description?.trim() || title;
     const subject = title;
     const comment = description;
-    const keywords = item.keywords || [];
+    const keywords = Array.isArray(item.keywords) 
+      ? item.keywords 
+      : (typeof item.keywords === 'string' ? (item.keywords as string).split(',').map(k => k.trim()).filter(Boolean) : []);
 
     // Determine Date Taken: prioritize exifMetadata DateTimeOriginal, then CreateDate, then file.lastModified, then new Date()
     let dateTaken: Date | string | undefined = undefined;
@@ -4692,6 +4695,9 @@ const App: React.FC = () => {
       exportName = `${cleanName}.${origExt}`;
     } else {
       exportName = getExportFilename(item.customFileName || item.file.name, item.file);
+    }
+    if (!exportName || !exportName.trim()) {
+      exportName = item.file.name;
     }
 
     const isVideo = ['mp4', 'mov', 'webm', 'm4v', 'avi'].includes(origExt);
@@ -4864,19 +4870,23 @@ const App: React.FC = () => {
 
   const handleDownloadSingleEmbedded = async (fileItem: FileItem) => {
     try {
+      setEmbedDownloading(true);
       await downloadSingleEmbeddedFile(fileItem, embedNamingMode);
     } catch (err) {
       console.error('[Download Single Embedded] Error:', err);
+    } finally {
+      setEmbedDownloading(false);
     }
   };
 
-  const handleDownloadEmbedded = async (explicitFiles?: FileItem[]) => {
+  const handleDownloadEmbedded = async (explicitFiles?: FileItem[] | any) => {
     const currentTool = activeToolRef.current || activeTool;
-    const currentFiles = explicitFiles || filesRef.current;
+    const isExplicitArray = Array.isArray(explicitFiles);
+    const currentFiles = isExplicitArray ? explicitFiles : filesRef.current;
     const toolFiles = getFilesForTool(currentFiles, currentTool);
     const completedFiles = toolFiles.filter(f => (f.title || f.description) && f.file);
     if (completedFiles.length === 0) {
-      if (!explicitFiles) {
+      if (!isExplicitArray) {
         alert(uiLanguage === 'id' ? 'Belum ada file dengan metadata selesai untuk diunduh.' : 'No completed files with metadata to embed.');
       }
       return;
