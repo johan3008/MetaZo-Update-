@@ -158,12 +158,20 @@
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+            transition: all 0.3s ease;
         }
         .dark .glass-nav {
             background: rgba(9, 13, 22, 0.85);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+        .glass-nav.scrolled {
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+        }
+        .dark .glass-nav.scrolled {
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+            border-bottom-color: rgba(124, 58, 237, 0.15);
         }
 
         .grid-pattern {
@@ -195,6 +203,16 @@
             background: rgba(124, 58, 237, 0.6);
         }
 
+        /* Touch-friendly horizontal scrollbar hiding */
+        .touch-scroll {
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .touch-scroll::-webkit-scrollbar {
+            display: none;
+        }
+
         .gradient-border-glow {
             position: relative;
         }
@@ -210,6 +228,154 @@
             mask-composite: exclude;
             pointer-events: none;
         }
+
+        /* ==================================================
+           1. LOGO SQUIRCLE STYLING (MATCHING LOGIN SCREEN)
+           ================================================== */
+        .mz-logo-squircle {
+            border-radius: 1.25rem;
+            background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #224abe 100%);
+            box-shadow: 0 8px 20px -4px rgba(124, 58, 237, 0.35);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+            position: relative;
+        }
+        .mz-logo-squircle:hover {
+            transform: scale(1.1) rotate(6deg);
+            box-shadow: 0 12px 28px -4px rgba(124, 58, 237, 0.55), 0 0 15px rgba(99, 102, 241, 0.35);
+        }
+        .mz-logo-squircle:active {
+            transform: scale(0.95);
+        }
+
+        /* ==================================================
+           2. METAZOPRO ANIMATED TEXT & BOUNCING CHARACTERS
+           ================================================== */
+        @keyframes text-shimmer {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .metazo-pro-gradient {
+            background: linear-gradient(135deg, #7c3aed 0%, #6366f1 25%, #ec4899 50%, #3b82f6 75%, #7c3aed 100%);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: text-shimmer 6s ease infinite;
+        }
+
+        .char-bounce {
+            display: inline-block;
+            transform-origin: bottom center;
+            transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.15s ease;
+            cursor: pointer;
+            user-select: none;
+        }
+        .char-bounce:hover {
+            transform: translateY(-5px) scale(1.22);
+            color: #7c3aed;
+        }
+        .dark .char-bounce:hover {
+            color: #a78bfa;
+            text-shadow: 0 0 12px rgba(167, 139, 250, 0.6);
+        }
+
+        @keyframes wave-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+        .animate-wave-bounce {
+            animation: wave-bounce 2s ease-in-out infinite;
+        }
+
+        /* ==================================================
+           3. SCROLL PROGRESS BAR & FLOATING BACK TO TOP
+           ================================================== */
+        #scrollProgressBar {
+            height: 3px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 100;
+            background: linear-gradient(90deg, #7c3aed, #6366f1, #ec4899, #3b82f6);
+            width: 0%;
+            transition: width 0.1s cubic-bezier(0.1, 0.8, 0.2, 1);
+            box-shadow: 0 0 10px rgba(124, 58, 237, 0.6);
+        }
+
+        #backToTopBtn {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(16px) scale(0.9);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #backToTopBtn.show {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0) scale(1);
+        }
+
+        /* ==================================================
+           4. SCROLL-TRIGGERED REVEAL ANIMATIONS
+           ================================================== */
+        .reveal-on-scroll {
+            opacity: 0;
+            transform: translateY(28px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: opacity, transform;
+        }
+        .reveal-on-scroll.revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .reveal-left {
+            opacity: 0;
+            transform: translateX(-36px);
+            transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: opacity, transform;
+        }
+        .reveal-left.revealed {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .reveal-right {
+            opacity: 0;
+            transform: translateX(36px);
+            transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: opacity, transform;
+        }
+        .reveal-right.revealed {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .reveal-scale {
+            opacity: 0;
+            transform: scale(0.93);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: opacity, transform;
+        }
+        .reveal-scale.revealed {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Stagger delays */
+        .stagger-1 { transition-delay: 0.08s; }
+        .stagger-2 { transition-delay: 0.16s; }
+        .stagger-3 { transition-delay: 0.24s; }
+        .stagger-4 { transition-delay: 0.32s; }
+        .stagger-5 { transition-delay: 0.40s; }
+        .stagger-6 { transition-delay: 0.48s; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .reveal-on-scroll, .reveal-left, .reveal-right, .reveal-scale {
+                opacity: 1 !important;
+                transform: none !important;
+                transition: none !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 dark:bg-[#090d16] dark:text-slate-100 transition-colors duration-300 relative selection:bg-brand-600 selection:text-white">
@@ -223,19 +389,31 @@
     </div>
 
     <!-- Top Floating Navbar -->
-    <header class="fixed top-0 left-0 right-0 z-50 glass-nav transition-all duration-300">
+    <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 glass-nav transition-all duration-300">
+        <!-- Top Scroll Progress Bar -->
+        <div id="scrollProgressBar" style="width: 0%;"></div>
+
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-18 flex items-center justify-between">
-            <!-- Brand Logo -->
-            <a href="#" class="flex items-center gap-2.5 group">
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center p-0.5 shadow-md shadow-brand-600/25 group-hover:scale-105 transition-transform">
-                    <img src="/src/assets/images/mz_pro_logo_1780923659277.png" alt="MetaZo Logo" class="w-full h-full object-contain rounded-lg" onerror="this.src='/favicon.ico'; this.onerror=null;">
+            <!-- Brand Logo matching LoginScreen -->
+            <a href="#" class="flex items-center gap-3 group select-none">
+                <div class="mz-logo-squircle w-9.5 h-9.5 sm:w-10 sm:h-10 rounded-[1.25rem] p-[2px] flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/80 dark:border-slate-800">
+                    <img src="/src/assets/images/mz_pro_logo_1780923659277.png" alt="MetaZo PRO Logo" class="w-full h-full object-cover scale-[1.05] rounded-[1.15rem] transition-transform duration-500 group-hover:scale-115" onerror="this.src='/favicon.ico'; this.onerror=null;">
                 </div>
                 <div class="flex flex-col">
                     <div class="flex items-center gap-1.5">
-                        <span class="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
-                            METAZO <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-500">PRO</span>
-                        </span>
-                        <span class="px-1.5 py-0.2 text-[8px] font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-300 border border-brand-500/20 rounded-full">v1.3</span>
+                        <div class="animated-brand-name flex items-center font-black tracking-tight text-slate-900 dark:text-white leading-none text-base sm:text-lg uppercase">
+                            <span class="char-bounce">M</span>
+                            <span class="char-bounce">e</span>
+                            <span class="char-bounce">t</span>
+                            <span class="char-bounce">a</span>
+                            <span class="char-bounce">Z</span>
+                            <span class="char-bounce">o</span>
+                            <span class="inline-block w-1"></span>
+                            <span class="char-bounce metazo-pro-gradient font-black">P</span>
+                            <span class="char-bounce metazo-pro-gradient font-black">R</span>
+                            <span class="char-bounce metazo-pro-gradient font-black">O</span>
+                        </div>
+                        <span class="px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-300 border border-brand-500/20 rounded-full">v1.3</span>
                     </div>
                     <span class="text-[9px] font-semibold text-slate-400 dark:text-slate-400 tracking-wider">AI Microstock Suite</span>
                 </div>
@@ -255,47 +433,102 @@
             </nav>
 
             <!-- Action Controls -->
-            <div class="flex items-center gap-2.5">
+            <div class="flex items-center gap-2 sm:gap-2.5">
+                <!-- UI Language Selector -->
+                <button id="langToggleBtn" aria-label="Ganti Bahasa / Switch Language" title="Ganti Bahasa (ID / EN)" class="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:text-brand-600 dark:hover:text-brand-400 hover:border-brand-500/30 transition-all cursor-pointer shadow-sm min-h-[40px] flex items-center gap-1.5 text-xs font-black select-none">
+                    <svg class="w-4 h-4 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                    </svg>
+                    <span id="currentLangLabel" class="uppercase font-black tracking-wider text-[11px]">ID</span>
+                </button>
+
                 <!-- Theme Toggle -->
-                <button id="themeToggleBtn" aria-label="Toggle Theme" class="p-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 hover:border-brand-500/30 transition-all cursor-pointer">
+                <button id="themeToggleBtn" aria-label="Toggle Theme" class="p-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 hover:border-brand-500/30 transition-all cursor-pointer shadow-sm min-w-[40px] min-h-[40px] flex items-center justify-center">
                     <!-- Sun Icon (shown in dark mode) -->
-                    <svg id="sunIcon" class="w-3.5 h-3.5 hidden dark:block text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg id="sunIcon" class="w-4 h-4 hidden dark:block text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
                     <!-- Moon Icon (shown in light mode) -->
-                    <svg id="moonIcon" class="w-3.5 h-3.5 block dark:hidden text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg id="moonIcon" class="w-4 h-4 block dark:hidden text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                     </svg>
                 </button>
 
-                <!-- CTA Button -->
-                <a href="/app" class="relative inline-flex items-center justify-center px-4 py-2 rounded-xl font-bold text-[11px] tracking-wider uppercase text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-md shadow-brand-600/25 hover:shadow-brand-600/40 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                <!-- CTA Button Desktop & Tablet -->
+                <a href="/app" class="relative inline-flex items-center justify-center px-4 py-2.5 rounded-xl font-bold text-[11.5px] tracking-wider uppercase text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-md shadow-brand-600/25 hover:shadow-brand-600/40 hover:scale-[1.02] active:scale-[0.98] transition-all min-h-[40px]">
                     <span>Buka Web App</span>
-                    <svg class="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="w-3.5 h-3.5 ml-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                     </svg>
                 </a>
 
                 <!-- Mobile menu button -->
-                <button id="mobileMenuBtn" aria-label="Open Menu" class="md:hidden p-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <button id="mobileMenuBtn" aria-label="Toggle Mobile Navigation" class="md:hidden p-2 rounded-xl border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center cursor-pointer">
+                    <svg id="menuIconBars" class="w-5 h-5 block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    <svg id="menuIconClose" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
             </div>
         </div>
 
-        <!-- Mobile dropdown menu -->
-        <div id="mobileMenu" class="hidden md:hidden px-6 pt-2 pb-6 glass-card border-b border-slate-200 dark:border-white/10 space-y-3">
-            <a href="#fitur" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Fitur Unggulan</a>
-            <a href="#simulasi" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Live Demo & Simulasi</a>
-            <a href="#komparasi" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Perbandingan</a>
-            <a href="#ulasan" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Ulasan Komunitas (<span id="mobileRatingBadge">5.0★</span>)</a>
-            <a href="#harga" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">Harga Lisensi</a>
-            <a href="#faq" class="block py-2 text-sm font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600">FAQ</a>
-            <div class="pt-2">
-                <a href="/app" class="block w-full py-3 text-center rounded-xl font-black text-xs uppercase tracking-wider text-white bg-brand-600">
-                    Masuk ke Web Application
+        <!-- Mobile dropdown menu with Glassmorphism & Animations -->
+        <div id="mobileMenu" class="hidden md:hidden px-5 pt-3 pb-6 glass-card border-b border-slate-200 dark:border-white/10 shadow-2xl transition-all duration-300">
+            <nav class="space-y-1 text-sm font-bold text-slate-700 dark:text-slate-200">
+                <a href="#fitur" class="mobile-nav-link flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-brand-500/10 hover:text-brand-600 transition-colors">
+                    <span class="flex items-center gap-2.5">
+                        <span class="text-base">⚡</span> Fitur Unggulan
+                    </span>
+                    <span class="text-xs text-slate-400">›</span>
+                </a>
+                <a href="#simulasi" class="mobile-nav-link flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-brand-500/10 hover:text-brand-600 transition-colors">
+                    <span class="flex items-center gap-2.5">
+                        <span class="text-base">🎯</span> Live Demo & Simulasi
+                    </span>
+                    <span class="text-xs text-slate-400">›</span>
+                </a>
+                <a href="#komparasi" class="mobile-nav-link flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-brand-500/10 hover:text-brand-600 transition-colors">
+                    <span class="flex items-center gap-2.5">
+                        <span class="text-base">⚖️</span> Perbandingan
+                    </span>
+                    <span class="text-xs text-slate-400">›</span>
+                </a>
+                <a href="#ulasan" class="mobile-nav-link flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-brand-500/10 hover:text-brand-600 transition-colors">
+                    <span class="flex items-center gap-2.5">
+                        <span class="text-base">⭐</span> Ulasan Komunitas
+                    </span>
+                    <span id="mobileRatingBadge" class="px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-500/15 text-amber-600 dark:text-amber-400">5.0★</span>
+                </a>
+                <a href="#harga" class="mobile-nav-link flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-brand-500/10 hover:text-brand-600 transition-colors">
+                    <span class="flex items-center gap-2.5">
+                        <span class="text-base">💎</span> Harga Lisensi
+                    </span>
+                    <span class="text-xs text-slate-400">›</span>
+                </a>
+                <a href="#faq" class="mobile-nav-link flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-brand-500/10 hover:text-brand-600 transition-colors">
+                    <span class="flex items-center gap-2.5">
+                        <span class="text-base">❓</span> Pertanyaan Umum (FAQ)
+                    </span>
+                    <span class="text-xs text-slate-400">›</span>
+                </a>
+
+                <!-- Mobile Language Selector -->
+                <button id="mobileLangToggleBtn" type="button" class="w-full flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-brand-500/10 hover:text-brand-600 transition-colors text-left font-bold text-slate-700 dark:text-slate-200">
+                    <span class="flex items-center gap-2.5">
+                        <span class="text-base">🌐</span> <span id="mobileLangText">Bahasa: Indonesia (ID)</span>
+                    </span>
+                    <span id="mobileLangBadge" class="px-2 py-0.5 rounded-md text-[10px] font-black bg-brand-500/15 text-brand-600 dark:text-brand-400 uppercase">Ganti ke EN</span>
+                </button>
+            </nav>
+
+            <div class="pt-4 mt-2 border-t border-slate-200/80 dark:border-white/10 space-y-2">
+                <a href="/app" class="flex items-center justify-center gap-2 w-full py-3.5 text-center rounded-xl font-black text-xs uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 shadow-lg shadow-brand-600/30 active:scale-98 transition-all">
+                    <span>Masuk ke Web Application</span>
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
                 </a>
             </div>
         </div>
@@ -306,38 +539,41 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             
             <!-- Announcement Badge -->
-            <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full glass-card border border-brand-500/30 text-slate-800 dark:text-slate-200 text-[11px] font-bold mb-6 shadow-sm">
+            <div class="reveal-on-scroll inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-card border border-brand-500/30 text-slate-800 dark:text-slate-200 text-[11px] sm:text-xs font-bold mb-6 shadow-sm">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
                 <span class="text-brand-600 dark:text-brand-300 font-extrabold uppercase tracking-wider">Terobosan Terbaru</span>
                 <span class="text-slate-300 dark:text-slate-600">|</span>
-                <span>AI Vision Engine untuk Microstock Contributor</span>
+                <span class="text-slate-600 dark:text-slate-300">AI Vision Engine untuk Microstock Contributor</span>
             </div>
 
-            <!-- Main Heading -->
-            <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-black tracking-tight text-slate-900 dark:text-white leading-[1.18] max-w-4xl mx-auto">
+            <!-- Main Heading with Dynamic Gradient & Reveal -->
+            <h1 class="reveal-on-scroll stagger-1 text-2.5xl sm:text-4xl md:text-5xl lg:text-[54px] font-black tracking-tight text-slate-900 dark:text-white leading-[1.18] max-w-4xl mx-auto">
                 Revolusi Workflow Microstock: 
-                <span class="block mt-1.5 text-transparent bg-clip-text bg-gradient-to-r from-brand-600 via-indigo-500 to-pink-500">
+                <span class="block mt-1 sm:mt-2 text-transparent bg-clip-text metazo-pro-gradient font-black">
                     Metadata Akurat & Ribuan Penjualan
                 </span>
                 dengan Kekuatan AI
             </h1>
 
-            <!-- Subheading -->
-            <p class="mt-5 text-xs sm:text-sm md:text-[14.5px] text-slate-600 dark:text-slate-300 font-medium max-w-2xl mx-auto leading-relaxed">
+            <!-- Subheading with Interactive Animated Brand Mention -->
+            <p class="reveal-on-scroll stagger-2 mt-4 sm:mt-5 text-xs sm:text-sm md:text-[14.5px] text-slate-600 dark:text-slate-300 font-medium max-w-2xl mx-auto leading-relaxed">
                 Tinggalkan riset judul manual dan 50 keyword yang membosankan. 
-                <span class="text-brand-600 dark:text-brand-400 font-bold">MetaZo PRO</span> 
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-brand-500/10 dark:bg-brand-500/20 border border-brand-500/25 font-black text-brand-600 dark:text-brand-300 shadow-sm hover:scale-105 transition-all cursor-pointer">
+                    <span class="metazo-pro-gradient font-black">MetaZo PRO</span>
+                    <span class="text-xs">✨</span>
+                </span> 
                 menganalisis foto, vektor, dan klip video Anda secara presisi untuk menembus algoritma pencarian Adobe Stock, Shutterstock, Freepik, Vecteezy, dan Canva.
             </p>
 
             <!-- Hero Action Buttons -->
-            <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
-                <a href="/app" class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-extrabold text-xs uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2">
+            <div class="reveal-on-scroll stagger-3 mt-7 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-3.5">
+                <a href="/app" class="w-full sm:w-auto px-6 py-3.5 sm:py-4 rounded-xl font-extrabold text-xs uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 min-h-[44px]">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     <span>Mulai Pakai Gratis (Trial)</span>
                 </a>
-                <a href="#simulasi" class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-xs tracking-wide text-slate-700 dark:text-slate-200 glass-card hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all flex items-center justify-center gap-2">
+                <a href="#simulasi" class="w-full sm:w-auto px-6 py-3.5 sm:py-4 rounded-xl font-bold text-xs tracking-wide text-slate-700 dark:text-slate-200 glass-card hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all flex items-center justify-center gap-2 min-h-[44px]">
                     <svg class="w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -346,48 +582,48 @@
                 </a>
             </div>
 
-            <!-- Social Proof Numbers -->
-            <div class="mt-10 pt-6 border-t border-slate-200/80 dark:border-white/5 grid grid-cols-2 md:grid-cols-4 gap-5 max-w-3xl mx-auto">
-                <div class="flex flex-col items-center">
-                    <span class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">50 Keywords</span>
-                    <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Ranking Relevansi SEO</span>
+            <!-- Social Proof Numbers with Counters & Mobile Grid Styling -->
+            <div class="reveal-on-scroll stagger-4 mt-10 pt-6 border-t border-slate-200/80 dark:border-white/5 grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-5 max-w-3xl mx-auto">
+                <div class="flex flex-col items-center p-3 sm:p-0 rounded-2xl sm:rounded-none bg-white/40 dark:bg-slate-900/30 sm:bg-transparent border border-slate-200/60 sm:border-0 dark:border-white/5">
+                    <span class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white" data-counter="50" data-suffix=" Keywords">50 Keywords</span>
+                    <span class="text-[10.5px] sm:text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 text-center">Ranking Relevansi SEO</span>
                 </div>
-                <div class="flex flex-col items-center">
+                <div class="flex flex-col items-center p-3 sm:p-0 rounded-2xl sm:rounded-none bg-white/40 dark:bg-slate-900/30 sm:bg-transparent border border-slate-200/60 sm:border-0 dark:border-white/5">
                     <span class="text-xl sm:text-2xl font-black text-brand-600 dark:text-brand-400">&lt; 5 Detik</span>
-                    <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Generasi Per Aset</span>
+                    <span class="text-[10.5px] sm:text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 text-center">Generasi Per Aset</span>
                 </div>
-                <div class="flex flex-col items-center">
+                <div class="flex flex-col items-center p-3 sm:p-0 rounded-2xl sm:rounded-none bg-white/40 dark:bg-slate-900/30 sm:bg-transparent border border-slate-200/60 sm:border-0 dark:border-white/5">
                     <span class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">100% Compliant</span>
-                    <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Format CSV Siap Upload</span>
+                    <span class="text-[10.5px] sm:text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 text-center">Format CSV Siap Upload</span>
                 </div>
-                <div class="flex flex-col items-center">
-                    <span class="text-xl sm:text-2xl font-black text-emerald-500">1,500+</span>
-                    <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Kontributor Aktif</span>
+                <div class="flex flex-col items-center p-3 sm:p-0 rounded-2xl sm:rounded-none bg-white/40 dark:bg-slate-900/30 sm:bg-transparent border border-slate-200/60 sm:border-0 dark:border-white/5">
+                    <span class="text-xl sm:text-2xl font-black text-emerald-500" data-counter="1500" data-suffix="+">1,500+</span>
+                    <span class="text-[10.5px] sm:text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 text-center">Kontributor Aktif</span>
                 </div>
             </div>
 
-            <!-- Supported Agencies Logos Strip -->
-            <div class="mt-16">
-                <p class="text-[11px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-6">
+            <!-- Supported Agencies Logos Strip (Swipeable on Mobile) -->
+            <div class="reveal-on-scroll stagger-5 mt-14 sm:mt-16">
+                <p class="text-[10.5px] sm:text-[11px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-4 sm:mb-6">
                     Mendukung Format Resmi & Sesuai Aturan Algoritma:
                 </p>
-                <div class="flex flex-wrap items-center justify-center gap-3 sm:gap-6 opacity-85">
-                    <div class="px-4 py-2 rounded-xl glass-card text-xs font-black tracking-wide text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <div class="flex items-center gap-2 sm:gap-3 overflow-x-auto touch-scroll sm:flex-wrap sm:justify-center pb-2 px-1">
+                    <div class="px-3.5 py-2 rounded-xl glass-card text-xs font-black tracking-wide text-slate-800 dark:text-slate-200 flex items-center gap-2 shrink-0 shadow-sm">
                         <span class="w-2 h-2 rounded-full bg-red-500"></span> Adobe Stock
                     </div>
-                    <div class="px-4 py-2 rounded-xl glass-card text-xs font-black tracking-wide text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <div class="px-3.5 py-2 rounded-xl glass-card text-xs font-black tracking-wide text-slate-800 dark:text-slate-200 flex items-center gap-2 shrink-0 shadow-sm">
                         <span class="w-2 h-2 rounded-full bg-rose-600"></span> Shutterstock
                     </div>
-                    <div class="px-4 py-2 rounded-xl glass-card text-xs font-black tracking-wide text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <div class="px-3.5 py-2 rounded-xl glass-card text-xs font-black tracking-wide text-slate-800 dark:text-slate-200 flex items-center gap-2 shrink-0 shadow-sm">
                         <span class="w-2 h-2 rounded-full bg-blue-500"></span> Freepik
                     </div>
-                    <div class="px-4 py-2 rounded-xl glass-card text-xs font-black tracking-wide text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <div class="px-3.5 py-2 rounded-xl glass-card text-xs font-black tracking-wide text-slate-800 dark:text-slate-200 flex items-center gap-2 shrink-0 shadow-sm">
                         <span class="w-2 h-2 rounded-full bg-orange-500"></span> Vecteezy
                     </div>
-                    <div class="px-4 py-2 rounded-xl glass-card text-xs font-black tracking-wide text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <div class="px-3.5 py-2 rounded-xl glass-card text-xs font-black tracking-wide text-slate-800 dark:text-slate-200 flex items-center gap-2 shrink-0 shadow-sm">
                         <span class="w-2 h-2 rounded-full bg-teal-400"></span> Canva
                     </div>
-                    <div class="px-4 py-2 rounded-xl glass-card text-xs font-black tracking-wide text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <div class="px-3.5 py-2 rounded-xl glass-card text-xs font-black tracking-wide text-slate-800 dark:text-slate-200 flex items-center gap-2 shrink-0 shadow-sm">
                         <span class="w-2 h-2 rounded-full bg-purple-500"></span> Midjourney / AI Art
                     </div>
                 </div>
@@ -398,7 +634,7 @@
     <!-- INTERACTIVE SIMULATOR / LIVE DEMO -->
     <section id="simulasi" class="py-16 md:py-20 relative z-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-2xl mx-auto mb-10">
+            <div class="reveal-on-scroll text-center max-w-2xl mx-auto mb-10">
                 <span class="px-3 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
                     Live Demo & Simulasi
                 </span>
@@ -411,19 +647,19 @@
             </div>
 
             <!-- Demo Container Box -->
-            <div class="glass-card gradient-border-glow rounded-3xl p-5 sm:p-7 lg:p-9 shadow-2xl">
-                <!-- Preset Switcher Tabs -->
-                <div class="flex flex-wrap items-center justify-center gap-2 pb-6 border-b border-slate-200 dark:border-white/10">
-                    <button onclick="switchDemoPreset('beach')" id="btn-beach" class="demo-tab-btn px-3.5 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all bg-brand-600 text-white shadow-md">
+            <div class="reveal-on-scroll stagger-1 glass-card gradient-border-glow rounded-3xl p-5 sm:p-7 lg:p-9 shadow-2xl">
+                <!-- Preset Switcher Tabs (Swipeable on Mobile) -->
+                <div class="flex items-center gap-2 pb-5 border-b border-slate-200 dark:border-white/10 overflow-x-auto touch-scroll sm:flex-wrap sm:justify-center px-1">
+                    <button onclick="switchDemoPreset('beach')" id="btn-beach" class="demo-tab-btn shrink-0 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all bg-brand-600 text-white shadow-md min-h-[40px]">
                         📸 Foto Sunset Tropis
                     </button>
-                    <button onclick="switchDemoPreset('robot')" id="btn-robot" class="demo-tab-btn px-3.5 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500">
+                    <button onclick="switchDemoPreset('robot')" id="btn-robot" class="demo-tab-btn shrink-0 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500 min-h-[40px]">
                         🤖 AI Generative Cyberpunk
                     </button>
-                    <button onclick="switchDemoPreset('vector')" id="btn-vector" class="demo-tab-btn px-3.5 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500">
+                    <button onclick="switchDemoPreset('vector')" id="btn-vector" class="demo-tab-btn shrink-0 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500 min-h-[40px]">
                         🎨 Vektor Infografis Bisnis
                     </button>
-                    <button onclick="switchDemoPreset('drone')" id="btn-drone" class="demo-tab-btn px-3.5 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500">
+                    <button onclick="switchDemoPreset('drone')" id="btn-drone" class="demo-tab-btn shrink-0 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-brand-500 min-h-[40px]">
                         🎥 Video Aerial 4K Drone
                     </button>
                 </div>
@@ -475,7 +711,7 @@
                                 <label class="text-[11px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                                     <span class="w-2 h-2 rounded-full bg-brand-500"></span> Commercial Stock Title
                                 </label>
-                                <button onclick="copyDemoField('demoTitleText', this)" class="text-[10px] font-black uppercase text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1">
+                                <button onclick="copyDemoField('demoTitleText', this)" class="text-[10px] font-black uppercase text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 cursor-pointer">
                                     Salin Judul
                                 </button>
                             </div>
@@ -490,7 +726,7 @@
                                 <label class="text-[11px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                                     <span class="w-2 h-2 rounded-full bg-indigo-500"></span> Detailed Stock Description
                                 </label>
-                                <button onclick="copyDemoField('demoDescText', this)" class="text-[10px] font-black uppercase text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1">
+                                <button onclick="copyDemoField('demoDescText', this)" class="text-[10px] font-black uppercase text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 cursor-pointer">
                                     Salin Deskripsi
                                 </button>
                             </div>
@@ -505,7 +741,7 @@
                                 <label class="text-[11px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 50 Ranked Keywords (Urut Sesuai Relevansi)
                                 </label>
-                                <button onclick="copyDemoKeywords(this)" class="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
+                                <button onclick="copyDemoKeywords(this)" class="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer">
                                     Salin 50 Keywords (Koma)
                                 </button>
                             </div>
@@ -524,7 +760,7 @@
                                 <span>Format 100% Cocok untuk Adobe Stock, Canva & Shutterstock CSV</span>
                             </div>
 
-                            <button onclick="downloadSampleCsv()" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-brand-600 dark:text-brand-300 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/20 transition-all flex items-center gap-1.5 cursor-pointer">
+                            <button onclick="downloadSampleCsv()" class="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-brand-600 dark:text-brand-300 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/20 transition-all flex items-center gap-1.5 cursor-pointer min-h-[38px]">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                 </svg>
@@ -540,7 +776,7 @@
     <!-- BEFORE VS AFTER (COMPARISON) -->
     <section id="komparasi" class="py-16 md:py-20 relative z-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-2xl mx-auto mb-12">
+            <div class="reveal-on-scroll text-center max-w-2xl mx-auto mb-12">
                 <span class="px-3 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-widest bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
                     Bandingkan Efisiensi
                 </span>
@@ -554,7 +790,7 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-7 max-w-4xl mx-auto">
                 <!-- The Old Way (Kuno / Manual) -->
-                <div class="p-6 sm:p-7 rounded-3xl glass-card border border-rose-500/20 dark:border-rose-500/20 relative overflow-hidden">
+                <div class="reveal-left p-6 sm:p-7 rounded-3xl glass-card border border-rose-500/20 dark:border-rose-500/20 relative overflow-hidden">
                     <div class="absolute top-0 right-0 px-3.5 py-1 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[9.5px] font-black uppercase tracking-widest rounded-bl-2xl">
                         Cara Manual (Melelahkan)
                     </div>
@@ -596,7 +832,7 @@
                 </div>
 
                 <!-- The MetaZo PRO Way -->
-                <div class="p-6 sm:p-7 rounded-3xl glass-card gradient-border-glow shadow-xl relative overflow-hidden bg-brand-900/5">
+                <div class="reveal-right p-6 sm:p-7 rounded-3xl glass-card gradient-border-glow shadow-xl relative overflow-hidden bg-brand-900/5">
                     <div class="absolute top-0 right-0 px-3.5 py-1 bg-brand-600 text-white text-[9.5px] font-black uppercase tracking-widest rounded-bl-2xl">
                         Solusi Cerdas (MetaZo PRO)
                     </div>
@@ -643,7 +879,7 @@
     <!-- CORE FEATURES GRID -->
     <section id="fitur" class="py-16 md:py-20 relative z-10 bg-slate-100/50 dark:bg-black/20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-2xl mx-auto mb-12">
+            <div class="reveal-on-scroll text-center max-w-2xl mx-auto mb-12">
                 <span class="px-3 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-widest bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
                     Fitur Lengkap
                 </span>
@@ -656,8 +892,39 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <!-- FLAGSHIP FEATURE: Auto Pilot Gen (Unggulan Kontributor) -->
+                <div class="reveal-on-scroll stagger-1 p-6 sm:p-7 rounded-3xl glass-card border-2 border-amber-500/50 hover:border-amber-400 bg-gradient-to-b from-amber-500/10 via-transparent to-orange-500/5 hover:-translate-y-1.5 transition-all group flex flex-col justify-between shadow-lg shadow-amber-500/10 hover:shadow-2xl hover:shadow-amber-500/25 relative overflow-hidden">
+                    <div class="absolute -top-10 -right-10 w-28 h-28 bg-gradient-to-br from-amber-400/20 to-orange-500/20 rounded-full blur-xl pointer-events-none group-hover:scale-150 transition-transform"></div>
+                    <div>
+                        <div class="flex items-center justify-between mb-5">
+                            <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform">
+                                <svg class="w-6 h-6 fill-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            </div>
+                            <span class="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm animate-pulse">
+                                ⚡ FITUR PALING UNGGUL
+                            </span>
+                        </div>
+                        <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                            <span>Auto Pilot Gen</span>
+                            <span class="text-[10px] text-amber-500 font-extrabold tracking-widest uppercase">AUTO PIPELINE</span>
+                        </h3>
+                        <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                            Otomatisasi total 1-Klik tanpa repot! File otomatis diinspeksi lolos QC &rarr; diarahkan ke AI Metadata (SEO title & 50 keywords) &rarr; di-embed lossless &rarr; langsung didistribusikan via FTP/SFTP ke Adobe Stock, Shutterstock, & Freepik atau auto-download seketika.
+                        </p>
+                    </div>
+                    <div class="mt-5 pt-3 border-t border-amber-500/20 flex items-center justify-between">
+                        <span class="text-[9.5px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                            QC ➔ METADATA ➔ FTP OTOMATIS
+                        </span>
+                        <span class="text-[9px] font-black px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">10x Lebih Cepat</span>
+                    </div>
+                </div>
+
                 <!-- Feature 1: AI Vision Image Metadata -->
-                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-brand-500/40 transition-all group flex flex-col justify-between">
+                <div class="reveal-on-scroll stagger-1 p-6 sm:p-7 rounded-3xl glass-card hover:border-brand-500/40 hover:-translate-y-1 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
                     <div>
                         <div class="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -673,7 +940,7 @@
                 </div>
 
                 <!-- Feature 2: Video Keyword & Frame Analyzer -->
-                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-indigo-500/40 transition-all group flex flex-col justify-between">
+                <div class="reveal-on-scroll stagger-2 p-6 sm:p-7 rounded-3xl glass-card hover:border-indigo-500/40 hover:-translate-y-1 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
                     <div>
                         <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -689,7 +956,7 @@
                 </div>
 
                 <!-- Feature 3: Vector EPS & SVG Engine -->
-                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-violet-500/40 transition-all group flex flex-col justify-between">
+                <div class="reveal-on-scroll stagger-3 p-6 sm:p-7 rounded-3xl glass-card hover:border-violet-500/40 hover:-translate-y-1 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
                     <div>
                         <div class="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -705,7 +972,7 @@
                 </div>
 
                 <!-- Feature 4: Pre-Flight AI Quality & Rejection Check -->
-                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-rose-500/40 transition-all group flex flex-col justify-between">
+                <div class="reveal-on-scroll stagger-1 p-6 sm:p-7 rounded-3xl glass-card hover:border-rose-500/40 hover:-translate-y-1 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
                     <div>
                         <div class="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -721,7 +988,7 @@
                 </div>
 
                 <!-- Feature 5: Direct In-File IPTC/XMP/EXIF Embed -->
-                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-fuchsia-500/40 transition-all group flex flex-col justify-between">
+                <div class="reveal-on-scroll stagger-2 p-6 sm:p-7 rounded-3xl glass-card hover:border-fuchsia-500/40 hover:-translate-y-1 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
                     <div>
                         <div class="w-10 h-10 rounded-xl bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -737,7 +1004,7 @@
                 </div>
 
                 <!-- Feature 6: 1-Click Multi-Agency CSV Export -->
-                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-amber-500/40 transition-all group flex flex-col justify-between">
+                <div class="reveal-on-scroll stagger-3 p-6 sm:p-7 rounded-3xl glass-card hover:border-amber-500/40 hover:-translate-y-1 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
                     <div>
                         <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -753,7 +1020,7 @@
                 </div>
 
                 <!-- Feature 7: Microstock Niche & Seasonal Calendar -->
-                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-emerald-500/40 transition-all group flex flex-col justify-between">
+                <div class="reveal-on-scroll stagger-1 p-6 sm:p-7 rounded-3xl glass-card hover:border-emerald-500/40 hover:-translate-y-1 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
                     <div>
                         <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -769,7 +1036,7 @@
                 </div>
 
                 <!-- Feature 8: Anti-Spam & Media Utilities -->
-                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-cyan-500/40 transition-all group flex flex-col justify-between">
+                <div class="reveal-on-scroll stagger-2 p-6 sm:p-7 rounded-3xl glass-card hover:border-cyan-500/40 hover:-translate-y-1 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
                     <div>
                         <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -785,7 +1052,7 @@
                 </div>
 
                 <!-- Feature 9: Multi-Engine AI & Server Master Key -->
-                <div class="p-6 sm:p-7 rounded-3xl glass-card hover:border-amber-500/40 transition-all group flex flex-col justify-between">
+                <div class="reveal-on-scroll stagger-3 p-6 sm:p-7 rounded-3xl glass-card hover:border-amber-500/40 hover:-translate-y-1 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
                     <div>
                         <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -806,7 +1073,7 @@
     <!-- PRICING & LICENSING SECTION -->
     <section id="harga" class="py-16 md:py-20 relative z-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-2xl mx-auto mb-12">
+            <div class="reveal-on-scroll text-center max-w-2xl mx-auto mb-12">
                 <span class="px-3 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
                     Investasi Terjangkau
                 </span>
@@ -831,10 +1098,10 @@
 
                 <!-- Currency Switcher Toggle -->
                 <div class="inline-flex items-center gap-1.5 p-1 rounded-2xl glass-card border border-slate-200 dark:border-white/10 mt-6">
-                    <button onclick="setCurrency('IDR')" id="currBtnIdr" class="px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-brand-600 text-white shadow-sm transition-all">
+                    <button onclick="setCurrency('IDR')" id="currBtnIdr" class="px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-brand-600 text-white shadow-sm transition-all min-h-[36px] cursor-pointer">
                         Rupiah (IDR)
                     </button>
-                    <button onclick="setCurrency('USD')" id="currBtnUsd" class="px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all">
+                    <button onclick="setCurrency('USD')" id="currBtnUsd" class="px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all min-h-[36px] cursor-pointer">
                         US Dollar (USD)
                     </button>
                 </div>
@@ -844,7 +1111,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-7 max-w-4xl mx-auto items-stretch">
                 
                 <!-- Plan 1: 30 Days Access -->
-                <div class="p-6 sm:p-8 rounded-3xl glass-card hover:border-slate-300 dark:hover:border-white/20 transition-all flex flex-col justify-between relative overflow-hidden">
+                <div class="reveal-on-scroll stagger-1 p-6 sm:p-8 rounded-3xl glass-card hover:border-slate-300 dark:hover:border-white/20 transition-all flex flex-col justify-between relative overflow-hidden shadow-sm hover:shadow-xl">
                     <!-- Discount Badge if active -->
                     <div id="badgeDiscount30" class="hidden absolute top-4 right-4 px-2.5 py-0.5 rounded-full bg-rose-500 text-white text-[9.5px] font-black uppercase tracking-wider shadow-md animate-pulse">
                         Hemat 30%
@@ -898,7 +1165,7 @@
                     </div>
 
                     <div class="mt-8">
-                        <a id="waBtn30" href="https://wa.me/6282275408171?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%2030%20Hari." target="_blank" class="w-full py-3 rounded-xl font-extrabold text-[11px] uppercase tracking-wider text-slate-800 dark:text-white glass-card hover:bg-slate-200 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+                        <a id="waBtn30" href="https://wa.me/6282275408171?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%2030%20Hari." target="_blank" class="w-full py-3 sm:py-3.5 rounded-xl font-extrabold text-[11px] uppercase tracking-wider text-slate-800 dark:text-white glass-card hover:bg-slate-200 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-2 min-h-[44px]">
                             <span>Pesan via WhatsApp</span>
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
@@ -908,7 +1175,7 @@
                 </div>
 
                 <!-- Plan 2: Lifetime Access (BEST DEAL) -->
-                <div class="p-6 sm:p-8 rounded-3xl glass-card gradient-border-glow shadow-2xl relative flex flex-col justify-between bg-gradient-to-b from-brand-950/20 to-transparent">
+                <div class="reveal-on-scroll stagger-2 p-6 sm:p-8 rounded-3xl glass-card gradient-border-glow shadow-2xl relative flex flex-col justify-between bg-gradient-to-b from-brand-950/20 to-transparent hover:shadow-brand-500/20 transition-all">
                     <div class="absolute -top-3 right-6 px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 text-[9px] font-black uppercase tracking-widest shadow-md">
                         ⭐ BEST DEAL & POPULER
                     </div>
@@ -966,7 +1233,7 @@
                     </div>
 
                     <div class="mt-8">
-                        <a id="waBtnLife" href="https://wa.me/6282275408171?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%20LIFETIME%20sekarang." target="_blank" class="w-full py-3.5 rounded-xl font-extrabold text-[11px] uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-lg shadow-brand-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                        <a id="waBtnLife" href="https://wa.me/6282275408171?text=Halo%20Admin%20MetaZo%2C%20saya%20ingin%20membeli%20Lisensi%20MetaZo%20PRO%20LIFETIME%20sekarang." target="_blank" class="w-full py-3.5 rounded-xl font-extrabold text-[11px] uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-lg shadow-brand-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 min-h-[44px]">
                             <span>Ambil Promo Lifetime Sekarang</span>
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -977,7 +1244,7 @@
             </div>
 
             <!-- Guarantee Note -->
-            <div class="mt-12 text-center text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center justify-center gap-2">
+            <div class="reveal-on-scroll stagger-3 mt-12 text-center text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center justify-center gap-2">
                 <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
@@ -990,7 +1257,7 @@
     <section id="ulasan" class="py-16 md:py-20 relative z-10 bg-slate-100/60 dark:bg-black/25">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <!-- Header -->
-            <div class="text-center max-w-2xl mx-auto mb-12">
+            <div class="reveal-on-scroll text-center max-w-2xl mx-auto mb-12">
                 <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-widest bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                     <span class="text-amber-500">★</span>
                     <span>Ulasan & Rating Komunitas</span>
@@ -1004,7 +1271,7 @@
             </div>
 
             <!-- COMMUNITY RATING SUMMARY DASHBOARD -->
-            <div class="glass-card gradient-border-glow rounded-3xl p-5 sm:p-7 lg:p-8 mb-8 shadow-xl">
+            <div class="reveal-on-scroll stagger-1 glass-card gradient-border-glow rounded-3xl p-5 sm:p-7 lg:p-8 mb-8 shadow-xl">
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
                     <!-- Left: Big Score -->
                     <div class="lg:col-span-4 flex flex-col items-center lg:items-start text-center lg:text-left border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/10 pb-5 lg:pb-0 lg:pr-6">
@@ -1064,7 +1331,7 @@
 
                     <!-- Right: Write Review & Live App Community CTA -->
                     <div class="lg:col-span-3 flex flex-col justify-center items-center lg:items-end gap-2.5 text-center lg:text-right">
-                        <a href="/CommunityReviews" class="w-full sm:w-auto px-4 py-3 rounded-xl font-black text-[11px] uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-md shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5">
+                        <a href="/CommunityReviews" class="w-full sm:w-auto px-4 py-3 rounded-xl font-black text-[11px] uppercase tracking-wider text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-md shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5 min-h-[42px]">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
@@ -1077,20 +1344,20 @@
                 </div>
             </div>
 
-            <!-- CONTROLS & FILTERS -->
-            <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
-                <!-- Filter Pills -->
-                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                    <button onclick="filterCommunityReviews('all', this)" class="review-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-brand-600 text-white shadow-sm transition-all">
+            <!-- CONTROLS & FILTERS (Swipeable on Mobile) -->
+            <div class="reveal-on-scroll stagger-2 flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+                <!-- Filter Pills with Touch-Scroll -->
+                <div class="flex items-center gap-2 overflow-x-auto touch-scroll sm:flex-wrap w-full md:w-auto pb-2 sm:pb-0 px-0.5">
+                    <button onclick="filterCommunityReviews('all', this)" class="review-filter-btn shrink-0 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-brand-600 text-white shadow-sm transition-all min-h-[38px] flex items-center justify-center">
                         Semua (<span id="countFilterAll">0</span>)
                     </button>
-                    <button onclick="filterCommunityReviews('5', this)" class="review-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all">
+                    <button onclick="filterCommunityReviews('5', this)" class="review-filter-btn shrink-0 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all min-h-[38px] flex items-center justify-center">
                         ⭐ 5 Bintang (<span id="countFilter5">0</span>)
                     </button>
-                    <button onclick="filterCommunityReviews('photo', this)" class="review-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all">
+                    <button onclick="filterCommunityReviews('photo', this)" class="review-filter-btn shrink-0 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all min-h-[38px] flex items-center justify-center">
                         📸 Dengan Bukti (<span id="countFilterPhoto">0</span>)
                     </button>
-                    <button onclick="filterCommunityReviews('tag_adobe', this)" class="review-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all">
+                    <button onclick="filterCommunityReviews('tag_adobe', this)" class="review-filter-btn shrink-0 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-all min-h-[38px] flex items-center justify-center">
                         ✅ Lolos Adobe Stock (<span id="countFilterAdobe">0</span>)
                     </button>
                 </div>
@@ -1102,9 +1369,9 @@
                         id="reviewSearchInput" 
                         oninput="searchCommunityReviews(this.value)"
                         placeholder="Cari ulasan kontributor..." 
-                        class="w-full py-2 pl-9 pr-4 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
+                        class="w-full py-2.5 pl-9 pr-4 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all min-h-[40px]"
                     />
-                    <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                 </div>
@@ -1116,7 +1383,7 @@
             </div>
 
             <!-- Bottom CTA to In-App Community Reviews -->
-            <div class="mt-12 text-center">
+            <div class="reveal-on-scroll stagger-1 mt-12 text-center">
                 <a href="/CommunityReviews" class="inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-brand-600 dark:text-brand-400 hover:underline">
                     <span>Lihat Semua Diskusi & Ulasan Lengkap di Aplikasi Web</span>
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1130,7 +1397,7 @@
     <!-- PHOTO ZOOM LIGHTBOX MODAL -->
     <div id="reviewPhotoModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4" onclick="closeReviewPhotoModal()">
         <div class="relative max-w-3xl w-full flex flex-col items-center" onclick="event.stopPropagation()">
-            <button onclick="closeReviewPhotoModal()" class="absolute -top-10 right-0 p-2 text-white/80 hover:text-white bg-white/10 rounded-full transition-colors">
+            <button onclick="closeReviewPhotoModal()" class="absolute -top-10 right-0 p-2 text-white/80 hover:text-white bg-white/10 rounded-full transition-colors cursor-pointer">
                 ✕ Tutup
             </button>
             <img id="reviewModalImg" src="" alt="Proof Screenshot" class="max-h-[80vh] w-auto rounded-2xl shadow-2xl border border-white/20 object-contain">
@@ -1140,7 +1407,7 @@
     <!-- FREQUENTLY ASKED QUESTIONS (FAQ) -->
     <section id="faq" class="py-16 md:py-20 relative z-10">
         <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-10">
+            <div class="reveal-on-scroll text-center mb-10">
                 <span class="px-3 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase tracking-widest bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
                     Pertanyaan Umum
                 </span>
@@ -1151,67 +1418,80 @@
 
             <div class="space-y-3.5">
                 <!-- FAQ Item 1 -->
-                <div class="rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
-                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer">
+                <div class="reveal-on-scroll stagger-1 rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
+                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer min-h-[48px]">
                         <span>Apakah hasil metadata MetaZo aman dan mematuhi aturan Adobe Stock & Shutterstock?</span>
                         <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    <div class="faq-content hidden px-4 sm:px-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
+                    <div class="faq-content hidden px-4 sm:p-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
                         Sangat aman. MetaZo PRO dirancang khusus mengikuti *guideline* resmi stock agency internasional. AI kami menyusun judul deskriptif tanpa spam *trademark*, melarang kata terlarang (seperti 'photo', 'vector' di agensi tertentu), serta mengurutkan keyword berdasarkan tingkat relevansi tertinggi agar portofolio Anda tidak kena penalti.
                     </div>
                 </div>
 
                 <!-- FAQ Item 2 -->
-                <div class="rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
-                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer">
+                <div class="reveal-on-scroll stagger-2 rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
+                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer min-h-[48px]">
                         <span>Apakah saya wajib memiliki API Key sendiri untuk menggunakannya?</span>
                         <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    <div class="faq-content hidden px-4 sm:px-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
+                    <div class="faq-content hidden px-4 sm:p-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
                         Tidak wajib! MetaZo PRO sudah dilengkapi dengan server backend engine bawaan yang siap pakai langsung setelah login. Namun, bagi pengguna tingkat lanjut yang ingin menggunakan API Key pribadi (Google Gemini, Groq, Mistral, Nvidia NIM, atau Z.AI) untuk rotasi multi-key kustom, aplikasi kami juga menyediakan panel pengaturan API yang sangat fleksibel.
                     </div>
                 </div>
 
                 <!-- FAQ Item 3 -->
-                <div class="rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
-                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer">
+                <div class="reveal-on-scroll stagger-3 rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
+                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer min-h-[48px]">
                         <span>Bagaimana cara kerja fitur Direct Embed Metadata ke file?</span>
                         <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    <div class="faq-content hidden px-4 sm:px-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
+                    <div class="faq-content hidden px-4 sm:p-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
                         Setelah AI menghasilkan metadata, Anda cukup menekan tombol "Download Embedded ZIP". Sistem akan menyuntikkan judul, deskripsi, dan 50 keyword ke dalam header metadata file Anda (EXIF, IPTC Core, dan Adobe XMP) secara loss-less (kualitas gambar tidak berkurang sedikit pun). Saat Anda mengunggah file tersebut ke Adobe Stock atau Shutterstock, agensi akan otomatis membaca judul dan keyword langsung dari file Anda.
                     </div>
                 </div>
 
                 <!-- FAQ Item 4 -->
-                <div class="rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
-                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer">
+                <div class="reveal-on-scroll stagger-4 rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
+                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer min-h-[48px]">
                         <span>Bagaimana proses aktivasi lisensi setelah saya melakukan pembelian?</span>
                         <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    <div class="faq-content hidden px-4 sm:px-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
+                    <div class="faq-content hidden px-4 sm:p-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
                         Sangat mudah dan cepat. Hubungi admin kami melalui WhatsApp, lakukan pembayaran, dan Anda akan menerima kode lisensi resmi (Serial Key). Buka aplikasi MetaZo PRO, klik menu "Aktivasi PRO", masukkan kode Anda, dan seluruh fitur premium akan aktif seketika tanpa perlu instalasi ulang.
                     </div>
                 </div>
 
                 <!-- FAQ Item 5 -->
-                <div class="rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
-                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer">
+                <div class="reveal-on-scroll stagger-5 rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
+                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer min-h-[48px]">
                         <span>Apakah MetaZo bisa digunakan di HP / Tablet?</span>
                         <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    <div class="faq-content hidden px-4 sm:px-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
+                    <div class="faq-content hidden px-4 sm:p-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
                         Ya! MetaZo PRO adalah aplikasi berbasis Progressive Web App (PWA) yang 100% responsif. Anda dapat mengaksesnya melalui browser di Laptop (Windows / macOS / Linux), iPad, Tablet Android, maupun Smartphone Anda dengan tampilan yang tetap rapi dan nyaman.
+                    </div>
+                </div>
+
+                <!-- FAQ Item 6: Free Trial Limit -->
+                <div class="reveal-on-scroll stagger-6 rounded-2xl glass-card overflow-hidden border border-slate-200 dark:border-white/10 transition-all">
+                    <button onclick="toggleFaq(this)" class="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer min-h-[48px]">
+                        <span>Berapa kuota untuk Akun Free Trial dan apa saja fiturnya?</span>
+                        <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div class="faq-content hidden px-4 sm:p-5 pb-4 sm:pb-5 text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3">
+                        Akun Free Trial mendapatkan kuota <strong>50 kali generate per hari</strong> gratis untuk semua workspace (Image Metadata, Video Frame & Metadata, Vector AI, Quality Check, hingga Motion Gen). Kuota di-reset secara otomatis setiap hari. Untuk menikmati fitur tanpa batas (unlimited) dan kecepatan server prioritas, Anda dapat mengaktifkan lisensi PRO kapan saja.
                     </div>
                 </div>
             </div>
@@ -1221,7 +1501,7 @@
     <!-- FINAL CALL TO ACTION BANNER -->
     <section class="py-16 md:py-20 relative z-10">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="rounded-3xl p-6 sm:p-10 lg:p-12 text-center relative overflow-hidden bg-gradient-to-r from-brand-700 via-indigo-700 to-purple-700 text-white shadow-2xl">
+            <div class="reveal-scale rounded-3xl p-6 sm:p-10 lg:p-12 text-center relative overflow-hidden bg-gradient-to-r from-brand-700 via-indigo-700 to-purple-700 text-white shadow-2xl">
                 <!-- Background ambient decorative circles -->
                 <div class="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-white/10 blur-3xl"></div>
                 <div class="absolute -bottom-24 -right-24 w-72 h-72 rounded-full bg-white/15 blur-3xl"></div>
@@ -1240,10 +1520,10 @@
                     </p>
 
                     <div class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-                        <a href="/app" class="w-full sm:w-auto px-6 py-3 rounded-xl font-black text-[11px] uppercase tracking-wider text-brand-900 bg-white hover:bg-slate-100 shadow-xl transition-all hover:scale-105 active:scale-95">
+                        <a href="/app" class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-black text-xs uppercase tracking-wider text-brand-900 bg-white hover:bg-slate-100 shadow-xl transition-all hover:scale-105 active:scale-95 min-h-[44px] flex items-center justify-center">
                             Buka Web App Sekarang
                         </a>
-                        <a href="#harga" class="w-full sm:w-auto px-6 py-3 rounded-xl font-extrabold text-[11px] uppercase tracking-wider text-white bg-white/15 hover:bg-white/25 border border-white/20 backdrop-blur-md transition-all">
+                        <a href="#harga" class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-extrabold text-xs uppercase tracking-wider text-white bg-white/15 hover:bg-white/25 border border-white/20 backdrop-blur-md transition-all min-h-[44px] flex items-center justify-center">
                             Lihat Opsi Lisensi
                         </a>
                     </div>
@@ -1252,19 +1532,29 @@
         </div>
     </section>
 
-
     <!-- FOOTER -->
     <footer class="py-12 border-t border-slate-200 dark:border-white/10 relative z-10 bg-white/40 dark:bg-slate-950/40 backdrop-blur-md text-xs">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex flex-col md:flex-row items-center justify-between gap-6">
-                <!-- Footer Brand -->
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center p-0.5 shadow-md">
-                        <img src="/src/assets/images/mz_pro_logo_1780923659277.png" alt="MetaZo Logo" class="w-full h-full object-contain rounded-lg" onerror="this.src='/favicon.ico'; this.onerror=null;">
+                <!-- Footer Brand matching LoginScreen -->
+                <div class="flex items-center gap-3 select-none">
+                    <div class="mz-logo-squircle w-9 h-9 rounded-[1.25rem] p-[2px] flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/80 dark:border-slate-800">
+                        <img src="/src/assets/images/mz_pro_logo_1780923659277.png" alt="MetaZo PRO Logo" class="w-full h-full object-cover scale-[1.05] rounded-[1.15rem]" onerror="this.src='/favicon.ico'; this.onerror=null;">
                     </div>
                     <div>
-                        <span class="font-black text-slate-900 dark:text-white uppercase tracking-tight">MetaZo PRO</span>
-                        <p class="text-[10px] text-slate-400">AI Microstock Metadata Assistant</p>
+                        <div class="animated-brand-name flex items-center font-black tracking-tight text-slate-900 dark:text-white leading-none text-sm uppercase">
+                            <span class="char-bounce">M</span>
+                            <span class="char-bounce">e</span>
+                            <span class="char-bounce">t</span>
+                            <span class="char-bounce">a</span>
+                            <span class="char-bounce">Z</span>
+                            <span class="char-bounce">o</span>
+                            <span class="inline-block w-1"></span>
+                            <span class="char-bounce metazo-pro-gradient font-black">P</span>
+                            <span class="char-bounce metazo-pro-gradient font-black">R</span>
+                            <span class="char-bounce metazo-pro-gradient font-black">O</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-0.5">AI Microstock Metadata Assistant</p>
                     </div>
                 </div>
 
@@ -1287,6 +1577,13 @@
             </div>
         </div>
     </footer>
+
+    <!-- Floating Back to Top Button -->
+    <button id="backToTopBtn" onclick="scrollToTop()" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-40 p-3 sm:p-3.5 rounded-2xl bg-brand-600 hover:bg-brand-500 active:scale-95 text-white shadow-xl shadow-brand-600/40 border border-white/20 transition-all cursor-pointer flex items-center justify-center group">
+        <svg class="w-5 h-5 transition-transform duration-300 group-hover:-translate-y-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+        </svg>
+    </button>
 
     <!-- INTERACTIVE JAVASCRIPT LOGIC -->
     <script>
@@ -1347,12 +1644,515 @@
             }
         });
 
-        // --- 2. MOBILE MENU TOGGLE ---
+        // --- 1.1 UI LANGUAGE SWITCHER (ID / EN) ---
+        const LANDING_TRANSLATIONS = {
+            id: {
+                langLabel: "ID",
+                mobileLangText: "Bahasa: Indonesia (ID)",
+                mobileLangBadge: "Ganti ke EN",
+                navFeatures: "Fitur Unggulan",
+                navDemo: "Live Demo",
+                navComparison: "Perbandingan",
+                navReviews: "Ulasan Komunitas",
+                navPricing: "Harga Lisensi",
+                navFaq: "FAQ",
+                navCta: "Buka Web App",
+                mobileCta: "Masuk ke Web Application",
+                heroBadgeTag: "Terobosan Terbaru",
+                heroBadgeText: "AI Vision Engine untuk Microstock Contributor",
+                heroTitle1: "Revolusi Workflow Microstock:",
+                heroTitle2: "Metadata Akurat & Ribuan Penjualan",
+                heroTitle3: "dengan Kekuatan AI",
+                heroSubtitle1: "Tinggalkan riset judul manual dan 50 keyword yang membosankan.",
+                heroSubtitle2: "menganalisis foto, vektor, dan klip video Anda secara presisi untuk menembus algoritma pencarian Adobe Stock, Shutterstock, Freepik, Vecteezy, dan Canva.",
+                heroBtnCta: "Mulai Pakai Gratis (Trial)",
+                heroBtnDemo: "Coba Simulasi Interaktif",
+                statKeywords: "50 Keywords",
+                statKeywordsSub: "Ranking Relevansi SEO",
+                statSpeed: "< 5 Detik",
+                statSpeedSub: "Generasi Per Aset",
+                statCompliant: "100% Compliant",
+                statCompliantSub: "Format CSV Siap Upload",
+                statUsers: "1,500+",
+                statUsersSub: "Kontributor Aktif",
+                agencySupported: "Mendukung Format Resmi & Sesuai Aturan Algoritma:",
+                simBadge: "Live Demo & Simulasi",
+                simHeading: "Lihat Bagaimana MetaZo Mengubah Visual Menjadi Uang",
+                simSub: "Pilih tipe aset di bawah untuk melihat hasil analisis AI secara langsung: Judul berdaya pikat komersial, deskripsi kaya konteks, dan 50 keyword siap ranking.",
+                compBadge: "Bandingkan Efisiensi",
+                compHeading: "Mengapa Kontributor Sukses Beralih ke MetaZo PRO?",
+                compSub: "Lihat perbedaan mencolok antara cara kuno yang membuang waktu dan otomatisasi cerdas berbasis AI.",
+                featBadge: "Fitur Lengkap",
+                featHeading: "Senjata Rahasia Sukses Kontributor Modern",
+                featSub: "Bukan sekadar penemu keyword biasa, MetaZo PRO adalah ekosistem produktivitas lengkap dari kreasi visual hingga submission.",
+                autopilotBadge: "⚡ FITUR PALING UNGGUL",
+                autopilotTag: "AUTO PIPELINE",
+                autopilotTitle: "Auto Pilot Gen",
+                autopilotDesc: "Otomatisasi total 1-Klik tanpa repot! File otomatis diinspeksi lolos QC → diarahkan ke AI Metadata (SEO title & 50 keywords) → di-embed lossless → langsung didistribusikan via FTP/SFTP ke Adobe Stock, Shutterstock, & Freepik atau auto-download seketika.",
+                autopilotFooter: "QC ➔ METADATA ➔ FTP OTOMATIS",
+                autopilotSpeed: "10x Lebih Cepat",
+                priceBadge: "Investasi Terjangkau",
+                priceHeading: "Pilihan Paket Lisensi MetaZo PRO",
+                priceSub: "Hemat puluhan jam per bulan dengan biaya yang kembali hanya dari 1–2 penjualan aset microstock Anda!",
+                faqBadge: "Pertanyaan Umum",
+                faqHeading: "Pertanyaan yang Sering Diajukan (FAQ)",
+                faqTrialQuestion: "Berapa kuota untuk Akun Free Trial dan apa saja fiturnya?",
+                faqTrialAnswer: "Akun Free Trial mendapatkan kuota <strong>50 kali generate per hari</strong> gratis untuk semua workspace (Image Metadata, Video Frame & Metadata, Vector AI, Quality Check, hingga Motion Gen). Kuota di-reset secara otomatis setiap hari. Untuk menikmati fitur tanpa batas (unlimited) dan kecepatan server prioritas, Anda dapat mengaktifkan lisensi PRO kapan saja.",
+                finalCtaBadge: "⚡ Siap Meningkatkan Penjualan Stock Anda?",
+                finalCtaHeading: "Mulai Hemat Waktu & Meroketkan Portfolio Anda Sekarang",
+                finalCtaSub: "Bergabunglah dengan ribuan kontributor yang telah mengubah pekerjaan melelahkan berjam-jam menjadi beberapa menit saja.",
+                finalCtaBtn1: "Buka Web App Sekarang",
+                finalCtaBtn2: "Lihat Opsi Lisensi",
+                footerTagline: "AI Microstock Metadata Assistant"
+            },
+            en: {
+                langLabel: "EN",
+                mobileLangText: "Language: English (EN)",
+                mobileLangBadge: "Switch to ID",
+                navFeatures: "Features",
+                navDemo: "Live Demo",
+                navComparison: "Comparison",
+                navReviews: "Community Reviews",
+                navPricing: "Pricing",
+                navFaq: "FAQ",
+                navCta: "Launch Web App",
+                mobileCta: "Enter Web Application",
+                heroBadgeTag: "Latest Innovation",
+                heroBadgeText: "AI Vision Engine for Microstock Contributors",
+                heroTitle1: "Revolutionize Microstock Workflow:",
+                heroTitle2: "Accurate Metadata & Skyrocketing Sales",
+                heroTitle3: "Powered by AI",
+                heroSubtitle1: "Leave manual title research and tedious 50-keyword tagging behind.",
+                heroSubtitle2: "precisely analyzes your photos, vectors, and video clips to crack search algorithms on Adobe Stock, Shutterstock, Freepik, Vecteezy, and Canva.",
+                heroBtnCta: "Start Free Trial",
+                heroBtnDemo: "Try Interactive Demo",
+                statKeywords: "50 Keywords",
+                statKeywordsSub: "SEO Relevance Ranking",
+                statSpeed: "< 5 Seconds",
+                statSpeedSub: "Generation Per Asset",
+                statCompliant: "100% Compliant",
+                statCompliantSub: "Ready-to-Upload CSV",
+                statUsers: "1,500+",
+                statUsersSub: "Active Contributors",
+                agencySupported: "Supports Official Formats & Complies with Stock Algorithms:",
+                simBadge: "Live Demo & Simulation",
+                simHeading: "See How MetaZo Turns Visuals Into Revenue",
+                simSub: "Select an asset type below to see instant AI vision results: Highly commercial titles, rich contextual descriptions, and 50 top-ranked keywords.",
+                compBadge: "Compare Efficiency",
+                compHeading: "Why Top Contributors Switch to MetaZo PRO",
+                compSub: "See the striking contrast between tedious manual workflows and intelligent AI automation.",
+                featBadge: "Complete Features",
+                featHeading: "Secret Weapons for Modern Stock Contributors",
+                featSub: "More than just a keyword generator, MetaZo PRO is a complete productivity ecosystem from creation to submission.",
+                autopilotBadge: "⚡ FLAGSHIP FEATURE",
+                autopilotTag: "AUTO PIPELINE",
+                autopilotTitle: "Auto Pilot Gen",
+                autopilotDesc: "1-Click complete automation! Files are automatically QC-inspected → forwarded to AI Metadata (SEO title & 50 keywords) → lossless embedded → directly distributed via FTP/SFTP to Adobe Stock, Shutterstock, & Freepik or instantly auto-downloaded.",
+                autopilotFooter: "AUTO QC ➔ METADATA ➔ FTP",
+                autopilotSpeed: "10x Faster",
+                priceBadge: "Affordable Investment",
+                priceHeading: "MetaZo PRO License Plans",
+                priceSub: "Save tens of hours every month at a cost recouped from just 1–2 microstock asset sales!",
+                faqBadge: "Frequently Asked Questions",
+                faqHeading: "Frequently Asked Questions (FAQ)",
+                faqTrialQuestion: "What is the Free Trial quota and what features are included?",
+                faqTrialAnswer: "Free Trial accounts receive a quota of <strong>50 free generations per day</strong> across all workspaces (Image Metadata, Video Frame & Metadata, Vector AI, Quality Check, and Motion Gen). Quotas reset automatically each day. To enjoy unlimited processing and priority server speed, you can activate an official PRO license at any time.",
+                finalCtaBadge: "⚡ Ready to Multiply Your Stock Sales?",
+                finalCtaHeading: "Start Saving Time & Scaling Your Portfolio Today",
+                finalCtaSub: "Join thousands of contributors who have turned hours of exhausting tagging into just minutes.",
+                finalCtaBtn1: "Open Web App Now",
+                finalCtaBtn2: "View License Options",
+                footerTagline: "AI Microstock Metadata Assistant"
+            }
+        };
+
+        const currentLangLabel = document.getElementById('currentLangLabel');
+        const langToggleBtn = document.getElementById('langToggleBtn');
+        const mobileLangToggleBtn = document.getElementById('mobileLangToggleBtn');
+        const mobileLangText = document.getElementById('mobileLangText');
+        const mobileLangBadge = document.getElementById('mobileLangBadge');
+
+        function getCurrentLandingLanguage() {
+            try {
+                const saved = localStorage.getItem('mz_ui_language');
+                if (saved === 'id' || saved === 'en') return saved;
+            } catch (e) {}
+            return 'id';
+        }
+
+        function applyLandingTranslations(lang) {
+            const tr = LANDING_TRANSLATIONS[lang] || LANDING_TRANSLATIONS.id;
+
+            // Update badge labels
+            if (currentLangLabel) currentLangLabel.innerText = tr.langLabel;
+            if (mobileLangText) mobileLangText.innerText = tr.mobileLangText;
+            if (mobileLangBadge) mobileLangBadge.innerText = tr.mobileLangBadge;
+
+            // Desktop Navbar
+            const desktopNavLinks = document.querySelectorAll('nav.hidden.md\\:flex a');
+            if (desktopNavLinks.length >= 6) {
+                desktopNavLinks[0].innerText = tr.navFeatures;
+                desktopNavLinks[1].innerText = tr.navDemo;
+                desktopNavLinks[2].innerText = tr.navComparison;
+                const reviewSpan = desktopNavLinks[3].querySelector('span:first-child');
+                if (reviewSpan) reviewSpan.innerText = tr.navReviews;
+                desktopNavLinks[4].innerText = tr.navPricing;
+                desktopNavLinks[5].innerText = tr.navFaq;
+            }
+
+            // Mobile Nav Links
+            const mobileLinks = document.querySelectorAll('#mobileMenu .mobile-nav-link');
+            if (mobileLinks.length >= 6) {
+                const updateMobileText = (el, icon, text) => {
+                    const span = el.querySelector('span.flex');
+                    if (span) span.innerHTML = `<span class="text-base">${icon}</span> ${text}`;
+                };
+                updateMobileText(mobileLinks[0], '⚡', tr.navFeatures);
+                updateMobileText(mobileLinks[1], '🎯', tr.navDemo);
+                updateMobileText(mobileLinks[2], '⚖️', tr.navComparison);
+                updateMobileText(mobileLinks[3], '⭐', tr.navReviews);
+                updateMobileText(mobileLinks[4], '💎', tr.navPricing);
+                updateMobileText(mobileLinks[5], '❓', tr.navFaq);
+            }
+
+            // Desktop & Mobile CTA Buttons
+            const desktopCta = document.querySelector('header a[href="/app"] span');
+            if (desktopCta) desktopCta.innerText = tr.navCta;
+            const mobileCta = document.querySelector('#mobileMenu a[href="/app"] span');
+            if (mobileCta) mobileCta.innerText = tr.mobileCta;
+
+            // Hero Announcement Badge
+            const heroBadgeTag = document.querySelector('section:first-of-type .reveal-on-scroll span.text-brand-600');
+            if (heroBadgeTag) heroBadgeTag.innerText = tr.heroBadgeTag;
+            const heroBadgeText = document.querySelector('section:first-of-type .reveal-on-scroll span.text-slate-600');
+            if (heroBadgeText) heroBadgeText.innerText = tr.heroBadgeText;
+
+            // Hero Headlines
+            const heroH1 = document.querySelector('section:first-of-type h1');
+            if (heroH1) {
+                heroH1.innerHTML = `${tr.heroTitle1} <span class="block mt-1 sm:mt-2 text-transparent bg-clip-text metazo-pro-gradient font-black">${tr.heroTitle2}</span> ${tr.heroTitle3}`;
+            }
+
+            // Hero Subtitle
+            const heroSub = document.querySelector('section:first-of-type p.reveal-on-scroll.stagger-2');
+            if (heroSub) {
+                heroSub.innerHTML = `${tr.heroSubtitle1} <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-brand-500/10 dark:bg-brand-500/20 border border-brand-500/25 font-black text-brand-600 dark:text-brand-300 shadow-sm hover:scale-105 transition-all cursor-pointer"><span class="metazo-pro-gradient font-black">MetaZo PRO</span> <span class="text-xs">✨</span></span> ${tr.heroSubtitle2}`;
+            }
+
+            // Hero Buttons
+            const heroBtnCta = document.querySelector('section:first-of-type a[href="/app"].stagger-3, section:first-of-type div.stagger-3 a[href="/app"] span');
+            if (heroBtnCta) heroBtnCta.innerText = tr.heroBtnCta;
+            const heroBtnDemo = document.querySelector('section:first-of-type a[href="#simulasi"] span');
+            if (heroBtnDemo) heroBtnDemo.innerText = tr.heroBtnDemo;
+
+            // Hero Stats Subtitles
+            const statsCards = document.querySelectorAll('section:first-of-type div.stagger-4 div');
+            if (statsCards.length >= 4) {
+                const sub0 = statsCards[0].querySelectorAll('span')[1];
+                if (sub0) sub0.innerText = tr.statKeywordsSub;
+                const sub1 = statsCards[1].querySelectorAll('span')[1];
+                if (sub1) sub1.innerText = tr.statSpeedSub;
+                const sub2 = statsCards[2].querySelectorAll('span')[1];
+                if (sub2) sub2.innerText = tr.statCompliantSub;
+                const sub3 = statsCards[3].querySelectorAll('span')[1];
+                if (sub3) sub3.innerText = tr.statUsersSub;
+            }
+
+            // Supported agencies text
+            const agencyHeader = document.querySelector('section:first-of-type div.stagger-5 p');
+            if (agencyHeader) agencyHeader.innerText = tr.agencySupported;
+
+            // Simulator Section Header
+            const simSec = document.getElementById('simulasi');
+            if (simSec) {
+                const badge = simSec.querySelector('span.uppercase');
+                if (badge) badge.innerText = tr.simBadge;
+                const h2 = simSec.querySelector('h2');
+                if (h2) h2.innerText = tr.simHeading;
+                const p = simSec.querySelector('p');
+                if (p) p.innerText = tr.simSub;
+            }
+
+            // Comparison Section Header
+            const compSec = document.getElementById('komparasi');
+            if (compSec) {
+                const badge = compSec.querySelector('span.uppercase');
+                if (badge) badge.innerText = tr.compBadge;
+                const h2 = compSec.querySelector('h2');
+                if (h2) h2.innerText = tr.compHeading;
+                const p = compSec.querySelector('p');
+                if (p) p.innerText = tr.compSub;
+            }
+
+            // Features Section Header & Flagship Auto Pilot Card
+            const featSec = document.getElementById('fitur');
+            if (featSec) {
+                const badge = featSec.querySelector('span.uppercase');
+                if (badge) badge.innerText = tr.featBadge;
+                const h2 = featSec.querySelector('h2');
+                if (h2) h2.innerText = tr.featHeading;
+                const p = featSec.querySelector('p');
+                if (p) p.innerText = tr.featSub;
+
+                // Auto Pilot Gen Flagship Card
+                const apBadge = featSec.querySelector('.border-amber-500\\/50 span.animate-pulse');
+                if (apBadge) apBadge.innerText = tr.autopilotBadge;
+                const apTag = featSec.querySelector('.border-amber-500\\/50 h3 span.text-amber-500');
+                if (apTag) apTag.innerText = tr.autopilotTag;
+                const apDesc = featSec.querySelector('.border-amber-500\\/50 p');
+                if (apDesc) apDesc.innerText = tr.autopilotDesc;
+                const apFooter = featSec.querySelector('.border-amber-500\\/50 .border-t span.text-amber-600');
+                if (apFooter) apFooter.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span> ${tr.autopilotFooter}`;
+                const apSpeed = featSec.querySelector('.border-amber-500\\/50 .border-t span.border-amber-500\\/30');
+                if (apSpeed) apSpeed.innerText = tr.autopilotSpeed;
+            }
+
+            // Pricing Section Header
+            const priceSec = document.getElementById('harga');
+            if (priceSec) {
+                const badge = priceSec.querySelector('span.uppercase');
+                if (badge) badge.innerText = tr.priceBadge;
+                const h2 = priceSec.querySelector('h2');
+                if (h2) h2.innerText = tr.priceHeading;
+                const p = priceSec.querySelector('p');
+                if (p) p.innerText = tr.priceSub;
+            }
+
+            // FAQ Section Header & Dynamic Items
+            const faqSec = document.getElementById('faq');
+            if (faqSec) {
+                const badge = faqSec.querySelector('span.uppercase');
+                if (badge) badge.innerText = tr.faqBadge;
+                const h2 = faqSec.querySelector('h2');
+                if (h2) h2.innerText = tr.faqHeading;
+
+                const faq6 = faqSec.querySelector('.stagger-6');
+                if (faq6) {
+                    const qSpan = faq6.querySelector('button span');
+                    if (qSpan) qSpan.innerText = tr.faqTrialQuestion;
+                    const aDiv = faq6.querySelector('.faq-content');
+                    if (aDiv) aDiv.innerHTML = tr.faqTrialAnswer;
+                }
+            }
+
+            // Final CTA Banner
+            const finalCtaSec = document.querySelector('section .reveal-scale');
+            if (finalCtaSec) {
+                const badge = finalCtaSec.querySelector('span.uppercase');
+                if (badge) badge.innerText = tr.finalCtaBadge;
+                const h2 = finalCtaSec.querySelector('h2');
+                if (h2) h2.innerText = tr.finalCtaHeading;
+                const p = finalCtaSec.querySelector('p');
+                if (p) p.innerText = tr.finalCtaSub;
+                const btn1 = finalCtaSec.querySelector('a[href="/app"]');
+                if (btn1) btn1.innerText = tr.finalCtaBtn1;
+                const btn2 = finalCtaSec.querySelector('a[href="#harga"]');
+                if (btn2) btn2.innerText = tr.finalCtaBtn2;
+            }
+
+            // Footer tagline
+            const footerTagline = document.querySelector('footer p.text-\\[10px\\]');
+            if (footerTagline) footerTagline.innerText = tr.footerTagline;
+        }
+
+        function setLandingLanguage(lang) {
+            try {
+                localStorage.setItem('mz_ui_language', lang);
+            } catch (e) {}
+            applyLandingTranslations(lang);
+        }
+
+        function toggleLandingLanguage() {
+            const current = getCurrentLandingLanguage();
+            const next = current === 'id' ? 'en' : 'id';
+            setLandingLanguage(next);
+        }
+
+        // Initialize UI Language
+        applyLandingTranslations(getCurrentLandingLanguage());
+
+        if (langToggleBtn) {
+            langToggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                toggleLandingLanguage();
+            });
+        }
+
+        if (mobileLangToggleBtn) {
+            mobileLangToggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                toggleLandingLanguage();
+            });
+        }
+
+        // --- 2. MOBILE MENU TOGGLE & NAVIGATION ---
         const mobileBtn = document.getElementById('mobileMenuBtn');
         const mobileMenu = document.getElementById('mobileMenu');
-        mobileBtn.addEventListener('click', () => {
-            mobileMenu.classList.toggle('hidden');
+        const menuIconBars = document.getElementById('menuIconBars');
+        const menuIconClose = document.getElementById('menuIconClose');
+
+        function toggleMobileMenu(forceClose = false) {
+            if (!mobileMenu) return;
+            const isOpen = !mobileMenu.classList.contains('hidden');
+            if (isOpen || forceClose) {
+                mobileMenu.classList.add('hidden');
+                if (menuIconBars) menuIconBars.classList.remove('hidden');
+                if (menuIconClose) menuIconClose.classList.add('hidden');
+            } else {
+                mobileMenu.classList.remove('hidden');
+                if (menuIconBars) menuIconBars.classList.add('hidden');
+                if (menuIconClose) menuIconClose.classList.remove('hidden');
+            }
+        }
+
+        if (mobileBtn) {
+            mobileBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleMobileMenu();
+            });
+        }
+
+        // Auto close mobile menu when clicking any link inside it
+        if (mobileMenu) {
+            mobileMenu.querySelectorAll('a').forEach(link => {
+                link.addEventListener('click', () => {
+                    toggleMobileMenu(true);
+                });
+            });
+        }
+
+        // Close mobile menu if clicked outside
+        document.addEventListener('click', (e) => {
+            if (mobileMenu && !mobileMenu.classList.contains('hidden')) {
+                if (!mobileMenu.contains(e.target) && !mobileBtn.contains(e.target)) {
+                    toggleMobileMenu(true);
+                }
+            }
         });
+
+        // --- 2.1 SCROLL PROGRESS BAR & BACK TO TOP BUTTON ---
+        const scrollProgressBar = document.getElementById('scrollProgressBar');
+        const backToTopBtn = document.getElementById('backToTopBtn');
+
+        function handleScrollEvents() {
+            const winScroll = document.documentElement.scrollTop || document.body.scrollTop;
+            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = height > 0 ? (winScroll / height) * 100 : 0;
+            
+            if (scrollProgressBar) {
+                scrollProgressBar.style.width = scrolled + '%';
+            }
+
+            if (backToTopBtn) {
+                if (winScroll > 320) {
+                    backToTopBtn.classList.add('visible');
+                } else {
+                    backToTopBtn.classList.remove('visible');
+                }
+            }
+        }
+
+        window.addEventListener('scroll', handleScrollEvents, { passive: true });
+
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+
+        // --- 2.2 INTERSECTION OBSERVER FOR SCROLL REVEAL ANIMATIONS ---
+        function initScrollAnimations() {
+            const revealElements = document.querySelectorAll('.reveal-on-scroll, .reveal-left, .reveal-right, .reveal-scale');
+            if (!('IntersectionObserver' in window)) {
+                revealElements.forEach(el => el.classList.add('revealed'));
+                return;
+            }
+
+            const observerOptions = {
+                root: null,
+                rootMargin: '0px 0px -40px 0px',
+                threshold: 0.12
+            };
+
+            const revealObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('revealed');
+                        // If element contains counters, trigger counter animation
+                        const counters = entry.target.querySelectorAll('[data-counter]');
+                        counters.forEach(counter => animateCounter(counter));
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, observerOptions);
+
+            revealElements.forEach(el => revealObserver.observe(el));
+        }
+
+        // Animated Number Counters (e.g. 50 keywords, 1,500+ microstockers)
+        function animateCounter(el) {
+            if (el.dataset.counterDone) return;
+            el.dataset.counterDone = 'true';
+
+            const target = parseInt(el.getAttribute('data-counter'), 10);
+            if (isNaN(target)) return;
+
+            const duration = 1400; // ms
+            const startTime = performance.now();
+            const startVal = 0;
+
+            function updateCounter(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                // Smooth easeOutCubic
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                const currentVal = Math.floor(startVal + (target - startVal) * easeOut);
+
+                if (target >= 1000) {
+                    el.textContent = currentVal.toLocaleString('en-US');
+                } else {
+                    el.textContent = currentVal;
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(updateCounter);
+                } else {
+                    if (target >= 1000) {
+                        el.textContent = target.toLocaleString('en-US');
+                    } else {
+                        el.textContent = target;
+                    }
+                }
+            }
+            requestAnimationFrame(updateCounter);
+        }
+
+        // Interactive Letter Wave for Brand Name
+        function initBrandLetterHover() {
+            const letters = document.querySelectorAll('.animated-brand-name .char-bounce');
+            letters.forEach((char, idx) => {
+                char.addEventListener('mouseenter', () => {
+                    char.style.transform = 'translateY(-4px) scale(1.18)';
+                    char.style.color = '#38bdf8';
+                });
+                char.addEventListener('mouseleave', () => {
+                    char.style.transform = '';
+                    char.style.color = '';
+                });
+            });
+        }
+
+        // Run when DOM is loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                initScrollAnimations();
+                initBrandLetterHover();
+            });
+        } else {
+            initScrollAnimations();
+            initBrandLetterHover();
+        }
 
         // --- 3. DYNAMIC PRICING & DATABASE DISCOUNT SYSTEM ---
         let currentCurrency = 'IDR';

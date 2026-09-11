@@ -30,7 +30,7 @@ export const SHUTTERSTOCK_CATEGORIES_VIDEO = [
 export type AppLanguage = 'en' | 'id';
 
 export const getDailyLimit = (): number => {
-  return 25;
+  return 50;
 };
 
 export const TRANSLATIONS = {

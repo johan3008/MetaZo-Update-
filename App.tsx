@@ -32,6 +32,7 @@ import { MotionGenView } from './src/components/MotionGenView';
 import { AntiSpamView } from './src/components/AntiSpamView';
 import { ReviewsView } from './src/components/ReviewsView';
 import { FtpUploaderView } from './src/components/FtpUploaderView';
+import { AutoPilotModal, AutoPilotConfig, DEFAULT_AUTOPILOT_CONFIG } from './src/components/AutoPilotModal';
 import { AutoReviewPromptModal } from './src/components/AutoReviewPromptModal';
 import { SaaSPortal } from './src/components/SaaSPortal';
 import { FAQAccordion } from './src/components/FAQAccordion';
@@ -1384,6 +1385,34 @@ const App: React.FC = () => {
   const [infoLanguage, setInfoLanguage] = useState<'id' | 'en'>('id');
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showAutoPilotModal, setShowAutoPilotModal] = useState(false);
+  const [autoPilotConfig, setAutoPilotConfig] = useState<AutoPilotConfig>(() => {
+    try {
+      const saved = localStorage.getItem('mz_autopilot_config');
+      if (saved) return { ...DEFAULT_AUTOPILOT_CONFIG, ...JSON.parse(saved) };
+    } catch (e) {
+      console.warn("Failed parsing mz_autopilot_config", e);
+    }
+    return DEFAULT_AUTOPILOT_CONFIG;
+  });
+
+  const handleSaveAutoPilotConfig = (newConfig: AutoPilotConfig) => {
+    setAutoPilotConfig(newConfig);
+    try {
+      localStorage.setItem('mz_autopilot_config', JSON.stringify(newConfig));
+      // Sinkronkan juga ke state Metadata bila diaktifkan
+      if (newConfig.keywordCount) setKeywordCount(newConfig.keywordCount);
+      if (newConfig.keywordMode) setKeywordMode(newConfig.keywordMode);
+      if (newConfig.titleLength) setTitleLength(newConfig.titleLength as any);
+      if (newConfig.metadataLanguage) setMetadataLanguage(newConfig.metadataLanguage);
+      if (newConfig.targetKeywords) setCustomPrompt(newConfig.targetKeywords);
+      setIsGenerativeAI(newConfig.isGenerativeAI);
+      if (newConfig.aiModelSource) setAiModelSource(newConfig.aiModelSource);
+    } catch (e) {
+      console.warn("Failed saving mz_autopilot_config", e);
+    }
+  };
+
   const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'mistral' | 'openai' | 'openrouter' | 'blackbox' | 'nvidia' | 'bluesminds' | 'aivene' | 'zai'>(() => {
     const val = localStorage.getItem('ai_provider') || 'gemini';
     const validProviders = ['gemini', 'groq', 'mistral', 'openai', 'openrouter', 'blackbox', 'nvidia', 'bluesminds', 'aivene', 'zai'];
@@ -4016,6 +4045,26 @@ const App: React.FC = () => {
 
         if (!stopGenerationRef.current && processedInThisRun > 0) {
             setTriggerAutoDownload(Date.now());
+
+            // 🚀 AUTO PILOT GEN: Jika aktif, eksekusi pipeline tahap akhir (FTP Upload atau Auto-Download Embedded Files & CSV)
+            if (autoPilotConfig.enabled) {
+              setTimeout(async () => {
+                console.log('[Auto Pilot Gen] Batch metadata finished. Executing finale pipeline...');
+                if (autoPilotConfig.enableFtp) {
+                  // Arahkan ke FTP Uploader agar pengguna melihat progres unggah ke agensi terpilih
+                  handleSetActiveTool(ToolType.FTP_UPLOADER);
+                } else {
+                  // Unduh otomatis file embedded dan CSV
+                  try {
+                    console.log('[Auto Pilot Gen] Auto-downloading embedded files & multi-platform CSV...');
+                    await handleDownloadEmbedded();
+                    handleExport();
+                  } catch (dlErr) {
+                    console.warn('[Auto Pilot Gen] Auto-download error:', dlErr);
+                  }
+                }
+              }, 1500);
+            }
         }
 
         setIsLoading(false);
@@ -4320,13 +4369,14 @@ const App: React.FC = () => {
     };
 
     if (exportAdobe) {
-      // Adobe Stock CSV Format: Filename,Title,Keywords,Category[,Generative AI]
+      // Adobe Stock CSV Format: Filename,Title,Keywords,Category[,Generative AI,Fictional]
       const hasAnyAi = toolFiles.some(f => (f.isGenerativeAI ?? isGenerativeAI));
       const headers = hasAnyAi 
-        ? ['Filename', 'Title', 'Keywords', 'Category', 'Generative AI']
+        ? ['Filename', 'Title', 'Keywords', 'Category', 'Generative AI', 'Fictional']
         : ['Filename', 'Title', 'Keywords', 'Category'];
       const rows = toolFiles.map(f => {
           const isAi = !!(f.isGenerativeAI ?? isGenerativeAI);
+          const isFictional = isAi && !!(f.fictionalPeopleProperty);
           const baseCols = [
             escapeCsv(getExportFilename(f.customFileName || f.file.name, f.file)), 
             escapeCsv(f.title || ''), 
@@ -4335,6 +4385,7 @@ const App: React.FC = () => {
           ];
           if (hasAnyAi) {
             baseCols.push(isAi ? 'yes' : 'no');
+            baseCols.push(isFictional ? 'yes' : 'no');
           }
           return baseCols;
       });
@@ -4345,6 +4396,7 @@ const App: React.FC = () => {
       link.download = `MetazoAI_Export_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
+
 
     if (exportShutterstock) {
       // Shutterstock CSV Format: Filename,Description,Keywords,Categories,Editorial,Mature content,illustration
@@ -5032,6 +5084,8 @@ const App: React.FC = () => {
           setSidebarOpen={setSidebarOpen} 
           setShowInfoModal={setShowInfoModal} 
           setShowSettingsModal={setShowSettingsModal}
+          setShowAutoPilotModal={setShowAutoPilotModal}
+          autoPilotEnabled={!!autoPilotConfig.enabled}
           t={t} 
           setShowActivation={setShowActivationModal}
           isLicensed={!!isMzLicensed}
@@ -5144,6 +5198,15 @@ const App: React.FC = () => {
               onSendToMetadataGen={(passedFiles) => {
                 if (passedFiles && passedFiles.length > 0) {
                   handleFileChange({ target: { files: passedFiles } });
+                  handleSetActiveTool(ToolType.IMAGE);
+                  
+                  // Jika Auto Pilot Gen aktif, langsung jalankan pembuatan metadata secara otomatis
+                  if (autoPilotConfig.enabled) {
+                    setTimeout(() => {
+                      console.log('[Auto Pilot Gen] Auto-triggering handleGenerateAll for incoming files...');
+                      handleGenerateAll(false);
+                    }, 1200);
+                  }
                 }
               }}
               aiOptions={commonAiOptions}
@@ -7534,6 +7597,16 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      <AutoPilotModal 
+        isOpen={showAutoPilotModal} 
+        onClose={() => setShowAutoPilotModal(false)} 
+        uiLanguage={uiLanguage} 
+        config={autoPilotConfig} 
+        onSaveConfig={handleSaveAutoPilotConfig} 
+        isLicensed={isMzLicensed} 
+        onOpenActivation={() => setShowActivationModal(true)} 
+      />
 
       <AboutModal 
         isOpen={showAboutModal} 
