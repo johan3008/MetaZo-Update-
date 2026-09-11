@@ -131,6 +131,32 @@ export const ImageQualityCheck: React.FC<{
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<Record<string, 'technical' | 'legal' | 'ai' | 'seo'>>({});
   const [copiedState, setCopiedState] = useState<Record<string, string>>({});
+  const [autoPilotForwardCountdown, setAutoPilotForwardCountdown] = useState<{ seconds: number; files: File[] } | null>(null);
+  const autoPilotTimerRef = useRef<any>(null);
+
+  const cancelAutoPilotForward = () => {
+    if (autoPilotTimerRef.current) {
+      clearInterval(autoPilotTimerRef.current);
+      autoPilotTimerRef.current = null;
+    }
+    setAutoPilotForwardCountdown(null);
+  };
+
+  const executeAutoPilotForwardNow = (filesToForward?: File[]) => {
+    const targetFiles = filesToForward || autoPilotForwardCountdown?.files;
+    cancelAutoPilotForward();
+    if (targetFiles && targetFiles.length > 0 && onSendToMetadataGen) {
+      onSendToMetadataGen(targetFiles);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (autoPilotTimerRef.current) {
+        clearInterval(autoPilotTimerRef.current);
+      }
+    };
+  }, []);
   
   const isStoppingRef = useRef(false);
   const queueRef = useRef<QCQueueItem[]>([]);
@@ -653,23 +679,49 @@ export const ImageQualityCheck: React.FC<{
     setCurrentProcessingId(null);
     setIsProcessing(false);
 
-    // 🚀 AUTO PILOT GEN: Jika aktif & akun PRO (isLicensed), periksa apakah ada file lolos (PASS) dan teruskan langsung ke MetadataGen
+    // 🚀 AUTO PILOT GEN: Hanya teruskan jika aktif, akun PRO (isLicensed), autoForwardQC diaktifkan, dan SELURUH antrean telah selesai diproses!
     try {
       const savedAp = localStorage.getItem('mz_autopilot_config');
       if (isLicensed && savedAp && onSendToMetadataGen && !isStoppingRef.current) {
-        const apConfig = JSON.parse(savedAp);
-        if (apConfig && apConfig.enabled) {
-          const minScore = typeof apConfig.qcMinScore === 'number' ? apConfig.qcMinScore : 75;
-          const passedItems = queueRef.current.filter(it => 
-            it.status === 'done' && 
-            it.report && 
-            (it.report.recommendation === 'PASS' || (typeof it.report.overallScore === 'number' && it.report.overallScore >= minScore))
-          );
-          if (passedItems.length > 0) {
-            console.log(`[Auto Pilot Gen] Forwarding ${passedItems.length} passed files to MetadataGen...`);
-            setTimeout(() => {
-              onSendToMetadataGen(passedItems.map(it => it.file));
-            }, 300);
+        // Validasi: Pastikan SEMUA file di antrean sudah selesai diproses (tidak ada yang pending atau processing)
+        const currentQueue = queueRef.current;
+        const totalItems = currentQueue.length;
+        const hasUnfinished = currentQueue.some(it => it.status === 'pending' || it.status === 'processing');
+
+        if (totalItems > 0 && !hasUnfinished) {
+          const apConfig = JSON.parse(savedAp);
+          // Default autoForwardQC adalah FALSE agar pengguna tetap bisa melihat hasil audit di Tab Quality Issues
+          if (apConfig && apConfig.enabled && apConfig.autoForwardQC) {
+            const minScore = typeof apConfig.qcMinScore === 'number' ? apConfig.qcMinScore : 75;
+            const passedItems = currentQueue.filter(it => 
+              it.status === 'done' && 
+              it.report && 
+              (it.report.recommendation === 'PASS' || (typeof it.report.overall_score === 'number' && it.report.overall_score >= minScore))
+            );
+            if (passedItems.length > 0) {
+              console.log(`[Auto Pilot Gen] All ${totalItems} items finished. autoForwardQC active. Starting 5s countdown for ${passedItems.length} passed files...`);
+              const filesToForward = passedItems.map(it => it.file);
+              cancelAutoPilotForward();
+              let remaining = 5;
+              setAutoPilotForwardCountdown({ seconds: remaining, files: filesToForward });
+
+              autoPilotTimerRef.current = setInterval(() => {
+                remaining -= 1;
+                if (remaining <= 0) {
+                  if (autoPilotTimerRef.current) {
+                    clearInterval(autoPilotTimerRef.current);
+                    autoPilotTimerRef.current = null;
+                  }
+                  setAutoPilotForwardCountdown(null);
+                  onSendToMetadataGen(filesToForward);
+                } else {
+                  setAutoPilotForwardCountdown({ seconds: remaining, files: filesToForward });
+                }
+              }, 1000);
+            }
+          } else if (apConfig && apConfig.enabled && !apConfig.autoForwardQC) {
+            // Tetap di Tab Quality Issues! Pengguna dapat meninjau hasil audit secara leluasa.
+            console.log('[Auto Pilot Gen] All items finished, autoForwardQC is disabled (default). Staying on Quality Issues tab.');
           }
         }
       }
@@ -860,6 +912,49 @@ export const ImageQualityCheck: React.FC<{
           </div>
         </div>
       </div>
+
+      {/* Auto Pilot Countdown Alert Banner */}
+      {autoPilotForwardCountdown && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border border-amber-500/40 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-amber-500/10"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
+              <Zap size={18} className="animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase text-amber-900 dark:text-amber-200">
+                  Auto Pilot: {autoPilotForwardCountdown.files.length} File Lolos QC
+                </span>
+                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-500 text-white animate-pulse">
+                  Pindah dalam {autoPilotForwardCountdown.seconds}s
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+                File akan dialihkan ke Tab MetadataGen untuk pembuatan judul & keyword otomatis.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={cancelAutoPilotForward}
+              className="px-4 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-black uppercase tracking-wider border border-slate-200 dark:border-white/10 transition-all cursor-pointer shadow-xs"
+            >
+              Tetap di Sini (Batal)
+            </button>
+            <button
+              onClick={() => executeAutoPilotForwardNow()}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-black uppercase tracking-wider shadow-sm shadow-amber-500/20 transition-all cursor-pointer"
+            >
+              Pindah Sekarang ➔
+            </button>
+          </div>
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
         {/* Left Stats, Settings & Queue Upload Hub (4 cols) */}

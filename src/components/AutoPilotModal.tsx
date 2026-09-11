@@ -15,6 +15,7 @@ export interface AutoPilotConfig {
   isGenerativeAI: boolean;
   aiModelSource: string;
   qcMinScore: number; // 70 - 95 (Passing threshold for QC)
+  autoForwardQC: boolean; // false: stay on QC tab, true: auto-forward to MetadataGen after countdown
   enableFtp: boolean; // true: upload to FTP, false: auto download embedded & CSV
   targetAgencies: string[]; // ['adobestock', 'shutterstock', 'freepik']
 }
@@ -29,6 +30,7 @@ export const DEFAULT_AUTOPILOT_CONFIG: AutoPilotConfig = {
   isGenerativeAI: true,
   aiModelSource: 'Midjourney',
   qcMinScore: 75,
+  autoForwardQC: false,
   enableFtp: false,
   targetAgencies: ['adobestock', 'shutterstock', 'freepik']
 };
@@ -404,6 +406,35 @@ export const AutoPilotModal: React.FC<AutoPilotModalProps> = ({
                   <span>75% (Standar Rekomendasi)</span>
                   <span>80% (Ketat)</span>
                   <span>90% (Ultra Curation)</span>
+                </div>
+              </div>
+
+              {/* Opsi: Otomatis Pindah ke Tab MetadataGen saat Lolos QC */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="pr-4">
+                    <div className="flex items-center space-x-2">
+                      <ArrowRight size={14} className="text-amber-500" />
+                      <p className="font-black text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
+                        {isIndo ? 'Otomatis Pindah ke Tab MetadataGen saat Lolos QC' : 'Auto-Transfer to MetadataGen on QC Pass'}
+                      </p>
+                    </div>
+                    <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-medium mt-1 leading-relaxed">
+                      {isIndo 
+                        ? 'Jika NONAKTIF (Rekomendasi), Anda tetap di Tab Quality Issues untuk meninjau audit & detail skor. Anda dapat klik "Kirim Semua Lolos ke MetadataGen" secara manual.' 
+                        : 'If DISABLED (Recommended), you remain on Quality Issues to inspect audit details. You can still manually click "Send Passed to MetadataGen".'}
+                    </p>
+                  </div>
+
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input 
+                      type="checkbox"
+                      checked={localConfig.autoForwardQC}
+                      onChange={(e) => setLocalConfig(prev => ({ ...prev, autoForwardQC: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-500 shadow-inner"></div>
+                  </label>
                 </div>
               </div>
 

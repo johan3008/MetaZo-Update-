@@ -376,6 +376,20 @@
                 transition: none !important;
             }
         }
+
+        /* Above-the-fold Hero content must always be visible immediately on mobile (prevent white/blank area) */
+        @media (max-width: 768px) {
+            section:first-of-type .reveal-on-scroll,
+            section:first-of-type .reveal-left,
+            section:first-of-type .reveal-right,
+            section:first-of-type .reveal-scale,
+            section:first-of-type .stagger-1,
+            section:first-of-type .stagger-2,
+            section:first-of-type .stagger-3 {
+                opacity: 1 !important;
+                transform: none !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 dark:bg-[#090d16] dark:text-slate-100 transition-colors duration-300 relative selection:bg-brand-600 selection:text-white">
@@ -455,7 +469,7 @@
                 </button>
 
                 <!-- CTA Button Desktop & Tablet -->
-                <a href="/app" class="relative inline-flex items-center justify-center px-4 py-2.5 rounded-xl font-bold text-[11.5px] tracking-wider uppercase text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-md shadow-brand-600/25 hover:shadow-brand-600/40 hover:scale-[1.02] active:scale-[0.98] transition-all min-h-[40px]">
+                <a href="/app" class="relative hidden sm:inline-flex items-center justify-center px-4 py-2.5 rounded-xl font-bold text-[11.5px] tracking-wider uppercase text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 shadow-md shadow-brand-600/25 hover:shadow-brand-600/40 hover:scale-[1.02] active:scale-[0.98] transition-all min-h-[40px]">
                     <span>Buka Web App</span>
                     <svg class="w-3.5 h-3.5 ml-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -1895,16 +1909,18 @@
                 if (p) p.innerText = tr.featSub;
 
                 // Auto Pilot Gen Flagship Card
-                const apBadge = featSec.querySelector('.border-amber-500\\/50 span.animate-pulse');
-                if (apBadge) apBadge.innerText = tr.autopilotBadge;
-                const apTag = featSec.querySelector('.border-amber-500\\/50 h3 span.text-amber-500');
-                if (apTag) apTag.innerText = tr.autopilotTag;
-                const apDesc = featSec.querySelector('.border-amber-500\\/50 p');
-                if (apDesc) apDesc.innerText = tr.autopilotDesc;
-                const apFooter = featSec.querySelector('.border-amber-500\\/50 .border-t span.text-amber-600');
-                if (apFooter) apFooter.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span> ${tr.autopilotFooter}`;
-                const apSpeed = featSec.querySelector('.border-amber-500\\/50 .border-t span.border-amber-500\\/30');
-                if (apSpeed) apSpeed.innerText = tr.autopilotSpeed;
+                try {
+                    const apBadge = featSec.querySelector('[class*="border-amber-500"] span.animate-pulse');
+                    if (apBadge) apBadge.innerText = tr.autopilotBadge;
+                    const apTag = featSec.querySelector('[class*="border-amber-500"] h3 span.text-amber-500');
+                    if (apTag) apTag.innerText = tr.autopilotTag;
+                    const apDesc = featSec.querySelector('[class*="border-amber-500"] p');
+                    if (apDesc) apDesc.innerText = tr.autopilotDesc;
+                    const apFooter = featSec.querySelector('[class*="border-amber-500"] .border-t span.text-amber-600');
+                    if (apFooter) apFooter.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span> ${tr.autopilotFooter}`;
+                    const apSpeed = featSec.querySelector('[class*="border-amber-500"] .border-t span[class*="border-amber"]');
+                    if (apSpeed) apSpeed.innerText = tr.autopilotSpeed;
+                } catch(e) {}
             }
 
             // Pricing Section Header
@@ -1951,8 +1967,10 @@
             }
 
             // Footer tagline
-            const footerTagline = document.querySelector('footer p.text-\\[10px\\]');
-            if (footerTagline) footerTagline.innerText = tr.footerTagline;
+            try {
+                const footerTagline = document.querySelector('footer p.text-\\[10px\\]') || document.querySelector('footer p:last-child');
+                if (footerTagline) footerTagline.innerText = tr.footerTagline;
+            } catch(e) {}
         }
 
         function setLandingLanguage(lang) {
@@ -2064,6 +2082,14 @@
         // --- 2.2 INTERSECTION OBSERVER FOR SCROLL REVEAL ANIMATIONS ---
         function initScrollAnimations() {
             const revealElements = document.querySelectorAll('.reveal-on-scroll, .reveal-left, .reveal-right, .reveal-scale');
+            
+            // Immediately reveal any above-the-fold hero elements so mobile never displays a blank white area
+            document.querySelectorAll('section:first-of-type .reveal-on-scroll, section:first-of-type .reveal-left, section:first-of-type .reveal-right, section:first-of-type .reveal-scale').forEach(el => {
+                el.classList.add('revealed');
+                const counters = el.querySelectorAll('[data-counter]');
+                counters.forEach(counter => animateCounter(counter));
+            });
+
             if (!('IntersectionObserver' in window)) {
                 revealElements.forEach(el => el.classList.add('revealed'));
                 return;

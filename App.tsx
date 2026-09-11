@@ -1114,6 +1114,8 @@ const App: React.FC = () => {
   const [prefilledSubject, setPrefilledSubject] = useState('');
   const [files, setFiles] = useState<FileItem[]>([]);
   const filesRef = useRef<FileItem[]>([]);
+  const activeToolRef = useRef<ToolType>(activeTool);
+  activeToolRef.current = activeTool;
   
   // --- TRIK LICIK 4: SYNCHRONOUS STATE UPDATE ---
   // Di background tab, React 18 sering menunda (batch) atau bahkan menghentikan
@@ -2237,6 +2239,7 @@ const App: React.FC = () => {
       setComingSoonFeature('motion_gen');
       return;
     }
+    activeToolRef.current = tool;
     setActiveTool(tool);
     const path = toolToPath[tool] || '/Dashboard';
     const isIframe = typeof window !== 'undefined' && window.self !== window.top;
@@ -4057,8 +4060,15 @@ const App: React.FC = () => {
                   // Unduh otomatis file embedded dan CSV
                   try {
                     console.log('[Auto Pilot Gen] Auto-downloading embedded files & multi-platform CSV...');
-                    await handleDownloadEmbedded();
-                    handleExport();
+                    const latestFiles = filesRef.current;
+                    const tool = activeToolRef.current || activeTool;
+                    const completed = getFilesForTool(latestFiles, tool).filter(f => (f.title || f.description) && f.file);
+                    if (completed.length > 0) {
+                      await handleDownloadEmbedded(latestFiles);
+                      handleExport(latestFiles);
+                    } else {
+                      console.warn('[Auto Pilot Gen] No completed files with metadata to download yet.');
+                    }
                   } catch (dlErr) {
                     console.warn('[Auto Pilot Gen] Auto-download error:', dlErr);
                   }
@@ -4326,8 +4336,10 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, [files, autoBackup, user?.uid]);
 
-  const handleExport = () => {
-    const toolFiles = getFilesForTool(files, activeTool);
+  const handleExport = (explicitFiles?: FileItem[]) => {
+    const currentTool = activeToolRef.current || activeTool;
+    const currentFiles = explicitFiles || filesRef.current;
+    const toolFiles = getFilesForTool(currentFiles, currentTool);
     if (!toolFiles.length) return;
 
     const escapeCsv = (str: string) => {
@@ -4393,7 +4405,7 @@ const App: React.FC = () => {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `MetazoAI_Export_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `MetazoAI_Export_${currentTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
 
@@ -4415,14 +4427,14 @@ const App: React.FC = () => {
               escapeCsv([f.shutterstockCategory1, f.shutterstockCategory2].filter(Boolean).filter(c => c.toLowerCase() !== 'arts').map(c => c.toLowerCase()).join(', ')),
               'no',
               'no',
-              activeTool === ToolType.VECTOR ? 'yes' : 'no'
+              currentTool === ToolType.VECTOR ? 'yes' : 'no'
           ];
       });
       const csvContent = "\ufeff" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `MetaZo_Shutterstock_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `MetaZo_Shutterstock_${currentTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
 
@@ -4467,7 +4479,7 @@ const App: React.FC = () => {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `MetaZo_Vecteezy_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `MetaZo_Vecteezy_${currentTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
 
@@ -4486,7 +4498,7 @@ const App: React.FC = () => {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `MetaZo_Canva_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `MetaZo_Canva_${currentTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
 
@@ -4509,7 +4521,7 @@ const App: React.FC = () => {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `MetaZo_Freepik_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `MetaZo_Freepik_${currentTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
 
@@ -4527,7 +4539,7 @@ const App: React.FC = () => {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `MetaZo_Pond5_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `MetaZo_Pond5_${currentTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
 
@@ -4543,7 +4555,7 @@ const App: React.FC = () => {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `MetaZo_DepositPhotos_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `MetaZo_DepositPhotos_${currentTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
 
@@ -4558,7 +4570,7 @@ const App: React.FC = () => {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `MetaZo_MiriCanvas_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `MetaZo_MiriCanvas_${currentTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
 
@@ -4573,7 +4585,7 @@ const App: React.FC = () => {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `MetaZo_123RF_${activeTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `MetaZo_123RF_${currentTool.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
   };
@@ -4804,11 +4816,15 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDownloadEmbedded = async () => {
-    const toolFiles = getFilesForTool(files, activeTool);
+  const handleDownloadEmbedded = async (explicitFiles?: FileItem[]) => {
+    const currentTool = activeToolRef.current || activeTool;
+    const currentFiles = explicitFiles || filesRef.current;
+    const toolFiles = getFilesForTool(currentFiles, currentTool);
     const completedFiles = toolFiles.filter(f => (f.title || f.description) && f.file);
     if (completedFiles.length === 0) {
-      alert(uiLanguage === 'id' ? 'Belum ada file dengan metadata selesai untuk diunduh.' : 'No completed files with metadata to embed.');
+      if (!explicitFiles) {
+        alert(uiLanguage === 'id' ? 'Belum ada file dengan metadata selesai untuk diunduh.' : 'No completed files with metadata to embed.');
+      }
       return;
     }
 
@@ -4854,7 +4870,7 @@ const App: React.FC = () => {
       if (zipEntries.length > 0) {
         const dateStr = new Date().toISOString().split('T')[0];
         const zipBlob = await createZipBlob(zipEntries);
-        const zipFilename = `MetaZo_Embedded_${activeTool.toUpperCase()}_${dateStr}.zip`;
+        const zipFilename = `MetaZo_Embedded_${currentTool.toUpperCase()}_${dateStr}.zip`;
         triggerBlobDownload(zipBlob, zipFilename);
       }
     } catch (e) {
