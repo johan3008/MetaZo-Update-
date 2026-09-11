@@ -1473,7 +1473,7 @@ export async function createZipBlob(entries: ZipEntryInput[]): Promise<Blob> {
     size: number;
     offset: number;
     localHeader: Uint8Array;
-    dataBytes: Uint8Array;
+    dataBlob: BlobPart;
   }[] = [];
 
   let currentOffset = 0;
@@ -1484,12 +1484,16 @@ export async function createZipBlob(entries: ZipEntryInput[]): Promise<Blob> {
   for (const entry of entries) {
     const nameBytes = enc.encode(entry.name);
     let dataBytes: Uint8Array;
+    let dataPart: BlobPart;
     if (entry.data instanceof Uint8Array) {
       dataBytes = entry.data;
+      dataPart = dataBytes;
     } else if (entry.data instanceof Blob) {
       dataBytes = new Uint8Array(await entry.data.arrayBuffer());
+      dataPart = entry.data;
     } else {
       dataBytes = new Uint8Array(0);
+      dataPart = dataBytes;
     }
 
     const checksum = crc32(dataBytes);
@@ -1517,7 +1521,7 @@ export async function createZipBlob(entries: ZipEntryInput[]): Promise<Blob> {
       size,
       offset: currentOffset,
       localHeader,
-      dataBytes
+      dataBlob: dataPart
     });
 
     currentOffset += localHeader.length + size;
@@ -1569,7 +1573,7 @@ export async function createZipBlob(entries: ZipEntryInput[]): Promise<Blob> {
   const blobParts: BlobPart[] = [];
   for (const rec of fileRecords) {
     blobParts.push(rec.localHeader);
-    blobParts.push(rec.dataBytes);
+    blobParts.push(rec.dataBlob);
   }
   for (const cd of centralDirHeaders) {
     blobParts.push(cd);

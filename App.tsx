@@ -4390,6 +4390,26 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, [files, autoBackup, user?.uid]);
 
+  const getExportFilename = (originalName: string, originalFile: File) => {
+      if (!originalFile || !originalFile.name) return originalName;
+      const origExt = originalFile.name.split('.').pop()?.toLowerCase() || '';
+      if (!origExt) return originalName;
+
+      const suffix = `.${origExt}`;
+      if (originalName.toLowerCase().endsWith(suffix)) {
+          return originalName;
+      }
+
+      if (origExt === 'jpg' && originalName.toLowerCase().endsWith('.jpeg')) {
+          return originalName;
+      }
+      if (origExt === 'jpeg' && originalName.toLowerCase().endsWith('.jpg')) {
+          return originalName;
+      }
+
+      return `${originalName}.${origExt}`;
+  };
+
   const handleExport = (explicitFiles?: FileItem[]) => {
     const currentTool = activeToolRef.current || activeTool;
     const currentFiles = explicitFiles || filesRef.current;
@@ -4412,26 +4432,6 @@ const App: React.FC = () => {
             return `"${s.replace(/"/g, '""')}"`;
         }
         return s;
-    };
-
-    const getExportFilename = (originalName: string, originalFile: File) => {
-        if (!originalFile || !originalFile.name) return originalName;
-        const origExt = originalFile.name.split('.').pop()?.toLowerCase() || '';
-        if (!origExt) return originalName;
-
-        const suffix = `.${origExt}`;
-        if (originalName.toLowerCase().endsWith(suffix)) {
-            return originalName;
-        }
-
-        if (origExt === 'jpg' && originalName.toLowerCase().endsWith('.jpeg')) {
-            return originalName;
-        }
-        if (origExt === 'jpeg' && originalName.toLowerCase().endsWith('.jpg')) {
-            return originalName;
-        }
-
-        return `${originalName}.${origExt}`;
     };
 
     if (exportAdobe) {
@@ -4900,9 +4900,31 @@ const App: React.FC = () => {
       for (let i = 0; i < completedFiles.length; i++) {
         setEmbedProgress({ current: i + 1, total: completedFiles.length });
         const item = completedFiles[i];
-        const res = await getEmbeddedBlobForItem(item, embedNamingMode);
-        if (res) {
-          let uniqueName = res.exportName;
+        if (!item || !item.file) continue;
+
+        try {
+          const res = await getEmbeddedBlobForItem(item, embedNamingMode);
+          if (res && res.blob) {
+            let uniqueName = res.exportName || item.file.name;
+            let counter = 1;
+            const dotIdx = uniqueName.lastIndexOf('.');
+            const base = dotIdx !== -1 ? uniqueName.slice(0, dotIdx) : uniqueName;
+            const ext = dotIdx !== -1 ? uniqueName.slice(dotIdx) : '';
+
+            while (usedNames.has(uniqueName.toLowerCase())) {
+              uniqueName = `${base}_${counter}${ext}`;
+              counter++;
+            }
+            usedNames.add(uniqueName.toLowerCase());
+
+            zipEntries.push({
+              name: uniqueName,
+              data: res.blob
+            });
+          }
+        } catch (itemErr) {
+          console.warn(`[Download Embedded] Fallback raw file for ${item.file.name}:`, itemErr);
+          let uniqueName = item.file.name;
           let counter = 1;
           const dotIdx = uniqueName.lastIndexOf('.');
           const base = dotIdx !== -1 ? uniqueName.slice(0, dotIdx) : uniqueName;
@@ -4916,7 +4938,7 @@ const App: React.FC = () => {
 
           zipEntries.push({
             name: uniqueName,
-            data: res.blob
+            data: item.file
           });
         }
       }
@@ -4926,6 +4948,8 @@ const App: React.FC = () => {
         const zipBlob = await createZipBlob(zipEntries);
         const zipFilename = `MetaZo_Embedded_${currentTool.toUpperCase()}_${dateStr}.zip`;
         triggerBlobDownload(zipBlob, zipFilename);
+      } else {
+        alert(uiLanguage === 'id' ? 'Tidak ada file media yang dapat dikemas ke dalam ZIP.' : 'No media files available to pack into ZIP.');
       }
     } catch (e) {
       console.error('[Download Embedded] Error:', e);
