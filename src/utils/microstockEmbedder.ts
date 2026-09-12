@@ -963,6 +963,90 @@ export function fillXmpPadding(target: Uint8Array, offset: number, length: numbe
   }
 }
 
+/**
+ * Surgically updates metadata inside an existing XMP packet without destroying
+ * critical Adobe Illustrator vector structures (such as <xmp:Thumbnails>,
+ * <xmpTPg:MaxPageSize> artboard dimensions, <xmpMM:DocumentID>, and <illustrator:StartupProfile>).
+ * Adobe Stock's ingestion engine validates artboard dimensions (4MP - 25MP) and vector previews
+ * from these Illustrator tags; if wiped out, Adobe Stock rejects the EPS with "had upload errors".
+ */
+function updateExistingEpsXmp(
+  xmpStr: string,
+  metadata: MicrostockMetadataInput
+): string {
+  let xml = xmpStr;
+
+  const title = String(metadata.title || '').trim();
+  const desc = String(metadata.description || metadata.comment || title).trim();
+  const keywords = cleanKeywordArray(metadata.keywords).slice(0, 49);
+  const creator = String(metadata.creator || 'MetaZo Contributor').trim();
+
+  // 1. Update or insert dc:title
+  const titleXml = `<dc:title>\n            <rdf:Alt>\n               <rdf:li xml:lang="x-default">${escapeXml(title)}</rdf:li>\n            </rdf:Alt>\n         </dc:title>`;
+  if (/<dc:title>[\s\S]*?<\/dc:title>/.test(xml)) {
+    xml = xml.replace(/<dc:title>[\s\S]*?<\/dc:title>/, titleXml);
+  } else {
+    xml = xml.replace('</rdf:Description>', `   ${titleXml}\n      </rdf:Description>`);
+  }
+
+  // 2. Update or insert dc:description
+  const descXml = `<dc:description>\n            <rdf:Alt>\n               <rdf:li xml:lang="x-default">${escapeXml(desc)}</rdf:li>\n            </rdf:Alt>\n         </dc:description>`;
+  if (/<dc:description>[\s\S]*?<\/dc:description>/.test(xml)) {
+    xml = xml.replace(/<dc:description>[\s\S]*?<\/dc:description>/, descXml);
+  } else {
+    xml = xml.replace('</rdf:Description>', `   ${descXml}\n      </rdf:Description>`);
+  }
+
+  // 3. Update or insert dc:subject (keywords)
+  const kwItems = keywords.map(k => `               <rdf:li>${escapeXml(k)}</rdf:li>`).join('\n');
+  const subjXml = `<dc:subject>\n            <rdf:Bag>\n${kwItems}\n            </rdf:Bag>\n         </dc:subject>`;
+  if (/<dc:subject>[\s\S]*?<\/dc:subject>/.test(xml)) {
+    xml = xml.replace(/<dc:subject>[\s\S]*?<\/dc:subject>/, subjXml);
+  } else {
+    xml = xml.replace('</rdf:Description>', `   ${subjXml}\n      </rdf:Description>`);
+  }
+
+  // 4. Update or insert pdf:Keywords
+  const pdfKw = `<pdf:Keywords>${escapeXml(keywords.join(', '))}</pdf:Keywords>`;
+  if (/<pdf:Keywords>[\s\S]*?<\/pdf:Keywords>/.test(xml)) {
+    xml = xml.replace(/<pdf:Keywords>[\s\S]*?<\/pdf:Keywords>/, pdfKw);
+  } else {
+    xml = xml.replace('</rdf:Description>', `   ${pdfKw}\n      </rdf:Description>`);
+  }
+
+  // 5. Update or insert photoshop:Headline
+  const headline = `<photoshop:Headline>${escapeXml(title)}</photoshop:Headline>`;
+  if (/<photoshop:Headline>[\s\S]*?<\/photoshop:Headline>/.test(xml)) {
+    xml = xml.replace(/<photoshop:Headline>[\s\S]*?<\/photoshop:Headline>/, headline);
+  } else {
+    if (!xml.includes('xmlns:photoshop=')) {
+      xml = xml.replace('<rdf:Description rdf:about=""', '<rdf:Description rdf:about=""\n            xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"');
+    }
+    xml = xml.replace('</rdf:Description>', `   ${headline}\n      </rdf:Description>`);
+  }
+
+  // 6. Creator
+  const creatorXml = `<dc:creator>\n            <rdf:Seq>\n               <rdf:li>${escapeXml(creator)}</rdf:li>\n            </rdf:Seq>\n         </dc:creator>`;
+  if (/<dc:creator>[\s\S]*?<\/dc:creator>/.test(xml)) {
+    xml = xml.replace(/<dc:creator>[\s\S]*?<\/dc:creator>/, creatorXml);
+  } else {
+    xml = xml.replace('</rdf:Description>', `   ${creatorXml}\n      </rdf:Description>`);
+  }
+
+  // 7. Generative AI source tag
+  if (metadata.isGenerativeAI) {
+    if (!xml.includes('xmlns:Iptc4xmpExt=')) {
+      xml = xml.replace('<rdf:Description rdf:about=""', '<rdf:Description rdf:about=""\n            xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"');
+    }
+    const aiTag = `<Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType>`;
+    if (!xml.includes('DigitalSourceType')) {
+      xml = xml.replace('</rdf:Description>', `   ${aiTag}\n      </rdf:Description>`);
+    }
+  }
+
+  return xml;
+}
+
 export function embedEpsMetadataBytes(
   inputBytes: Uint8Array,
   metadata: MicrostockMetadataInput
@@ -1054,15 +1138,26 @@ export function embedEpsMetadataBytes(
         const packetEnd = closeIdx + 2;
         const existingLen = packetEnd - packetStart;
 
-        const xmpString = buildXmpPacket(metadata, 'application/postscript');
-        const endMarkerRegex = /<\?xpacket\s+end=["'][wr]["']\?>\s*$/i;
-        const xmpCore = xmpString.replace(endMarkerRegex, '').trimEnd();
+        // Try surgical update first: preserves Illustrator thumbnails, artboard size, and DocumentID
+        const existingXmpStr = new TextDecoder('utf8').decode(workingBytes.subarray(packetStart, packetEnd));
+        const closeMetaIdx = existingXmpStr.indexOf('</x:xmpmeta>');
+        let xmpCore: string;
+
+        if (closeMetaIdx !== -1) {
+          const existingCore = existingXmpStr.substring(0, closeMetaIdx + 12);
+          xmpCore = updateExistingEpsXmp(existingCore, metadata);
+        } else {
+          const xmpString = buildXmpPacket(metadata, 'application/postscript');
+          const endMarkerRegex = /<\?xpacket\s+end=["'][wr]["']\?>\s*$/i;
+          xmpCore = xmpString.replace(endMarkerRegex, '').trimEnd();
+        }
+
         const endTrailer = '<?xpacket end="w"?>';
         const coreBytes = new TextEncoder().encode(xmpCore);
         const endTrailerBytes = new TextEncoder().encode(endTrailer);
         const requiredLen = coreBytes.length + endTrailerBytes.length;
 
-        // In-place replacement with whitespace padding (Exact original file size maintained!)
+        // In-place replacement with whitespace padding (EXACT ORIGINAL FILE SIZE MAINTAINED 100%!)
         if (requiredLen <= existingLen) {
           const result = new Uint8Array(workingBytes.length);
           result.set(workingBytes);
