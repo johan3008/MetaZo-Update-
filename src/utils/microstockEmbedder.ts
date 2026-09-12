@@ -1210,57 +1210,161 @@ export function embedEpsMetadataBytes(
     }
   }
 
-  // 3. Fallback for legacy EPS files without existing XMP:
-  // Must insert AFTER %%EndComments or after DSC comment header lines so %%BoundingBox is NOT displaced!
-  const endCommentsBytes = new TextEncoder().encode('%%EndComments');
-  let insertPos = findSubarray(workingBytes, endCommentsBytes, psStart, psEnd);
+  // 3. Fallback for EPS files without an existing XMP packet.
+  //
+  // IMPORTANT: XMP in EPS is NOT a simple comment block. Adobe's XMP
+  // specification requires a %ADO_ContainsXMP marker in the DSC header and
+  // a real PostScript metadata stream. The XMP packet must be consumed by
+  // currentfile/SubFileDecode so the XML is never executed as PostScript.
+  // The EPS drawing content is bracketed with /BDC and /EMC pdfmarks.
+  //
+  // This is the critical difference from the old %XMPbegin/%XMPend fallback,
+  // which could produce an EPS that looked valid but failed strict parsers.
 
-  if (insertPos !== -1) {
-    insertPos += endCommentsBytes.length;
-    while (insertPos < workingBytes.length && (workingBytes[insertPos] === 0x0A || workingBytes[insertPos] === 0x0D)) {
-      insertPos++;
-    }
-  } else {
-    // Scan lines starting with '%' from psStart to find the end of DSC header comments
-    let scanPos = psStart;
-    let lastCommentEnd = psStart;
-    while (scanPos < psEnd) {
-      if (workingBytes[scanPos] === 0x25) { // '%'
-        while (scanPos < psEnd && workingBytes[scanPos] !== 0x0A && workingBytes[scanPos] !== 0x0D) {
-          scanPos++;
-        }
-        if (scanPos < psEnd && workingBytes[scanPos] === 0x0D && workingBytes[scanPos + 1] === 0x0A) {
-          scanPos += 2;
-        } else if (scanPos < psEnd) {
-          scanPos++;
-        }
-        lastCommentEnd = scanPos;
-      } else {
-        break;
-      }
-    }
-    insertPos = lastCommentEnd > psStart ? lastCommentEnd : psStart;
-  }
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder('latin1');
+  const psOriginal = workingBytes.subarray(psStart, psEnd);
+  const psText = decoder.decode(psOriginal);
+
+  // Do not create a second main-XMP marker if a damaged/partial marker exists.
+  // At this point we already know there is no complete XMP packet.
+  const marker = '%ADO_ContainsXMP: MainFirst\n';
 
   const xmpPacket = buildXmpPacket(metadata, 'application/postscript');
-  const dscBlock = `\n%XMPbegin\n${xmpPacket}\n%XMPend\n`;
-  const dscBytes = new TextEncoder().encode(dscBlock);
-  const delta = dscBytes.length;
+  // A unique PostScript object name avoids collisions when EPS files are
+  // placed inside another PostScript/EPS document.
+  const uniqueSuffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
+    .replace(/[^A-Za-z0-9]/g, '');
+  const streamName = `MetaZo_XMP_${uniqueSuffix}`;
+  const handlerName = `MetaZo_XMP_pdfmark_${uniqueSuffix}`;
+
+  // Standard Adobe/XMP EPS embedding pattern.
+  const xmpBlock =
+    `/currentdistillerparams where\n` +
+    `{pop currentdistillerparams /CoreDistVersion get 5000 lt} {true} ifelse\n` +
+    `{userdict /${handlerName} /cleartomark load put\n` +
+    `userdict /${handlerName}_read {flushfile cleartomark} bind put}\n` +
+    `{userdict /${handlerName} /pdfmark load put\n` +
+    `userdict /${handlerName}_read {/PUT pdfmark} bind put} ifelse\n` +
+    `[/NamespacePush ${handlerName}]\n` +
+    `[/_objdef {${streamName}} /type /stream /OBJ ${handlerName}]\n` +
+    `[{${streamName}} 2 dict begin\n` +
+    `/Type /Metadata def /Subtype /XML def currentdict end /PUT ${handlerName}]\n` +
+    `[{${streamName}} currentfile 0 (% &&end EPS XMP packet marker&&)\n` +
+    `/SubFileDecode filter ${handlerName}_read\n` +
+    `${xmpPacket}\n` +
+    `% &&end EPS XMP packet marker&&\n` +
+    `[/Document 1 dict begin /Metadata {${streamName}} def currentdict end /BDC ${handlerName}]\n` +
+    `[/NamespacePop ${handlerName}]\n`;
+
+  const bdcEndMarker =
+    `\n[/EMC ${handlerName}]\n`;
+
+  // Insert the required DSC marker before %%EndComments.
+  const endComments = psText.indexOf('%%EndComments');
+  let markerPos = endComments >= 0 ? endComments : 0;
+  if (!psText.includes('%ADO_ContainsXMP:')) {
+    // Marker must be in the DSC header, before %%EndComments.
+    // markerPos is a character offset in the latin1 representation, which is
+    // byte-for-byte equivalent for the EPS PostScript section.
+  } else {
+    // A marker exists but the XMP packet was incomplete. Replace it rather
+    // than creating two conflicting MainFirst declarations.
+    const markerMatch = psText.match(/^%ADO_ContainsXMP:[^\r\n]*[\r\n]?/m);
+    if (markerMatch && markerMatch.index !== undefined) {
+      const oldStart = markerMatch.index;
+      const oldEnd = oldStart + markerMatch[0].length;
+      const withoutOldMarker = psText.slice(0, oldStart) + psText.slice(oldEnd);
+      const adjustedEndComments = withoutOldMarker.indexOf('%%EndComments');
+      const pos = adjustedEndComments >= 0 ? adjustedEndComments : 0;
+      const updated = withoutOldMarker.slice(0, pos) + marker + withoutOldMarker.slice(pos);
+      // Continue using the updated text below.
+      // This branch only occurs for malformed files produced by the previous
+      // embedder, so a text rebuild is safer than trying to preserve offsets.
+      const afterComments = updated.indexOf('%%EndComments');
+      let setupPos = afterComments >= 0 ? afterComments + '%%EndComments'.length : 0;
+      while (setupPos < updated.length && (updated[setupPos] === '\n' || updated[setupPos] === '\r')) setupPos++;
+      const endSetup = updated.indexOf('%%EndSetup');
+      const endProlog = updated.indexOf('%%EndProlog');
+      const candidates = [endSetup, endProlog].filter((n) => n >= 0);
+      if (candidates.length) {
+        setupPos = Math.max(...candidates);
+        setupPos += updated.slice(setupPos).startsWith('%%EndSetup') ? '%%EndSetup'.length : '%%EndProlog'.length;
+      }
+      const trailer = updated.indexOf('%%Trailer');
+      const eof = updated.lastIndexOf('%%EOF');
+      const emcPos = trailer >= 0 ? trailer : (eof >= 0 ? eof : updated.length);
+      const finalPsText = updated.slice(0, setupPos) + '\n' + xmpBlock + '\n' + updated.slice(setupPos, emcPos) + bdcEndMarker + updated.slice(emcPos);
+      const finalPs = encoder.encode(finalPsText);
+      const delta = finalPs.length - psOriginal.length;
+      const result = new Uint8Array(workingBytes.length + delta);
+      result.set(workingBytes.subarray(0, psStart), 0);
+      result.set(finalPs, psStart);
+      result.set(workingBytes.subarray(psEnd), psStart + finalPs.length);
+      if (isDosEps) {
+        const view = new DataView(result.buffer, result.byteOffset, 30);
+        view.setUint32(8, psLength + delta, true);
+        if (wmfStart > psEnd) view.setUint32(12, wmfStart + delta, true);
+        if (tiffStart > psEnd) view.setUint32(20, tiffStart + delta, true);
+      }
+      return result;
+    }
+  }
+
+  // Normal no-XMP path.
+  const headerText = psText;
+  const headerMarkerPos = headerText.indexOf('%%EndComments');
+  const markerInsert = headerMarkerPos >= 0 ? headerMarkerPos : 0;
+  let textWithMarker = headerText;
+  if (!headerText.includes('%ADO_ContainsXMP:')) {
+    textWithMarker = headerText.slice(0, markerInsert) + marker + headerText.slice(markerInsert);
+  }
+
+  // Place the XMP setup after the prolog/setup declarations, but before the
+  // actual drawing program. This avoids putting pdfmark setup into %%BeginProlog
+  // and follows the EPS ordering requirement that XMP precede EPS drawing data.
+  const markerAdjustedEndComments = textWithMarker.indexOf('%%EndComments');
+  let contentStart = markerAdjustedEndComments >= 0
+    ? markerAdjustedEndComments + '%%EndComments'.length
+    : 0;
+  while (contentStart < textWithMarker.length && (textWithMarker[contentStart] === '\n' || textWithMarker[contentStart] === '\r')) contentStart++;
+
+  const endProlog = textWithMarker.indexOf('%%EndProlog');
+  const endSetup = textWithMarker.indexOf('%%EndSetup');
+  const setupCandidates = [endProlog, endSetup].filter((n) => n >= 0);
+  if (setupCandidates.length) {
+    const p = Math.max(...setupCandidates);
+    contentStart = p + (textWithMarker.startsWith('%%EndSetup', p) ? '%%EndSetup'.length : '%%EndProlog'.length);
+    while (contentStart < textWithMarker.length && (textWithMarker[contentStart] === '\n' || textWithMarker[contentStart] === '\r')) contentStart++;
+  }
+
+  const trailerPos = textWithMarker.indexOf('%%Trailer');
+  const eofPos = textWithMarker.lastIndexOf('%%EOF');
+  const emcPos = trailerPos >= 0 ? trailerPos : (eofPos >= 0 ? eofPos : textWithMarker.length);
+
+  const finalPsText =
+    textWithMarker.slice(0, contentStart) +
+    '\n' + xmpBlock +
+    textWithMarker.slice(contentStart, emcPos) +
+    bdcEndMarker +
+    textWithMarker.slice(emcPos);
+
+  const finalPs = encoder.encode(finalPsText);
+  const delta = finalPs.length - psOriginal.length;
 
   const result = new Uint8Array(workingBytes.length + delta);
-  result.set(workingBytes.subarray(0, insertPos), 0);
-  result.set(dscBytes, insertPos);
-  result.set(workingBytes.subarray(insertPos), insertPos + delta);
+  result.set(workingBytes.subarray(0, psStart), 0);
+  result.set(finalPs, psStart);
+  result.set(workingBytes.subarray(psEnd), psStart + finalPs.length);
 
+  // DOS EPS binary header offsets are absolute file offsets. Since the
+  // insertion happens inside the PostScript section, the preview offsets must
+  // move by the same total delta.
   if (isDosEps) {
     const newView = new DataView(result.buffer, result.byteOffset, 30);
     newView.setUint32(8, psLength + delta, true);
-    if (wmfStart > insertPos) {
-      newView.setUint32(12, wmfStart + delta, true);
-    }
-    if (tiffStart > insertPos) {
-      newView.setUint32(20, tiffStart + delta, true);
-    }
+    if (wmfStart > psEnd) newView.setUint32(12, wmfStart + delta, true);
+    if (tiffStart > psEnd) newView.setUint32(20, tiffStart + delta, true);
   }
 
   return result;
