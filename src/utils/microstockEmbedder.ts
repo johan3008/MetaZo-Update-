@@ -180,7 +180,7 @@ export function buildXmpPacket(metadata: MicrostockMetadataInput, mimeType: stri
     .map(c => `        <rdf:li>${escapeXml(c)}</rdf:li>`)
     .join('\n');
 
-  return `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+  return `<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0-c000 1.000000, 2022/01/01-00:00:00">
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
     <rdf:Description rdf:about=""
@@ -933,7 +933,36 @@ function findSubarray(haystack: Uint8Array, needle: Uint8Array, start = 0, limit
  * For legacy EPS without existing XMP:
  * Inserts the %XMPbegin...%XMPend block AFTER %%EndComments (never before %%BoundingBox),
  * preserving all PostScript DSC header comments and updating DOS EPS header pointers.
+/**
+ * Fills XMP whitespace padding according to Adobe XMP Specification Part 3:
+ * Generates lines of spaces delimited by \n (line length <= 100 characters)
+ * with a terminal newline before the closing <?xpacket end="w"?>.
+ * This guarantees strict PostScript Document Structuring Conventions (DSC)
+ * line-length compliance (preventing PostScript /limitcheck and line buffer overflows in Adobe Stock ingestion).
  */
+export function fillXmpPadding(target: Uint8Array, offset: number, length: number): void {
+  if (length <= 0) return;
+  let pos = offset;
+  let remaining = length;
+
+  // Leading newline right after </x:xmpmeta>
+  target[pos++] = 0x0A; // '\n'
+  remaining--;
+
+  while (remaining > 0) {
+    if (remaining === 1) {
+      target[pos++] = 0x0A; // '\n'
+      remaining--;
+    } else {
+      const chunkSize = Math.min(remaining, 100);
+      target.fill(0x20, pos, pos + chunkSize - 1);
+      target[pos + chunkSize - 1] = 0x0A; // '\n' terminates each line of spaces
+      pos += chunkSize;
+      remaining -= chunkSize;
+    }
+  }
+}
+
 export function embedEpsMetadataBytes(
   inputBytes: Uint8Array,
   metadata: MicrostockMetadataInput
@@ -1028,7 +1057,7 @@ export function embedEpsMetadataBytes(
         const xmpString = buildXmpPacket(metadata, 'application/postscript');
         const endMarkerRegex = /<\?xpacket\s+end=["'][wr]["']\?>\s*$/i;
         const xmpCore = xmpString.replace(endMarkerRegex, '').trimEnd();
-        const endTrailer = '\n<?xpacket end="w"?>';
+        const endTrailer = '<?xpacket end="w"?>';
         const coreBytes = new TextEncoder().encode(xmpCore);
         const endTrailerBytes = new TextEncoder().encode(endTrailer);
         const requiredLen = coreBytes.length + endTrailerBytes.length;
@@ -1040,19 +1069,22 @@ export function embedEpsMetadataBytes(
           result.set(coreBytes, packetStart);
           const paddingLen = existingLen - requiredLen;
           if (paddingLen > 0) {
-            result.fill(0x20, packetStart + coreBytes.length, packetStart + coreBytes.length + paddingLen);
+            fillXmpPadding(result, packetStart + coreBytes.length, paddingLen);
           }
           result.set(endTrailerBytes, packetStart + coreBytes.length + paddingLen);
           return result;
         }
 
         // Rare case: metadata exceeds existing padding -> splice in-place at packetStart
-        const delta = requiredLen - existingLen;
+        const spliceTrailer = '\n<?xpacket end="w"?>';
+        const spliceTrailerBytes = new TextEncoder().encode(spliceTrailer);
+        const totalSpliceLen = coreBytes.length + spliceTrailerBytes.length;
+        const delta = totalSpliceLen - existingLen;
         const result = new Uint8Array(workingBytes.length + delta);
         result.set(workingBytes.subarray(0, packetStart), 0);
         result.set(coreBytes, packetStart);
-        result.set(endTrailerBytes, packetStart + coreBytes.length);
-        result.set(workingBytes.subarray(packetEnd), packetStart + requiredLen);
+        result.set(spliceTrailerBytes, packetStart + coreBytes.length);
+        result.set(workingBytes.subarray(packetEnd), packetStart + totalSpliceLen);
 
         if (isDosEps) {
           const newView = new DataView(result.buffer, result.byteOffset, 30);
@@ -1183,7 +1215,7 @@ export function embedAiMetadataBytes(
           const xmpString = buildXmpPacket(metadata, 'application/pdf');
           const endMarkerRegex = /<\?xpacket\s+end=["'][wr]["']\?>\s*$/i;
           const xmpCore = xmpString.replace(endMarkerRegex, '').trimEnd();
-          const endTrailer = '\n<?xpacket end="w"?>';
+          const endTrailer = '<?xpacket end="w"?>';
           const coreBytes = new TextEncoder().encode(xmpCore);
           const endTrailerBytes = new TextEncoder().encode(endTrailer);
 
@@ -1198,7 +1230,7 @@ export function embedAiMetadataBytes(
             // Overwrite packetStart to packetEnd
             result.set(coreBytes, packetStart);
             if (paddingLen > 0) {
-              result.fill(0x20, packetStart + coreBytes.length, packetStart + coreBytes.length + paddingLen);
+              fillXmpPadding(result, packetStart + coreBytes.length, paddingLen);
             }
             result.set(endTrailerBytes, packetStart + coreBytes.length + paddingLen);
             return result;
