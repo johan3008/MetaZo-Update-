@@ -161,6 +161,7 @@ export const ImageQualityCheck: React.FC<{
   }, []);
   
   const isStoppingRef = useRef(false);
+  const isProcessingRef = useRef(false);
   const queueRef = useRef<QCQueueItem[]>([]);
   queueRef.current = queue;
 
@@ -222,8 +223,11 @@ export const ImageQualityCheck: React.FC<{
 
   const handleClearAll = () => {
     isStoppingRef.current = true;
+    isProcessingRef.current = false;
+    cancelAutoPilotForward();
     setIsProcessing(false);
     setCurrentProcessingId(null);
+    queueRef.current = [];
     queue.forEach(item => {
       if (item.previewUrl && item.previewUrl.startsWith('blob:')) {
         try { URL.revokeObjectURL(item.previewUrl); } catch (_) {}
@@ -237,11 +241,14 @@ export const ImageQualityCheck: React.FC<{
 
   const handleRemoveItem = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    cancelAutoPilotForward();
     const item = queue.find(it => it.id === id);
     if (item && item.previewUrl && item.previewUrl.startsWith('blob:')) {
       try { URL.revokeObjectURL(item.previewUrl); } catch (_) {}
     }
-    setQueue(prev => prev.filter(it => it.id !== id));
+    const filtered = queueRef.current.filter(it => it.id !== id);
+    queueRef.current = filtered;
+    setQueue(filtered);
   };
 
   const resizeAndProcess = (file: File): Promise<string> => {
@@ -620,77 +627,104 @@ export const ImageQualityCheck: React.FC<{
 
   // 📋 Memproses Antrean Secara Berurutan Satu Per Satu (Sequential Queue)
   const processQueue = async (itemsList?: QCQueueItem[]) => {
-    let workingQueue = itemsList ? [...itemsList] : [...queueRef.current];
-    const pendingItems = workingQueue.filter(it => it.status === 'pending' || it.status === 'error');
-    if (pendingItems.length === 0) return;
+    if (itemsList && itemsList.length > 0) {
+      queueRef.current = itemsList;
+    }
 
-    if (!isLicensed && dailyGenCount + pendingItems.length > getDailyLimit()) {
-      setError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, getDailyLimit() - dailyGenCount)} kali audit, tetapi Anda memiliki ${pendingItems.length} file dalam antrean.`);
+    if (isProcessingRef.current) {
+      console.log('[QC Queue] Already processing, loop will continue processing pending items.');
+      return;
+    }
+
+    cancelAutoPilotForward();
+
+    // Reset error items to pending if retry is needed
+    const hasPendingInitial = queueRef.current.some(it => it.status === 'pending');
+    if (!hasPendingInitial && queueRef.current.some(it => it.status === 'error')) {
+      const resetQueue = queueRef.current.map(it => it.status === 'error' ? { ...it, status: 'pending' as const, error: null } : it);
+      queueRef.current = resetQueue;
+      setQueue(resetQueue);
+    }
+
+    const pendingCount = queueRef.current.filter(it => it.status === 'pending').length;
+    if (pendingCount === 0) return;
+
+    if (!isLicensed && dailyGenCount + pendingCount > getDailyLimit()) {
+      setError(`Batas Trial Terlampaui. Sisa kuota Anda hari ini adalah ${Math.max(0, getDailyLimit() - dailyGenCount)} kali audit, tetapi Anda memiliki ${pendingCount} file dalam antrean.`);
       if (setShowLimitModal) setShowLimitModal(true);
       return;
     }
 
+    isProcessingRef.current = true;
     setIsProcessing(true);
     isStoppingRef.current = false;
     setError(null);
 
-    for (let i = 0; i < pendingItems.length; i++) {
-      if (isStoppingRef.current) break;
+    try {
+      while (!isStoppingRef.current) {
+        // Ambil item pending berikutnya dari antrean aktif secara dinamis
+        const targetItem = queueRef.current.find(it => it.status === 'pending');
+        if (!targetItem) break;
 
-      const targetItem = pendingItems[i];
-      setCurrentProcessingId(targetItem.id);
-
-      workingQueue = workingQueue.map(it => it.id === targetItem.id ? {
-        ...it,
-        status: 'processing',
-        error: null,
-        currentStep: 'Memulai audit...'
-      } : it);
-      queueRef.current = workingQueue;
-      setQueue(workingQueue);
-
-      try {
-        const updateStep = (stepText: string) => {
-          workingQueue = workingQueue.map(it => it.id === targetItem.id ? { ...it, currentStep: stepText } : it);
-          queueRef.current = workingQueue;
-          setQueue(workingQueue);
-        };
-
-        const report = await analyzeSingleFile(targetItem, updateStep);
-
-        if (isStoppingRef.current) break;
-
-        workingQueue = workingQueue.map(it => it.id === targetItem.id ? {
+        setCurrentProcessingId(targetItem.id);
+        const processingQueue = queueRef.current.map(it => it.id === targetItem.id ? {
           ...it,
-          status: 'done',
-          report,
+          status: 'processing' as const,
           error: null,
-          currentStep: undefined
+          currentStep: 'Memulai audit...'
         } : it);
-        queueRef.current = workingQueue;
-        setQueue(workingQueue);
+        queueRef.current = processingQueue;
+        setQueue(processingQueue);
 
-        if (incrementDailyCount) {
-          incrementDailyCount(1);
+        try {
+          const updateStep = (stepText: string) => {
+            const stepQueue = queueRef.current.map(it => it.id === targetItem.id ? { ...it, currentStep: stepText } : it);
+            queueRef.current = stepQueue;
+            setQueue(stepQueue);
+          };
+
+          const report = await analyzeSingleFile(targetItem, updateStep);
+
+          if (isStoppingRef.current) break;
+
+          const doneQueue = queueRef.current.map(it => it.id === targetItem.id ? {
+            ...it,
+            status: 'done' as const,
+            report,
+            error: null,
+            currentStep: undefined
+          } : it);
+          queueRef.current = doneQueue;
+          setQueue(doneQueue);
+
+          if (incrementDailyCount) {
+            incrementDailyCount(1);
+          }
+        } catch (err: any) {
+          console.error(`QC Error for ${targetItem.name}:`, err);
+          const errorQueue = queueRef.current.map(it => it.id === targetItem.id ? {
+            ...it,
+            status: 'error' as const,
+            error: err.message || 'Gagal memproses audit gambar.',
+            currentStep: undefined
+          } : it);
+          queueRef.current = errorQueue;
+          setQueue(errorQueue);
         }
-      } catch (err: any) {
-        console.error(`QC Error for ${targetItem.name}:`, err);
-        workingQueue = workingQueue.map(it => it.id === targetItem.id ? {
-          ...it,
-          status: 'error',
-          error: err.message || 'Gagal memproses audit gambar.',
-          currentStep: undefined
-        } : it);
-        queueRef.current = workingQueue;
-        setQueue(workingQueue);
       }
+    } finally {
+      isProcessingRef.current = false;
+      setCurrentProcessingId(null);
+      setIsProcessing(false);
     }
 
-    setCurrentProcessingId(null);
-    setIsProcessing(false);
+    // 🚀 AUTO PILOT GEN: HANYA TERUSKAN JIKA SELURUH FILE BATCH 100% SELESAI DIPROSES!
+    // Syarat ketat: Tidak dihentikan manual, ada handler onSendToMetadataGen, antrean tidak kosong,
+    // dan TIDAK ADA SATUPUN file yang masih 'pending' atau 'processing'!
+    const finalQueue = queueRef.current;
+    const hasUnfinished = finalQueue.some(it => it.status === 'pending' || it.status === 'processing');
 
-    // 🚀 AUTO PILOT GEN: Hanya teruskan jika aktif dan seluruh antrean selesai diproses!
-    if (!isStoppingRef.current && onSendToMetadataGen) {
+    if (!isStoppingRef.current && onSendToMetadataGen && finalQueue.length > 0 && !hasUnfinished) {
       try {
         let activeApConfig = autoPilotConfig;
         if (!activeApConfig) {
@@ -701,7 +735,7 @@ export const ImageQualityCheck: React.FC<{
         // Jika Auto Pilot diaktifkan, otomatis alihkan ke MetadataGen
         if (activeApConfig && activeApConfig.enabled) {
           const minScore = typeof activeApConfig.qcMinScore === 'number' ? activeApConfig.qcMinScore : 75;
-          const passedItems = workingQueue.filter(it => {
+          const passedItems = finalQueue.filter(it => {
             if (it.status !== 'done' || !it.report) return false;
             const rec = (it.report.recommendation || '').toString().trim().toUpperCase();
             const score = Number(it.report.overall_score);
@@ -709,7 +743,7 @@ export const ImageQualityCheck: React.FC<{
           });
 
           if (passedItems.length > 0) {
-            console.log(`[Auto Pilot Gen] All ${workingQueue.length} items finished. Auto-forwarding ${passedItems.length} passed file(s) to MetadataGen...`);
+            console.log(`[Auto Pilot Gen] All ${finalQueue.length} batch items finished QC. Auto-forwarding ${passedItems.length} passed file(s) to MetadataGen...`);
             const filesToForward = passedItems.map(it => it.file);
             cancelAutoPilotForward();
 
@@ -718,6 +752,13 @@ export const ImageQualityCheck: React.FC<{
               setAutoPilotForwardCountdown({ seconds: remaining, files: filesToForward });
 
               autoPilotTimerRef.current = setInterval(() => {
+                // Periksa kembali jika ada file baru masuk saat countdown
+                if (queueRef.current.some(it => it.status === 'pending' || it.status === 'processing')) {
+                  console.log('[Auto Pilot Gen] File baru masuk selama countdown QC, membatalkan auto-forward...');
+                  cancelAutoPilotForward();
+                  return;
+                }
+
                 remaining -= 1;
                 if (remaining <= 0) {
                   if (autoPilotTimerRef.current) {
@@ -732,7 +773,7 @@ export const ImageQualityCheck: React.FC<{
               }, 1000);
             }
           } else {
-            console.warn('[Auto Pilot Gen] All items finished QC, but no items passed the score threshold.');
+            console.warn('[Auto Pilot Gen] All batch items finished QC, but no items passed the score threshold.');
           }
         }
       } catch (apErr) {
@@ -743,6 +784,8 @@ export const ImageQualityCheck: React.FC<{
 
   const handleStopQueue = () => {
     isStoppingRef.current = true;
+    isProcessingRef.current = false;
+    cancelAutoPilotForward();
     setIsProcessing(false);
     setCurrentProcessingId(null);
     setQueue(prev => prev.map(it => it.status === 'processing' ? { ...it, status: 'pending', currentStep: undefined } : it));
@@ -805,10 +848,15 @@ export const ImageQualityCheck: React.FC<{
     queueRef.current = updatedQueue;
     setQueue(updatedQueue);
 
-    // Otomatis mulai memproses antrean baru secara satu per satu
-    setTimeout(() => {
-      processQueue(updatedQueue);
-    }, 150);
+    // Batalkan countdown auto pilot jika ada file baru masuk ke batch
+    cancelAutoPilotForward();
+
+    // Otomatis mulai memproses antrean baru jika belum berjalan
+    if (!isProcessingRef.current) {
+      setTimeout(() => {
+        processQueue(updatedQueue);
+      }, 150);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

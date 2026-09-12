@@ -155,7 +155,7 @@ export function buildXmpPacket(metadata: MicrostockMetadataInput, mimeType: stri
   const title = String(metadata.title || '').trim();
   const description = String(metadata.description || metadata.comment || title).trim();
   const subject = String(metadata.subject || title).trim();
-  const keywords = cleanKeywordArray(metadata.keywords);
+  const keywords = cleanKeywordArray(metadata.keywords).slice(0, 49);
   const creator = metadata.creator || 'MetaZo Contributor';
   const copyright = metadata.copyright || 'All rights reserved';
   const software = metadata.software || 'MetaZo Microstock AI Assistant';
@@ -180,14 +180,16 @@ export function buildXmpPacket(metadata: MicrostockMetadataInput, mimeType: stri
     .map(c => `        <rdf:li>${escapeXml(c)}</rdf:li>`)
     .join('\n');
 
-  return `<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>
-<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="MetaZo AI Microstock Engine">
+  return `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0-c000 1.000000, 2022/01/01-00:00:00">
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
     <rdf:Description rdf:about=""
       xmlns:dc="http://purl.org/dc/elements/1.1/"
+      xmlns:pdf="http://ns.adobe.com/pdf/1.3/"
       xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"
       xmlns:Iptc4xmpCore="http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/"
       xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"
+      xmlns:lr="http://ns.adobe.com/lightroom/1.0/"
       xmlns:plus="http://ns.useplus.org/ldf/xmp/1.0/"
       xmlns:xmp="http://ns.adobe.com/xap/1.0/"
       xmlns:xmpRights="http://ns.adobe.com/xap/1.0/rights/">
@@ -207,6 +209,12 @@ export function buildXmpPacket(metadata: MicrostockMetadataInput, mimeType: stri
 ${keywordItems}
         </rdf:Bag>
       </dc:subject>
+      <pdf:Keywords>${escapeXml(keywords.join(', '))}</pdf:Keywords>
+      <lr:hierarchicalSubject>
+        <rdf:Bag>
+${keywordItems}
+        </rdf:Bag>
+      </lr:hierarchicalSubject>
       <dc:creator>
         <rdf:Seq>
           <rdf:li>${escapeXml(creator)}</rdf:li>
@@ -228,6 +236,7 @@ ${suppCatItems}
       </photoshop:SupplementalCategories>` : ''}
       <photoshop:Credit>${escapeXml(creator)}</photoshop:Credit>
       <photoshop:Source>${escapeXml(metadata.aiModelSource ? `${metadata.aiModelSource} via MetaZo` : 'MetaZo AI Assistant')}</photoshop:Source>
+      <photoshop:AuthorsPosition>Contributor</photoshop:AuthorsPosition>
       ${metadata.isGenerativeAI ? `<Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType>
       <Iptc4xmpCore:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpCore:DigitalSourceType>
       <plus:ModelReleaseStatus>${metadata.fictionalPeopleProperty ? 'http://ns.useplus.org/ldf/vocab/MR-NON' : 'http://ns.useplus.org/ldf/vocab/MR-NAP'}</plus:ModelReleaseStatus>
@@ -600,11 +609,37 @@ function buildPngChunk(type: string, data: Uint8Array): Uint8Array {
   return chunk;
 }
 
+function formatRawProfile(name: string, bytes: Uint8Array): Uint8Array {
+  // Standard ImageMagick / ExifTool raw profile text format:
+  // \n<name>\n%8lu\n<hex-lines>\n
+  const len = bytes.length;
+  const lenStr = String(len).padStart(8, ' ');
+  let header = `\n${name}\n${lenStr}\n`;
+  let hexLines = '';
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i].toString(16).padStart(2, '0');
+    hexLines += b;
+    if ((i + 1) % 36 === 0) {
+      hexLines += '\n';
+    }
+  }
+  if (!hexLines.endsWith('\n')) {
+    hexLines += '\n';
+  }
+  return new TextEncoder().encode(header + hexLines);
+}
+
 /**
- * Embeds XMP (iTXt XML:com.adobe.xmp) and metadata tEXt chunks into a PNG file.
+ * Embeds XMP (iTXt XML:com.adobe.xmp), IPTC (Raw profile type iptc), Raw profile type xmp,
+ * standard/microstock tEXt chunks, and eXIf chunks into a PNG file.
+ * Automatically cleans up existing/duplicate metadata and AI generation prompt chunks
+ * to ensure 100% auto-detection by Adobe Stock Contributor and microstock parsers.
  */
 export function embedPngMetadata(pngBytes: Uint8Array, metadata: MicrostockMetadataInput): Uint8Array {
   const pngSig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+  if (pngBytes.length < 8) {
+    throw new Error('Buffer too small for PNG signature');
+  }
   for (let i = 0; i < 8; i++) {
     if (pngBytes[i] !== pngSig[i]) {
       throw new Error('Invalid PNG buffer: signature mismatch');
@@ -616,7 +651,8 @@ export function embedPngMetadata(pngBytes: Uint8Array, metadata: MicrostockMetad
   const description = String(metadata.description || metadata.comment || title).trim();
   const subject = String(metadata.subject || title).trim();
   const comment = String(metadata.comment || description).trim();
-  const keywords = cleanKeywordArray(metadata.keywords);
+  // Ensure keywords are strictly capped to 49 for 100% Adobe Stock compliance
+  const keywords = cleanKeywordArray(metadata.keywords).slice(0, 49);
   const creator = metadata.creator || 'MetaZo Contributor';
   const copyright = metadata.copyright || 'All rights reserved';
   const software = metadata.software || 'MetaZo Microstock AI Assistant';
@@ -624,8 +660,8 @@ export function embedPngMetadata(pngBytes: Uint8Array, metadata: MicrostockMetad
   const isoDate = formatIsoDate(dateObj);
   const exifDateStr = formatExifDate(dateObj);
 
-  // 1. Build iTXt XML:com.adobe.xmp chunk
-  const xmpPacket = buildXmpPacket(metadata, 'image/png');
+  // 1. Build XMP Packet and iTXt XML:com.adobe.xmp chunk
+  const xmpPacket = buildXmpPacket({ ...metadata, keywords }, 'image/png');
   const keywordBytes = encoder.encode('XML:com.adobe.xmp\0');
   const xmpPayloadBytes = encoder.encode(xmpPacket);
   const itxtPrefix = new Uint8Array([0x00, 0x00, 0x00, 0x00]);
@@ -635,7 +671,24 @@ export function embedPngMetadata(pngBytes: Uint8Array, metadata: MicrostockMetad
   itxtData.set(xmpPayloadBytes, keywordBytes.length + itxtPrefix.length);
   const itxtChunk = buildPngChunk('iTXt', itxtData);
 
-  // 2. Build tEXt chunks for standard parsers
+  // 2. Build Binary IPTC profile & Raw profile type iptc chunk (ImageMagick / ExifTool microstock standard)
+  const iptcRaw = buildIptcBuffer({ ...metadata, keywords });
+  const rawIptcText = formatRawProfile('iptc', iptcRaw);
+  const iptcProfileKey = encoder.encode('Raw profile type iptc\0');
+  const iptcChunkData = new Uint8Array(iptcProfileKey.length + rawIptcText.length);
+  iptcChunkData.set(iptcProfileKey, 0);
+  iptcChunkData.set(rawIptcText, iptcProfileKey.length);
+  const rawIptcChunk = buildPngChunk('tEXt', iptcChunkData);
+
+  // 3. Build Raw profile type xmp chunk
+  const rawXmpText = formatRawProfile('xmp', xmpPayloadBytes);
+  const xmpProfileKey = encoder.encode('Raw profile type xmp\0');
+  const xmpChunkData = new Uint8Array(xmpProfileKey.length + rawXmpText.length);
+  xmpChunkData.set(xmpProfileKey, 0);
+  xmpChunkData.set(rawXmpText, xmpProfileKey.length);
+  const rawXmpChunk = buildPngChunk('tEXt', xmpChunkData);
+
+  // 4. Build standard and microstock tEXt chunks
   const makeTextChunk = (key: string, val: string) => {
     const k = encoder.encode(key + '\0');
     const v = encoder.encode(val);
@@ -651,6 +704,9 @@ export function embedPngMetadata(pngBytes: Uint8Array, metadata: MicrostockMetad
     makeTextChunk('Description', description),
     makeTextChunk('Comment', comment),
     makeTextChunk('Keywords', keywords.join(', ')),
+    makeTextChunk('tags', keywords.join(', ')),
+    makeTextChunk('XPTitle', title),
+    makeTextChunk('XPKeywords', keywords.join('; ')),
     makeTextChunk('Author', creator),
     makeTextChunk('Copyright', copyright),
     makeTextChunk('Creation Time', isoDate),
@@ -658,7 +714,7 @@ export function embedPngMetadata(pngBytes: Uint8Array, metadata: MicrostockMetad
     makeTextChunk('Source', 'MetaZo AI Assistant')
   ];
 
-  // 3. Build optional eXIf chunk if piexif is available
+  // 5. Build optional eXIf chunk if piexif is available
   let exifChunk: Uint8Array | null = null;
   try {
     const piexifLib = getPiexifLib();
@@ -722,28 +778,102 @@ export function embedPngMetadata(pngBytes: Uint8Array, metadata: MicrostockMetad
     }
   } catch (_) {}
 
-  // 4. Find end of IHDR chunk
-  const ihdrView = new DataView(pngBytes.buffer, pngBytes.byteOffset, pngBytes.byteLength);
-  const ihdrLen = ihdrView.getUint32(8);
-  const insertPos = 8 + 12 + ihdrLen;
+  // 6. Parse existing chunks, STRIPPING old metadata/prompt chunks and PRESERVING rendering chunks
+  const keptChunksBeforeIdat: Uint8Array[] = [];
+  const idatAndLaterChunks: Uint8Array[] = [];
+  let foundIdat = false;
+  let pos = 8;
+  const view = new DataView(pngBytes.buffer, pngBytes.byteOffset, pngBytes.byteLength);
 
-  const before = pngBytes.subarray(0, insertPos);
-  const after = pngBytes.subarray(insertPos);
+  const metadataTextKeysToDrop = new Set([
+    'title', 'subject', 'description', 'comment', 'keywords', 'tags',
+    'author', 'copyright', 'creation time', 'software', 'source',
+    'xptitle', 'xpcomment', 'xpauthor', 'xpkeywords', 'xpsubject',
+    'parameters', 'prompt', 'negative_prompt',
+    'raw profile type iptc', 'raw profile type xmp', 'raw profile type exif'
+  ]);
 
-  const extraChunks: Uint8Array[] = [itxtChunk, ...textChunks];
+  while (pos + 8 <= pngBytes.length) {
+    const len = view.getUint32(pos, false);
+    const totalChunkLen = 12 + len;
+    if (pos + totalChunkLen > pngBytes.length) break;
+
+    const chunk = pngBytes.subarray(pos, pos + totalChunkLen);
+    const type = String.fromCharCode(chunk[4], chunk[5], chunk[6], chunk[7]);
+
+    if (type === 'IDAT') {
+      foundIdat = true;
+    }
+
+    if (type === 'IHDR') {
+      keptChunksBeforeIdat.push(chunk);
+    } else if (type === 'iTXt') {
+      let nullIdx = -1;
+      for (let i = 8; i < 8 + Math.min(len, 80); i++) {
+        if (chunk[i] === 0) { nullIdx = i; break; }
+      }
+      const kw = nullIdx !== -1 
+        ? new TextDecoder('latin1').decode(chunk.subarray(8, nullIdx)).toLowerCase() 
+        : '';
+      if (kw === 'xml:com.adobe.xmp' || metadataTextKeysToDrop.has(kw)) {
+        // Drop old XMP and metadata iTXt chunks
+      } else {
+        (foundIdat ? idatAndLaterChunks : keptChunksBeforeIdat).push(chunk);
+      }
+    } else if (type === 'tEXt' || type === 'zTXt') {
+      let nullIdx = -1;
+      for (let i = 8; i < 8 + Math.min(len, 80); i++) {
+        if (chunk[i] === 0) { nullIdx = i; break; }
+      }
+      const kw = nullIdx !== -1 
+        ? new TextDecoder('latin1').decode(chunk.subarray(8, nullIdx)).toLowerCase() 
+        : '';
+      if (metadataTextKeysToDrop.has(kw)) {
+        // Drop old metadata / AI generation prompts
+      } else {
+        (foundIdat ? idatAndLaterChunks : keptChunksBeforeIdat).push(chunk);
+      }
+    } else if (type === 'eXIf') {
+      // Drop old eXIf, replace with clean new one
+    } else {
+      // Keep PLTE, tRNS, sRGB, gAMA, cHRM, iCCP, pHYs, IDAT, IEND, etc.
+      (foundIdat ? idatAndLaterChunks : keptChunksBeforeIdat).push(chunk);
+    }
+
+    pos += totalChunkLen;
+  }
+
+  // New clean metadata chunks to inject before IDAT
+  const newMetadataChunks: Uint8Array[] = [
+    itxtChunk,
+    rawIptcChunk,
+    rawXmpChunk,
+    ...textChunks
+  ];
   if (exifChunk) {
-    extraChunks.push(exifChunk);
+    newMetadataChunks.push(exifChunk);
   }
 
-  const extraChunksLen = extraChunks.reduce((a, c) => a + c.length, 0);
-  const result = new Uint8Array(before.length + extraChunksLen + after.length);
+  // Combine: 8-byte PNG header + keptChunksBeforeIdat + newMetadataChunks + idatAndLaterChunks
+  const headerBytes = pngBytes.subarray(0, 8);
+  const totalLen = 
+    headerBytes.length +
+    keptChunksBeforeIdat.reduce((acc, c) => acc + c.length, 0) +
+    newMetadataChunks.reduce((acc, c) => acc + c.length, 0) +
+    idatAndLaterChunks.reduce((acc, c) => acc + c.length, 0);
 
+  const result = new Uint8Array(totalLen);
   let w = 0;
-  result.set(before, w); w += before.length;
-  for (const ec of extraChunks) {
-    result.set(ec, w); w += ec.length;
+  result.set(headerBytes, w); w += headerBytes.length;
+  for (const c of keptChunksBeforeIdat) {
+    result.set(c, w); w += c.length;
   }
-  result.set(after, w);
+  for (const c of newMetadataChunks) {
+    result.set(c, w); w += c.length;
+  }
+  for (const c of idatAndLaterChunks) {
+    result.set(c, w); w += c.length;
+  }
 
   return result;
 }
@@ -1416,39 +1546,49 @@ export async function embedMicrostockMetadata(
   const name = file.name.toLowerCase();
   const ext = name.split('.').pop() || '';
 
-  if (ext === 'jpg' || ext === 'jpeg' || file.type === 'image/jpeg') {
-    const arrayBuffer = await file.arrayBuffer();
-    const embeddedBytes = embedJpegMetadata(new Uint8Array(arrayBuffer), metadata);
-    return new Blob([embeddedBytes], { type: 'image/jpeg' });
-  }
-
-  if (ext === 'png' || file.type === 'image/png') {
-    const arrayBuffer = await file.arrayBuffer();
-    const embeddedBytes = embedPngMetadata(new Uint8Array(arrayBuffer), metadata);
-    return new Blob([embeddedBytes], { type: 'image/png' });
-  }
-
+  // 1. Vector SVG Text
   if (ext === 'svg' || file.type === 'image/svg+xml') {
     const svgText = await file.text();
     const updatedSvg = embedSvgMetadata(svgText, metadata);
     return new Blob([updatedSvg], { type: 'image/svg+xml' });
   }
 
-  if (ext === 'eps') {
-    const arrayBuffer = await file.arrayBuffer();
-    const embeddedBytes = embedEpsMetadataBytes(new Uint8Array(arrayBuffer), metadata);
+  const arrayBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+
+  // Magic bytes sniffing for foolproof binary detection
+  const isPng = bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
+  const isJpg = bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xD8;
+  const isDosEps = bytes.length >= 4 && bytes[0] === 0xC5 && bytes[1] === 0xD0 && bytes[2] === 0xD3 && bytes[3] === 0xC6;
+  const isPsEps = bytes.length >= 2 && bytes[0] === 0x25 && bytes[1] === 0x21; // '%!'
+  const isPdfAi = bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46; // '%PDF'
+
+  if (isPng || ext === 'png' || file.type === 'image/png') {
+    if (isPng) {
+      const embeddedBytes = embedPngMetadata(bytes, metadata);
+      return new Blob([embeddedBytes], { type: 'image/png' });
+    }
+  }
+
+  if (isJpg || ext === 'jpg' || ext === 'jpeg' || file.type === 'image/jpeg') {
+    if (isJpg) {
+      const embeddedBytes = embedJpegMetadata(bytes, metadata);
+      return new Blob([embeddedBytes], { type: 'image/jpeg' });
+    }
+  }
+
+  if (isDosEps || isPsEps || ext === 'eps') {
+    const embeddedBytes = embedEpsMetadataBytes(bytes, metadata);
     return new Blob([embeddedBytes], { type: 'application/postscript' });
   }
 
-  if (ext === 'ai') {
-    const arrayBuffer = await file.arrayBuffer();
-    const embeddedBytes = embedAiMetadataBytes(new Uint8Array(arrayBuffer), metadata);
+  if (isPdfAi || ext === 'ai') {
+    const embeddedBytes = embedAiMetadataBytes(bytes, metadata);
     return new Blob([embeddedBytes], { type: 'application/illustrator' });
   }
 
   if (ext === 'mp4' || ext === 'mov' || ext === 'm4v' || ext === 'webm' || file.type.startsWith('video/')) {
-    const arrayBuffer = await file.arrayBuffer();
-    const embeddedBytes = embedMp4MetadataBytes(new Uint8Array(arrayBuffer), metadata);
+    const embeddedBytes = embedMp4MetadataBytes(bytes, metadata);
     const mimeType = ext === 'mov' ? 'video/quicktime' : (ext === 'webm' ? 'video/webm' : 'video/mp4');
     return new Blob([embeddedBytes], { type: mimeType });
   }

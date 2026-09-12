@@ -1399,6 +1399,7 @@ const App: React.FC = () => {
     return DEFAULT_AUTOPILOT_CONFIG;
   });
   const autoPilotConfigRef = useRef<AutoPilotConfig>(autoPilotConfig);
+  const autoPilotFinaleTimerRef = useRef<any>(null);
   useEffect(() => {
     autoPilotConfigRef.current = autoPilotConfig;
   }, [autoPilotConfig]);
@@ -4056,19 +4057,38 @@ const App: React.FC = () => {
             });
         }
 
-        if (!stopGenerationRef.current && processedInThisRun > 0) {
+        const activeLoopTool = activeToolRef.current || activeTool;
+        const currentToolFiles = getFilesForTool(filesRef.current, activeLoopTool);
+        const hasUnfinishedBatchFiles = currentToolFiles.some(f => (!f.title && !f.error) || f.isGenerating || f.isExtracting);
+
+        if (!stopGenerationRef.current && processedInThisRun > 0 && !hasUnfinishedBatchFiles) {
             // Trigger auto download CSV legacy hanya jika BUKAN Auto Pilot
             if (!autoPilotConfig.enabled) {
               setTriggerAutoDownload(Date.now());
             }
 
             // 🚀 AUTO PILOT GEN: Jika aktif, eksekusi pipeline tahap akhir (FTP Upload atau Auto-Download File Embedded, TANPA CSV)
+            // HANYA jika seluruh antrean batch selesai diproses!
             if (autoPilotConfig.enabled) {
-              setTimeout(async () => {
-                console.log('[Auto Pilot Gen] Batch metadata finished. Executing finale pipeline (Embedded media files only, NO CSV)...');
+              if (autoPilotFinaleTimerRef.current) {
+                clearTimeout(autoPilotFinaleTimerRef.current);
+                autoPilotFinaleTimerRef.current = null;
+              }
+
+              autoPilotFinaleTimerRef.current = setTimeout(async () => {
+                console.log('[Auto Pilot Gen] Batch metadata finished for all files. Executing finale pipeline (Embedded media files only, NO CSV)...');
                 const latestFiles = filesRef.current;
                 const tool = activeToolRef.current || activeTool;
-                const completed = getFilesForTool(latestFiles, tool).filter(f => (f.title || f.description) && f.file);
+                const toolFiles = getFilesForTool(latestFiles, tool);
+
+                // Verifikasi ulang bahwa tidak ada file yang sedang diproses atau pending di background
+                const stillWorking = toolFiles.some(f => (!f.title && !f.error) || f.isGenerating || f.isExtracting);
+                if (stillWorking) {
+                  console.log('[Auto Pilot Gen] Batch files are still pending or generating. Postponing finale pipeline.');
+                  return;
+                }
+
+                const completed = toolFiles.filter(f => (f.title || f.description) && f.file);
 
                 if (completed.length === 0) {
                   console.warn('[Auto Pilot Gen] No completed files with metadata to process.');
@@ -4117,15 +4137,19 @@ const App: React.FC = () => {
                     console.error('[Auto Pilot Gen] Error preparing embedded files for FTP:', ftpErr);
                     setEmbedDownloading(false);
                     setEmbedProgress(null);
+                  } finally {
+                    autoPilotFinaleTimerRef.current = null;
                   }
                 } else {
                   // Unduh otomatis HANYA file embedded (BUKAN CSV)
                   try {
-                    console.log('[Auto Pilot Gen] Auto-downloading embedded files (JPG/PNG/EPS/SVG/MP4)...');
+                    console.log(`[Auto Pilot Gen] Auto-downloading ${completed.length} embedded file(s) (JPG/PNG/EPS/SVG/MP4)...`);
                     await handleDownloadEmbedded(latestFiles);
                     // CATATAN: handleExport() TIDAK dipanggil karena Auto Pilot hanya mengunduh file embedded, bukan CSV.
                   } catch (dlErr) {
                     console.warn('[Auto Pilot Gen] Auto-download embedded error:', dlErr);
+                  } finally {
+                    autoPilotFinaleTimerRef.current = null;
                   }
                 }
               }, 1500);
@@ -4174,6 +4198,10 @@ const App: React.FC = () => {
 
   const handleStopGeneration = () => {
       stopGenerationRef.current = true;
+      if (autoPilotFinaleTimerRef.current) {
+        clearTimeout(autoPilotFinaleTimerRef.current);
+        autoPilotFinaleTimerRef.current = null;
+      }
       setIsLoading(false);
       setIsPaused(false);
       setReturnToStartCountdown(null);
@@ -5308,17 +5336,38 @@ const App: React.FC = () => {
                   
                   // Periksa status Auto Pilot dari Ref atau localStorage
                   let isApActive = autoPilotConfigRef.current?.enabled;
+                  let currentApConfig = autoPilotConfigRef.current;
                   if (!isApActive) {
                     try {
                       const raw = localStorage.getItem('mz_autopilot_config');
-                      if (raw) isApActive = JSON.parse(raw).enabled;
+                      if (raw) {
+                        currentApConfig = JSON.parse(raw);
+                        isApActive = currentApConfig?.enabled;
+                      }
                     } catch (e) {}
                   }
 
-                  // Jika Auto Pilot aktif, langsung jalankan pembuatan metadata secara otomatis
+                  // Sinkronkan preferensi Auto Pilot bila aktif
+                  if (currentApConfig && isApActive) {
+                    if (currentApConfig.keywordCount) setKeywordCount(currentApConfig.keywordCount);
+                    if (currentApConfig.keywordMode) setKeywordMode(currentApConfig.keywordMode);
+                    if (currentApConfig.titleLength) setTitleLength(currentApConfig.titleLength as any);
+                    if (currentApConfig.metadataLanguage) setMetadataLanguage(currentApConfig.metadataLanguage);
+                    if (currentApConfig.targetKeywords) setCustomPrompt(currentApConfig.targetKeywords);
+                    if (currentApConfig.isGenerativeAI !== undefined) setIsGenerativeAI(currentApConfig.isGenerativeAI);
+                    if (currentApConfig.aiModelSource) setAiModelSource(currentApConfig.aiModelSource);
+                  }
+
+                  // Batalkan timer finale lama jika masih ada
+                  if (autoPilotFinaleTimerRef.current) {
+                    clearTimeout(autoPilotFinaleTimerRef.current);
+                    autoPilotFinaleTimerRef.current = null;
+                  }
+
+                  // Jika Auto Pilot aktif, langsung jalankan pembuatan metadata untuk seluruh file batch yang masuk
                   if (isApActive) {
                     setTimeout(() => {
-                      console.log('[Auto Pilot Gen] Auto-triggering handleGenerateAll for incoming files...');
+                      console.log(`[Auto Pilot Gen] Auto-triggering handleGenerateAll for all ${passedFiles.length} incoming batch file(s)...`);
                       handleGenerateAll(false);
                     }, 1000);
                   }
