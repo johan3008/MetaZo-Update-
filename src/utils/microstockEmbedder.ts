@@ -980,68 +980,69 @@ function updateExistingEpsXmp(
   const desc = String(metadata.description || metadata.comment || title).trim();
   const keywords = cleanKeywordArray(metadata.keywords).slice(0, 49);
   const creator = String(metadata.creator || 'MetaZo Contributor').trim();
+  const dateObj = resolveDateTaken(metadata.dateTaken);
+  const isoDate = formatIsoDate(dateObj);
 
-  // 1. Update or insert dc:title
+  // Ensure standard namespaces exist on rdf:Description
+  if (!xml.includes('xmlns:dc=')) {
+    xml = xml.replace('<rdf:Description rdf:about=""', '<rdf:Description rdf:about=""\n            xmlns:dc="http://purl.org/dc/elements/1.1/"');
+  }
+  if (!xml.includes('xmlns:pdf=')) {
+    xml = xml.replace('<rdf:Description rdf:about=""', '<rdf:Description rdf:about=""\n            xmlns:pdf="http://ns.adobe.com/pdf/1.3/"');
+  }
+  if (!xml.includes('xmlns:photoshop=')) {
+    xml = xml.replace('<rdf:Description rdf:about=""', '<rdf:Description rdf:about=""\n            xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"');
+  }
+
+  // Helper to replace or insert a block before </rdf:Description>
+  const replaceOrInsert = (tagRegex: RegExp, newXml: string) => {
+    if (tagRegex.test(xml)) {
+      xml = xml.replace(tagRegex, newXml);
+    } else {
+      xml = xml.replace('</rdf:Description>', `   ${newXml}\n      </rdf:Description>`);
+    }
+  };
+
+  // 1. dc:title
   const titleXml = `<dc:title>\n            <rdf:Alt>\n               <rdf:li xml:lang="x-default">${escapeXml(title)}</rdf:li>\n            </rdf:Alt>\n         </dc:title>`;
-  if (/<dc:title>[\s\S]*?<\/dc:title>/.test(xml)) {
-    xml = xml.replace(/<dc:title>[\s\S]*?<\/dc:title>/, titleXml);
-  } else {
-    xml = xml.replace('</rdf:Description>', `   ${titleXml}\n      </rdf:Description>`);
-  }
+  replaceOrInsert(/<dc:title\b[\s\S]*?(?:<\/dc:title>|\/>)/, titleXml);
 
-  // 2. Update or insert dc:description
+  // 2. dc:description
   const descXml = `<dc:description>\n            <rdf:Alt>\n               <rdf:li xml:lang="x-default">${escapeXml(desc)}</rdf:li>\n            </rdf:Alt>\n         </dc:description>`;
-  if (/<dc:description>[\s\S]*?<\/dc:description>/.test(xml)) {
-    xml = xml.replace(/<dc:description>[\s\S]*?<\/dc:description>/, descXml);
-  } else {
-    xml = xml.replace('</rdf:Description>', `   ${descXml}\n      </rdf:Description>`);
-  }
+  replaceOrInsert(/<dc:description\b[\s\S]*?(?:<\/dc:description>|\/>)/, descXml);
 
-  // 3. Update or insert dc:subject (keywords)
+  // 3. dc:subject (keywords)
   const kwItems = keywords.map(k => `               <rdf:li>${escapeXml(k)}</rdf:li>`).join('\n');
   const subjXml = `<dc:subject>\n            <rdf:Bag>\n${kwItems}\n            </rdf:Bag>\n         </dc:subject>`;
-  if (/<dc:subject>[\s\S]*?<\/dc:subject>/.test(xml)) {
-    xml = xml.replace(/<dc:subject>[\s\S]*?<\/dc:subject>/, subjXml);
-  } else {
-    xml = xml.replace('</rdf:Description>', `   ${subjXml}\n      </rdf:Description>`);
-  }
+  replaceOrInsert(/<dc:subject\b[\s\S]*?(?:<\/dc:subject>|\/>)/, subjXml);
 
-  // 4. Update or insert pdf:Keywords
+  // 4. pdf:Keywords
   const pdfKw = `<pdf:Keywords>${escapeXml(keywords.join(', '))}</pdf:Keywords>`;
-  if (/<pdf:Keywords>[\s\S]*?<\/pdf:Keywords>/.test(xml)) {
-    xml = xml.replace(/<pdf:Keywords>[\s\S]*?<\/pdf:Keywords>/, pdfKw);
-  } else {
-    xml = xml.replace('</rdf:Description>', `   ${pdfKw}\n      </rdf:Description>`);
-  }
+  replaceOrInsert(/<pdf:Keywords\b[\s\S]*?(?:<\/pdf:Keywords>|\/>)/, pdfKw);
 
-  // 5. Update or insert photoshop:Headline
+  // 5. photoshop:Headline
   const headline = `<photoshop:Headline>${escapeXml(title)}</photoshop:Headline>`;
-  if (/<photoshop:Headline>[\s\S]*?<\/photoshop:Headline>/.test(xml)) {
-    xml = xml.replace(/<photoshop:Headline>[\s\S]*?<\/photoshop:Headline>/, headline);
-  } else {
-    if (!xml.includes('xmlns:photoshop=')) {
-      xml = xml.replace('<rdf:Description rdf:about=""', '<rdf:Description rdf:about=""\n            xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"');
-    }
-    xml = xml.replace('</rdf:Description>', `   ${headline}\n      </rdf:Description>`);
-  }
+  replaceOrInsert(/<photoshop:Headline\b[\s\S]*?(?:<\/photoshop:Headline>|\/>)/, headline);
 
-  // 6. Creator
+  // 6. dc:creator
   const creatorXml = `<dc:creator>\n            <rdf:Seq>\n               <rdf:li>${escapeXml(creator)}</rdf:li>\n            </rdf:Seq>\n         </dc:creator>`;
-  if (/<dc:creator>[\s\S]*?<\/dc:creator>/.test(xml)) {
-    xml = xml.replace(/<dc:creator>[\s\S]*?<\/dc:creator>/, creatorXml);
-  } else {
-    xml = xml.replace('</rdf:Description>', `   ${creatorXml}\n      </rdf:Description>`);
-  }
+  replaceOrInsert(/<dc:creator\b[\s\S]*?(?:<\/dc:creator>|\/>)/, creatorXml);
 
-  // 7. Generative AI source tag
+  // 7. photoshop:Credit
+  const creditXml = `<photoshop:Credit>${escapeXml(creator)}</photoshop:Credit>`;
+  replaceOrInsert(/<photoshop:Credit\b[\s\S]*?(?:<\/photoshop:Credit>|\/>)/, creditXml);
+
+  // 8. Update xmp:MetadataDate & xmp:ModifyDate if present
+  const metaDateXml = `<xmp:MetadataDate>${escapeXml(isoDate)}</xmp:MetadataDate>`;
+  replaceOrInsert(/<xmp:MetadataDate\b[\s\S]*?(?:<\/xmp:MetadataDate>|\/>)/, metaDateXml);
+
+  // 9. Generative AI source tag
   if (metadata.isGenerativeAI) {
     if (!xml.includes('xmlns:Iptc4xmpExt=')) {
       xml = xml.replace('<rdf:Description rdf:about=""', '<rdf:Description rdf:about=""\n            xmlns:Iptc4xmpExt="http://iptc.org/std/Iptc4xmpExt/2008-02-29/"');
     }
     const aiTag = `<Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType>`;
-    if (!xml.includes('DigitalSourceType')) {
-      xml = xml.replace('</rdf:Description>', `   ${aiTag}\n      </rdf:Description>`);
-    }
+    replaceOrInsert(/<Iptc4xmpExt:DigitalSourceType\b[\s\S]*?(?:<\/Iptc4xmpExt:DigitalSourceType>|\/>)/, aiTag);
   }
 
   return xml;
@@ -1153,9 +1154,26 @@ export function embedEpsMetadataBytes(
         }
 
         const endTrailer = '<?xpacket end="w"?>';
-        const coreBytes = new TextEncoder().encode(xmpCore);
+        let coreBytes = new TextEncoder().encode(xmpCore);
         const endTrailerBytes = new TextEncoder().encode(endTrailer);
-        const requiredLen = coreBytes.length + endTrailerBytes.length;
+        let requiredLen = coreBytes.length + endTrailerBytes.length;
+
+        // If metadata exceeds existing space, trim keywords count to fit within original padding
+        if (requiredLen > existingLen && closeMetaIdx !== -1) {
+          let kwSlice = keywords.slice(0, 30);
+          while (kwSlice.length >= 5) {
+            kwSlice = kwSlice.slice(0, kwSlice.length - 5);
+            xmpCore = updateExistingEpsXmp(existingXmpStr.substring(0, closeMetaIdx + 12), {
+              ...metadata,
+              keywords: kwSlice
+            });
+            coreBytes = new TextEncoder().encode(xmpCore);
+            if (coreBytes.length + endTrailerBytes.length <= existingLen) {
+              break;
+            }
+          }
+          requiredLen = coreBytes.length + endTrailerBytes.length;
+        }
 
         // In-place replacement with whitespace padding (EXACT ORIGINAL FILE SIZE MAINTAINED 100%!)
         if (requiredLen <= existingLen) {
