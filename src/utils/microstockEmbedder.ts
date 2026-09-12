@@ -969,22 +969,59 @@ export function embedEpsMetadataBytes(
     tiffStart = view.getUint32(20, true);
   }
 
-  const psEnd = Math.min(inputBytes.length, psStart + psLength);
+  // 1b. Auto-Repair: Detect if file was previously damaged by legacy tool
+  // (e.g. an injected %XMPbegin / %XRXbegin block placed before %%BoundingBox in DSC header)
+  let workingBytes = inputBytes;
+  const searchLimit = Math.min(workingBytes.length, psStart + 32768);
+  const headerStr = new TextDecoder('latin1').decode(workingBytes.subarray(psStart, searchLimit));
+  const corruptXmpMatch = headerStr.match(/(?:\r?\n%%Title:[^\r\n]*\r?\n%%Creator:[^\r\n]*[\s\S]*?)?(?:%XMPbegin|%XRXbegin)[\s\S]*?(?:%XMPend|%XRXend)\r?\n/);
+
+  if (corruptXmpMatch && corruptXmpMatch.index !== undefined) {
+    const relStart = corruptXmpMatch.index;
+    const relEnd = relStart + corruptXmpMatch[0].length;
+    const bbAfter = headerStr.indexOf('%%BoundingBox:', relEnd);
+
+    if (bbAfter !== -1) {
+      const absStart = psStart + relStart;
+      const absEnd = psStart + relEnd;
+      const delta = absEnd - absStart;
+      const cleaned = new Uint8Array(workingBytes.length - delta);
+      cleaned.set(workingBytes.subarray(0, absStart), 0);
+      cleaned.set(workingBytes.subarray(absEnd), absStart);
+
+      if (isDosEps) {
+        const view = new DataView(cleaned.buffer, cleaned.byteOffset, 30);
+        psLength -= delta;
+        view.setUint32(8, psLength, true);
+        if (tiffStart > absStart) {
+          tiffStart -= delta;
+          view.setUint32(20, tiffStart, true);
+        }
+        if (wmfStart > absStart) {
+          wmfStart -= delta;
+          view.setUint32(12, wmfStart, true);
+        }
+      }
+      workingBytes = cleaned;
+    }
+  }
+
+  const psEnd = Math.min(workingBytes.length, psStart + psLength);
 
   // 2. Fast check: Does this EPS contain an existing XMP packet?
   // Adobe Illustrator files contain <?xpacket begin= ... <?xpacket end= with whitespace padding.
   const beginPattern = new TextEncoder().encode('<?xpacket begin=');
   const endPattern = new TextEncoder().encode('<?xpacket end=');
 
-  const packetStart = findSubarray(inputBytes, beginPattern, psStart, psEnd);
+  const packetStart = findSubarray(workingBytes, beginPattern, psStart, psEnd);
   if (packetStart !== -1) {
-    const endIdx = findSubarray(inputBytes, endPattern, packetStart, psEnd);
+    const endIdx = findSubarray(workingBytes, endPattern, packetStart, psEnd);
     if (endIdx !== -1) {
       let closeIdx = endIdx + endPattern.length;
-      while (closeIdx < inputBytes.length - 1 && !(inputBytes[closeIdx] === 0x3F && inputBytes[closeIdx + 1] === 0x3E)) {
+      while (closeIdx < workingBytes.length - 1 && !(workingBytes[closeIdx] === 0x3F && workingBytes[closeIdx + 1] === 0x3E)) {
         closeIdx++;
       }
-      if (closeIdx < inputBytes.length - 1) {
+      if (closeIdx < workingBytes.length - 1) {
         const packetEnd = closeIdx + 2;
         const existingLen = packetEnd - packetStart;
 
@@ -998,8 +1035,8 @@ export function embedEpsMetadataBytes(
 
         // In-place replacement with whitespace padding (Exact original file size maintained!)
         if (requiredLen <= existingLen) {
-          const result = new Uint8Array(inputBytes.length);
-          result.set(inputBytes);
+          const result = new Uint8Array(workingBytes.length);
+          result.set(workingBytes);
           result.set(coreBytes, packetStart);
           const paddingLen = existingLen - requiredLen;
           if (paddingLen > 0) {
@@ -1011,11 +1048,11 @@ export function embedEpsMetadataBytes(
 
         // Rare case: metadata exceeds existing padding -> splice in-place at packetStart
         const delta = requiredLen - existingLen;
-        const result = new Uint8Array(inputBytes.length + delta);
-        result.set(inputBytes.subarray(0, packetStart), 0);
+        const result = new Uint8Array(workingBytes.length + delta);
+        result.set(workingBytes.subarray(0, packetStart), 0);
         result.set(coreBytes, packetStart);
         result.set(endTrailerBytes, packetStart + coreBytes.length);
-        result.set(inputBytes.subarray(packetEnd), packetStart + requiredLen);
+        result.set(workingBytes.subarray(packetEnd), packetStart + requiredLen);
 
         if (isDosEps) {
           const newView = new DataView(result.buffer, result.byteOffset, 30);
@@ -1031,11 +1068,11 @@ export function embedEpsMetadataBytes(
   // 3. Fallback for legacy EPS files without existing XMP:
   // Must insert AFTER %%EndComments or after DSC comment header lines so %%BoundingBox is NOT displaced!
   const endCommentsBytes = new TextEncoder().encode('%%EndComments');
-  let insertPos = findSubarray(inputBytes, endCommentsBytes, psStart, psEnd);
+  let insertPos = findSubarray(workingBytes, endCommentsBytes, psStart, psEnd);
 
   if (insertPos !== -1) {
     insertPos += endCommentsBytes.length;
-    while (insertPos < inputBytes.length && (inputBytes[insertPos] === 0x0A || inputBytes[insertPos] === 0x0D)) {
+    while (insertPos < workingBytes.length && (workingBytes[insertPos] === 0x0A || workingBytes[insertPos] === 0x0D)) {
       insertPos++;
     }
   } else {
@@ -1043,11 +1080,11 @@ export function embedEpsMetadataBytes(
     let scanPos = psStart;
     let lastCommentEnd = psStart;
     while (scanPos < psEnd) {
-      if (inputBytes[scanPos] === 0x25) { // '%'
-        while (scanPos < psEnd && inputBytes[scanPos] !== 0x0A && inputBytes[scanPos] !== 0x0D) {
+      if (workingBytes[scanPos] === 0x25) { // '%'
+        while (scanPos < psEnd && workingBytes[scanPos] !== 0x0A && workingBytes[scanPos] !== 0x0D) {
           scanPos++;
         }
-        if (scanPos < psEnd && inputBytes[scanPos] === 0x0D && inputBytes[scanPos + 1] === 0x0A) {
+        if (scanPos < psEnd && workingBytes[scanPos] === 0x0D && workingBytes[scanPos + 1] === 0x0A) {
           scanPos += 2;
         } else if (scanPos < psEnd) {
           scanPos++;
@@ -1065,10 +1102,10 @@ export function embedEpsMetadataBytes(
   const dscBytes = new TextEncoder().encode(dscBlock);
   const delta = dscBytes.length;
 
-  const result = new Uint8Array(inputBytes.length + delta);
-  result.set(inputBytes.subarray(0, insertPos), 0);
+  const result = new Uint8Array(workingBytes.length + delta);
+  result.set(workingBytes.subarray(0, insertPos), 0);
   result.set(dscBytes, insertPos);
-  result.set(inputBytes.subarray(insertPos), insertPos + delta);
+  result.set(workingBytes.subarray(insertPos), insertPos + delta);
 
   if (isDosEps) {
     const newView = new DataView(result.buffer, result.byteOffset, 30);

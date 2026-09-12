@@ -27,7 +27,7 @@ interface ExportPanelProps {
   canDownload: boolean;
   handleExport: () => void;
   handleBackupJSON?: () => void;
-  handleDownloadEmbedded?: () => void;
+  handleDownloadEmbedded?: (explicitFiles?: any, customNamingMode?: 'matching_csv' | 'seo_title') => void;
   embedDownloading?: boolean;
   embedProgress?: { current: number; total: number } | null;
   embedNamingMode?: 'matching_csv' | 'seo_title';
@@ -366,7 +366,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
 
           {handleDownloadEmbedded && (
             <button
-              onClick={() => handleDownloadEmbedded()}
+              onClick={() => handleDownloadEmbedded(undefined, embedNamingMode)}
               disabled={!canDownload || embedDownloading}
               className={`px-5 py-3 text-xs font-black uppercase tracking-wider rounded-[1.5rem] transition-all flex items-center justify-center gap-2 cursor-pointer shadow active:scale-[0.98] ${
                 canDownload && !embedDownloading 

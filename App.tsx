@@ -3065,9 +3065,28 @@ const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [embedDownloading, setEmbedDownloading] = useState(false);
-  const [embedNamingMode, setEmbedNamingMode] = useState<'matching_csv' | 'seo_title'>(() => {
+  const [embedNamingMode, _setEmbedNamingMode] = useState<'matching_csv' | 'seo_title'>(() => {
+    try {
+      const saved = localStorage.getItem('mz_embed_naming_mode');
+      if (saved === 'matching_csv' || saved === 'seo_title') return saved;
+    } catch (_) {}
     return autoPilotConfig.embedNamingMode || 'matching_csv';
   });
+
+  const setEmbedNamingMode = (mode: 'matching_csv' | 'seo_title') => {
+    _setEmbedNamingMode(mode);
+    try {
+      localStorage.setItem('mz_embed_naming_mode', mode);
+    } catch (_) {}
+    setAutoPilotConfig(prev => {
+      const updated = { ...prev, embedNamingMode: mode };
+      autoPilotConfigRef.current = updated;
+      try {
+        localStorage.setItem('mz_autopilot_config', JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
+  };
   const [embedProgress, setEmbedProgress] = useState<{ current: number; total: number } | null>(null);
   const [ftpInitialFiles, setFtpInitialFiles] = useState<{ files: File[]; autoStart: boolean; targetAgencies?: string[] } | null>(null);
 
@@ -4096,9 +4115,10 @@ const App: React.FC = () => {
                   return;
                 }
 
-                const effectiveNamingMode = autoPilotConfig.embedNamingMode || embedNamingMode;
+                const currentAp = autoPilotConfigRef.current || autoPilotConfig;
+                const effectiveNamingMode = currentAp.embedNamingMode || embedNamingMode || 'matching_csv';
 
-                if (autoPilotConfig.enableFtp) {
+                if (currentAp.enableFtp) {
                   // Arahkan ke FTP Uploader: embed metadata ke file media terlebih dahulu (BUKAN CSV), lalu kirim ke antrian FTP
                   try {
                     console.log(`[Auto Pilot Gen] Embedding metadata (${effectiveNamingMode}) into ${completed.length} file(s) for FTP upload...`);
@@ -4130,7 +4150,7 @@ const App: React.FC = () => {
                       setFtpInitialFiles({
                         files: embeddedFiles,
                         autoStart: true,
-                        targetAgencies: autoPilotConfig.targetAgencies
+                        targetAgencies: currentAp.targetAgencies
                       });
                       handleSetActiveTool(ToolType.FTP_UPLOADER);
                     } else {
@@ -4914,7 +4934,7 @@ const App: React.FC = () => {
     explicitFiles?: FileItem[] | any,
     customNamingMode?: 'matching_csv' | 'seo_title'
   ) => {
-    const effectiveNamingMode = customNamingMode || autoPilotConfigRef.current?.embedNamingMode || embedNamingMode;
+    const effectiveNamingMode = customNamingMode || embedNamingMode || autoPilotConfigRef.current?.embedNamingMode || 'matching_csv';
     const currentTool = activeToolRef.current || activeTool;
     const isExplicitArray = Array.isArray(explicitFiles);
     const currentFiles = isExplicitArray ? explicitFiles : filesRef.current;
@@ -4969,7 +4989,16 @@ const App: React.FC = () => {
           }
         } catch (itemErr) {
           console.warn(`[Download Embedded] Fallback raw file for ${item.file.name}:`, itemErr);
-          let uniqueName = item.file.name;
+          let rawName = item.file.name;
+          const origExt = (item.file.name.split('.').pop() || 'jpg').toLowerCase();
+          if (effectiveNamingMode === 'seo_title') {
+            const rawTitle = item.title?.trim() || item.description?.trim() || item.customFileName?.trim() || item.file.name.replace(/\.[^/.]+$/, '');
+            const cleanTitle = rawTitle.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim() || 'asset';
+            rawName = `${cleanTitle}.${origExt}`;
+          } else if (item.customFileName) {
+            rawName = getExportFilename(item.customFileName, item.file);
+          }
+          let uniqueName = rawName;
           let counter = 1;
           const dotIdx = uniqueName.lastIndexOf('.');
           const base = dotIdx !== -1 ? uniqueName.slice(0, dotIdx) : uniqueName;
