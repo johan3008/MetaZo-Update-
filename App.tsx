@@ -1417,6 +1417,7 @@ const App: React.FC = () => {
       if (newConfig.targetKeywords) setCustomPrompt(newConfig.targetKeywords);
       setIsGenerativeAI(newConfig.isGenerativeAI);
       if (newConfig.aiModelSource) setAiModelSource(newConfig.aiModelSource);
+      if (newConfig.embedNamingMode) setEmbedNamingMode(newConfig.embedNamingMode);
     } catch (e) {
       console.warn("Failed saving mz_autopilot_config", e);
     }
@@ -3064,7 +3065,9 @@ const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [embedDownloading, setEmbedDownloading] = useState(false);
-  const [embedNamingMode, setEmbedNamingMode] = useState<'matching_csv' | 'seo_title'>('matching_csv');
+  const [embedNamingMode, setEmbedNamingMode] = useState<'matching_csv' | 'seo_title'>(() => {
+    return autoPilotConfig.embedNamingMode || 'matching_csv';
+  });
   const [embedProgress, setEmbedProgress] = useState<{ current: number; total: number } | null>(null);
   const [ftpInitialFiles, setFtpInitialFiles] = useState<{ files: File[]; autoStart: boolean; targetAgencies?: string[] } | null>(null);
 
@@ -3298,10 +3301,13 @@ const App: React.FC = () => {
               reader.readAsDataURL(file);
           });
       } else if (ext === 'eps' || ext === 'ai') {
-          // 1. Try to generate thumbnail JPG/PNG di sisi client
+          // 1. Try to generate thumbnail JPG/PNG di sisi client first!
           const clientSidePreview = await extractEPSClientSide(file);
+          if (clientSidePreview) {
+              return [clientSidePreview];
+          }
           
-          // 2. Simpan EPS ke R2 (once, before any ghostscript logic)
+          // 2. Client-side preview failed, prepare server-side Ghostscript conversion
           let uploadedUrl = null;
           let getUrlData = null;
           try {
@@ -3316,8 +3322,11 @@ const App: React.FC = () => {
                       body: file,
                       headers: { 'Content-Type': file.type || 'application/postscript' }
                   });
-                  if (!putRes.ok) throw new Error(`Failed to upload to storage: ${putRes.status}`);
-                  uploadedUrl = getUrlData.fileUrl;
+                  if (putRes.ok) {
+                      uploadedUrl = getUrlData.fileUrl;
+                  } else {
+                      console.warn(`Failed to upload to storage: ${putRes.status}, falling back to multipart`);
+                  }
               } else {
                   // Try Vercel Blob if S3/R2 fails or is unconfigured
                   try {
@@ -3333,15 +3342,7 @@ const App: React.FC = () => {
                   }
               }
           } catch (uploadErr: any) {
-              console.warn("Failed to save EPS to R2/Storage:", uploadErr);
-              if (uploadErr.message === 'Failed to fetch') {
-                  throw new Error(`Gagal upload ke Cloudflare R2 (CORS Error). Pastikan Anda telah menambahkan setting CORS di dashboard Cloudflare R2 bucket Anda.`);
-              }
-          }
-
-          // If client-side thumbnail succeeded, we just return it to AI Vision!
-          if (clientSidePreview) {
-              return [clientSidePreview];
+              console.warn("Failed to save EPS to R2/Storage (will use multipart fallback):", uploadErr);
           }
            
           // 3. Fallback: If client-side failed, use server-side Ghostscript
@@ -4095,10 +4096,12 @@ const App: React.FC = () => {
                   return;
                 }
 
+                const effectiveNamingMode = autoPilotConfig.embedNamingMode || embedNamingMode;
+
                 if (autoPilotConfig.enableFtp) {
                   // Arahkan ke FTP Uploader: embed metadata ke file media terlebih dahulu (BUKAN CSV), lalu kirim ke antrian FTP
                   try {
-                    console.log(`[Auto Pilot Gen] Embedding metadata into ${completed.length} file(s) for FTP upload...`);
+                    console.log(`[Auto Pilot Gen] Embedding metadata (${effectiveNamingMode}) into ${completed.length} file(s) for FTP upload...`);
                     setEmbedDownloading(true);
                     setEmbedProgress({ current: 0, total: completed.length });
 
@@ -4107,7 +4110,7 @@ const App: React.FC = () => {
                       setEmbedProgress({ current: i + 1, total: completed.length });
                       const item = completed[i];
                       if (!item) continue;
-                      const res = await getEmbeddedBlobForItem(item, embedNamingMode);
+                      const res = await getEmbeddedBlobForItem(item, effectiveNamingMode);
                       if (res && res.blob) {
                         // Pastikan BUKAN CSV, microstock FTP hanya menerima file gambar, vektor, atau video
                         if (!res.exportName.toLowerCase().endsWith('.csv')) {
@@ -4143,8 +4146,8 @@ const App: React.FC = () => {
                 } else {
                   // Unduh otomatis HANYA file embedded (BUKAN CSV)
                   try {
-                    console.log(`[Auto Pilot Gen] Auto-downloading ${completed.length} embedded file(s) (JPG/PNG/EPS/SVG/MP4)...`);
-                    await handleDownloadEmbedded(latestFiles);
+                    console.log(`[Auto Pilot Gen] Auto-downloading ${completed.length} embedded file(s) (${effectiveNamingMode}) (JPG/PNG/EPS/SVG/MP4)...`);
+                    await handleDownloadEmbedded(latestFiles, effectiveNamingMode);
                     // CATATAN: handleExport() TIDAK dipanggil karena Auto Pilot hanya mengunduh file embedded, bukan CSV.
                   } catch (dlErr) {
                     console.warn('[Auto Pilot Gen] Auto-download embedded error:', dlErr);
@@ -4907,7 +4910,11 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDownloadEmbedded = async (explicitFiles?: FileItem[] | any) => {
+  const handleDownloadEmbedded = async (
+    explicitFiles?: FileItem[] | any,
+    customNamingMode?: 'matching_csv' | 'seo_title'
+  ) => {
+    const effectiveNamingMode = customNamingMode || autoPilotConfigRef.current?.embedNamingMode || embedNamingMode;
     const currentTool = activeToolRef.current || activeTool;
     const isExplicitArray = Array.isArray(explicitFiles);
     const currentFiles = isExplicitArray ? explicitFiles : filesRef.current;
@@ -4927,7 +4934,7 @@ const App: React.FC = () => {
       // If only 1 file, download directly as single file without zip
       if (completedFiles.length === 1) {
         setEmbedProgress({ current: 1, total: 1 });
-        await downloadSingleEmbeddedFile(completedFiles[0], embedNamingMode);
+        await downloadSingleEmbeddedFile(completedFiles[0], effectiveNamingMode);
         return;
       }
 
@@ -4941,7 +4948,7 @@ const App: React.FC = () => {
         if (!item || !item.file) continue;
 
         try {
-          const res = await getEmbeddedBlobForItem(item, embedNamingMode);
+          const res = await getEmbeddedBlobForItem(item, effectiveNamingMode);
           if (res && res.blob) {
             let uniqueName = res.exportName || item.file.name;
             let counter = 1;
@@ -5356,6 +5363,7 @@ const App: React.FC = () => {
                     if (currentApConfig.targetKeywords) setCustomPrompt(currentApConfig.targetKeywords);
                     if (currentApConfig.isGenerativeAI !== undefined) setIsGenerativeAI(currentApConfig.isGenerativeAI);
                     if (currentApConfig.aiModelSource) setAiModelSource(currentApConfig.aiModelSource);
+                    if (currentApConfig.embedNamingMode) setEmbedNamingMode(currentApConfig.embedNamingMode);
                   }
 
                   // Batalkan timer finale lama jika masih ada

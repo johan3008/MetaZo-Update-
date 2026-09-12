@@ -65,11 +65,47 @@ self.onmessage = async (e: MessageEvent) => {
             }
         }
         
-        // DOS EPS TIFF extraction removed because embedded TIFF previews
-        // in old EPS files are typically low-resolution, dithered (halftones),
-        // and cause the AI to hallucinate "dots" and "textures".
-        // Instead, let it fall through to XMP JPEG or hit the server's Ghostscript
-        // which renders actual vectors to a clean image.
+        // 2. Search for DOS EPS TIFF preview (Magic bytes 0xC5, 0xD0, 0xD3, 0xC6)
+        const isDosEps = uint8Array.length >= 30 &&
+            uint8Array[0] === 0xC5 &&
+            uint8Array[1] === 0xD0 &&
+            uint8Array[2] === 0xD3 &&
+            uint8Array[3] === 0xC6;
+
+        if (isDosEps) {
+            try {
+                const view = new DataView(buffer);
+                const tiffOffset = view.getUint32(20, true);
+                const tiffLength = view.getUint32(24, true);
+
+                if (tiffOffset > 0 && tiffLength > 0) {
+                    const tiffSlice = file.slice(tiffOffset, tiffOffset + tiffLength);
+                    const tiffBuffer = await tiffSlice.arrayBuffer();
+                    const ifds = UTIF.decode(tiffBuffer);
+                    if (ifds && ifds.length > 0) {
+                        UTIF.decodeImage(tiffBuffer, ifds[0]);
+                        const rgba = UTIF.toRGBA8(ifds[0]);
+                        const width = ifds[0].width;
+                        const height = ifds[0].height;
+
+                        if (width > 0 && height > 0 && typeof OffscreenCanvas !== 'undefined') {
+                            const canvas = new OffscreenCanvas(width, height);
+                            const ctx = canvas.getContext('2d');
+                            if (ctx) {
+                                const imgData = ctx.createImageData(width, height);
+                                imgData.data.set(rgba);
+                                ctx.putImageData(imgData, 0, 0);
+                                const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.85 });
+                                self.postMessage({ success: true, blob: blob });
+                                return;
+                            }
+                        }
+                    }
+                }
+            } catch (tiffErr) {
+                console.warn("DOS EPS TIFF extraction failed, falling back:", tiffErr);
+            }
+        }
 
         // 3.5 Look for XMP Base64 JPEG Thumbnail (often found in AI files that aren't PDF compatible)
         const decoder = new TextDecoder('ascii');

@@ -14,6 +14,7 @@ export interface AutoPilotConfig {
   targetKeywords: string; // Instruksi / Target Kata Kunci Tambahan
   isGenerativeAI: boolean;
   aiModelSource: string;
+  embedNamingMode?: 'matching_csv' | 'seo_title';
   qcMinScore: number; // 70 - 95 (Passing threshold for QC)
   autoForwardQC: boolean; // false: stay on QC tab, true: auto-forward to MetadataGen after countdown
   enableFtp: boolean; // true: upload to FTP, false: auto download embedded media files (no CSV)
@@ -29,6 +30,7 @@ export const DEFAULT_AUTOPILOT_CONFIG: AutoPilotConfig = {
   targetKeywords: '',
   isGenerativeAI: true,
   aiModelSource: 'Midjourney',
+  embedNamingMode: 'matching_csv',
   qcMinScore: 75,
   autoForwardQC: true,
   enableFtp: false,
@@ -369,6 +371,67 @@ export const AutoPilotModal: React.FC<AutoPilotModalProps> = ({
                     </select>
                   </div>
                 )}
+              </div>
+
+              {/* Embedded File Naming Mode */}
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <FileText size={14} className="text-emerald-500" />
+                    <span className="font-black text-slate-800 dark:text-white uppercase tracking-wider text-[11px]">
+                      {isIndo ? 'Penamaan File Tertanam (Embedded File Naming)' : 'Embedded File Naming'}
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                    Auto-Detect Ready
+                  </span>
+                </div>
+
+                <p className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                  {isIndo 
+                    ? 'Pilih skema penamaan file saat metadata disematkan otomatis dan diunduh atau dikirim ke FTP.' 
+                    : 'Choose file naming scheme when metadata is embedded and auto-downloaded or transferred to FTP.'}
+                </p>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLocalConfig(prev => ({ ...prev, embedNamingMode: 'matching_csv' }))}
+                    className={`py-2 px-2 text-[10.5px] uppercase font-extrabold rounded-xl border transition-all text-center cursor-pointer ${
+                      (localConfig.embedNamingMode || 'matching_csv') === 'matching_csv'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20'
+                        : 'bg-white dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                    title={isIndo ? "Nama file sesuai CSV export (nama file asli / custom). Direkomendasikan untuk sinkronisasi upload microstock." : "File name matches CSV export (original / custom). Recommended for microstock upload sync."}
+                  >
+                    Match CSV Name
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLocalConfig(prev => ({ ...prev, embedNamingMode: 'seo_title' }))}
+                    className={`py-2 px-2 text-[10.5px] uppercase font-extrabold rounded-xl border transition-all text-center cursor-pointer ${
+                      localConfig.embedNamingMode === 'seo_title'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20'
+                        : 'bg-white dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                    title={isIndo ? "Nama file menggunakan SEO Title yang dihasilkan AI" : "File name uses AI generated SEO Title"}
+                  >
+                    SEO Title Name
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200 dark:border-slate-800">
+                  <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500">
+                    {isIndo ? 'Format Didukung:' : 'Supported Formats:'}
+                  </span>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {['JPG', 'PNG', 'SVG', 'EPS', 'AI', 'MP4', 'MOV'].map(fmt => (
+                      <span key={fmt} className="text-[8px] font-black px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-slate-300">
+                        {fmt}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           )}
