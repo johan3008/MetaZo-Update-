@@ -15,6 +15,7 @@ import { PakasirClient } from 'pakasir-client';
 import { generateStockMetadata, generateAutoSubject, generateTopicMatrix, generateBatchStockMetadata, generateOptimizedPrompt, analyzeImageToPrompt, analyzeBatchImageToPrompt, analyzeVideoKeyword, generateHollywoodPrompts, checkImageQuality, checkVideoQuality, apiKeyStorage, uploadVideoToGemini, generateCalendarEvents, generateEventKeywords, suggestKeywords, searchAdobeStockWithBypass, generateMotionCode } from './server/gemini.ts';
 import { testFtpConnection, uploadToFtp } from './server/ftpService.ts';
 import { embedJpegMetadata, embedPngMetadata, embedSvgMetadata, embedEpsMetadata, embedEpsMetadataBytes, embedAiMetadataBytes, embedMp4MetadataBytes, ADOBE_CATEGORY_NAMES, cleanKeywordArray, resolveDateTaken, formatExifDate, formatIsoDate, formatIptcDate } from './src/utils/microstockEmbedder.ts';
+import { auditVectorBuffer } from './src/utils/vectorQualityChecker.ts';
 import fluentFfmpeg from 'fluent-ffmpeg';
 import { createRequire } from 'module';
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
@@ -1828,6 +1829,7 @@ app.get('/api/debug-uploads', (req, res) => {
             } catch (svgErr) {
                 console.warn('[embedMetadataForAdobe] SVG injection note:', svgErr);
             }
+            return filePath;
         }
 
         if (ext === '.eps') {
@@ -1839,6 +1841,7 @@ app.get('/api/debug-uploads', (req, res) => {
             } catch (epsErr) {
                 console.warn('[embedMetadataForAdobe] EPS injection note:', epsErr);
             }
+            return filePath;
         }
 
         if (ext === '.ai') {
@@ -1850,6 +1853,7 @@ app.get('/api/debug-uploads', (req, res) => {
             } catch (aiErr) {
                 console.warn('[embedMetadataForAdobe] AI injection note:', aiErr);
             }
+            return filePath;
         }
 
         // 2. Native Pure-JS Embedded Layers (JPEG & PNG)
@@ -2548,12 +2552,15 @@ app.get('/api/debug-uploads', (req, res) => {
             let imagePayload: any;
             let fileType: string | undefined = req.body.fileType;
             let metadata: any = undefined;
+            let fileBuffer: Buffer | null = null;
+            let fileName = req.file?.originalname || '';
 
             if (req.file) {
-                const buffer = fs.readFileSync(req.file.path);
+                fileBuffer = fs.readFileSync(req.file.path);
                 const mime = req.file.mimetype || 'image/jpeg';
-                imagePayload = `data:${mime};base64,${buffer.toString('base64')}`;
+                imagePayload = `data:${mime};base64,${fileBuffer.toString('base64')}`;
                 fileType = fileType || mime;
+                fileName = req.file.originalname || fileName;
                 try { fs.unlinkSync(req.file.path); } catch (_) {}
             } else if (req.body.fileUrl || req.body.pathKey || (typeof req.body.image === 'string' && (req.body.image.startsWith('http://') || req.body.image.startsWith('https://')))) {
                 const targetUrl = req.body.fileUrl || (typeof req.body.image === 'string' ? req.body.image : '');
@@ -2562,17 +2569,60 @@ app.get('/api/debug-uploads', (req, res) => {
                 try {
                     const parsedUrl = new URL(targetUrl || 'http://localhost');
                     ext = path.extname(parsedUrl.pathname) || (fileType ? `.${fileType.replace(/^image\//, '')}` : '.jpeg');
+                    if (parsedUrl.pathname) {
+                        fileName = path.basename(parsedUrl.pathname);
+                    }
                 } catch (_) {}
                 const downloaded = await downloadFileFromStorage(targetUrl, pathKey, ext);
                 cleanupDownload = downloaded.cleanup;
-                const buffer = fs.readFileSync(downloaded.localPath);
+                fileBuffer = fs.readFileSync(downloaded.localPath);
                 let mime = 'image/jpeg';
                 if (ext.toLowerCase() === '.png') mime = 'image/png';
                 else if (ext.toLowerCase() === '.webp') mime = 'image/webp';
-                imagePayload = `data:${mime};base64,${buffer.toString('base64')}`;
+                else if (ext.toLowerCase() === '.svg') mime = 'image/svg+xml';
+                else if (ext.toLowerCase() === '.eps' || ext.toLowerCase() === '.ai') mime = 'application/postscript';
+                imagePayload = `data:${mime};base64,${fileBuffer.toString('base64')}`;
                 fileType = fileType || mime;
             } else if (req.body.image) {
                 imagePayload = req.body.image;
+            }
+
+            const isVector = req.body.isVector === true || req.body.isVector === 'true' ||
+                !!fileName.match(/\.(eps|ai|svg)$/i) ||
+                (typeof fileType === 'string' && !!fileType.match(/(eps|ai|svg|postscript)/i));
+
+            let vectorGate: any = undefined;
+            if (req.body.vectorGate) {
+                try {
+                    vectorGate = typeof req.body.vectorGate === 'string' ? JSON.parse(req.body.vectorGate) : req.body.vectorGate;
+                } catch (_) {}
+            }
+
+            // If it's a vector file, calculate vector gate deterministically if not yet present
+            if (isVector && !vectorGate && fileBuffer) {
+                try {
+                    vectorGate = auditVectorBuffer(fileBuffer, fileName);
+                } catch (vErr) {
+                    console.warn('[check-image-quality] Error calculating vector gate:', vErr);
+                }
+            }
+
+            // For Gemini Vision: Gemini only accepts raster images (JPEG/PNG/WEBP).
+            // PostScript and raw SVG base64 are rejected with 400 Unsupported MIME type.
+            // If the client provided a rendered vector preview (JPEG), prioritize it as imagePayload.
+            if (isVector && req.body.vectorPreview && typeof req.body.vectorPreview === 'string' && req.body.vectorPreview.startsWith('data:image/')) {
+                imagePayload = req.body.vectorPreview;
+            } else if (isVector && fileBuffer) {
+                // If it's an SVG and no client preview was sent, convert to JPEG using sharp
+                if (fileName.toLowerCase().endsWith('.svg') || fileType?.includes('svg')) {
+                    try {
+                        const sharp = (await import('sharp')).default;
+                        const jpegBuf = await sharp(fileBuffer).jpeg({ quality: 92 }).toBuffer();
+                        imagePayload = `data:image/jpeg;base64,${jpegBuf.toString('base64')}`;
+                    } catch (sharpErr) {
+                        console.warn('[check-image-quality] Sharp SVG conversion error:', sharpErr);
+                    }
+                }
             }
 
             if (!imagePayload) {
@@ -2586,7 +2636,16 @@ app.get('/api/debug-uploads', (req, res) => {
             }
 
             const { tolerance, language, model } = req.body;
-            const result = await checkImageQuality(imagePayload, tolerance || 'MEDIUM', language || 'Bahasa', model, fileType, metadata);
+            const result = await checkImageQuality(
+                imagePayload, 
+                tolerance || 'MEDIUM', 
+                language || 'Bahasa', 
+                model, 
+                fileType, 
+                metadata,
+                isVector,
+                vectorGate
+            );
             if (cleanupDownload) {
                 try { cleanupDownload(); } catch (_) {}
                 cleanupDownload = null;
@@ -2603,6 +2662,7 @@ app.get('/api/debug-uploads', (req, res) => {
             res.status(500).json({ error: e.message || 'Error checking image quality' });
         }
     });
+
 
     app.post('/api/check-video-quality', upload.single('video'), async (req, res) => {
         try {

@@ -6709,7 +6709,9 @@ export async function checkImageQuality(
   language: string = 'Bahasa', 
   model?: string, 
   fileType?: string, 
-  imageMetadata?: any
+  imageMetadata?: any,
+  isVector?: boolean,
+  vectorGate?: any
 ) {
   const store = apiKeyStorage.getStore();
   const provider = (store && store.provider) || 'gemini';
@@ -6717,12 +6719,54 @@ export async function checkImageQuality(
   const isIndonesian = !language || language === 'Bahasa' || language === 'id' || language === 'Indonesian' || language?.toLowerCase() === 'indonesian' || language?.toLowerCase() === 'id';
   const targetLanguageName = isIndonesian ? 'Indonesian (Bahasa Indonesia)' : 'English';
 
+  const isVectorAsset = !!isVector || !!vectorGate || !!fileType?.match(/(eps|ai|svg|postscript)/i);
+
+  let vectorGateInstruction = "";
+  if (vectorGate) {
+    const craft = vectorGate.craftsmanship;
+    const craftDetail = craft ? `\n- Kehalusan Kurva Bezier: ${craft.curveRatioPercent}% kurva (${craft.curveCount} kurva vs ${craft.lineCount} garis lurus, ${craft.pathCount} total elemen/path)
+- Risiko AI Autotrace: ${craft.autotraceRisk}
+- Rating Kualitas Vektor: ${craft.qualityRating}
+- Evaluasi Kurva: ${craft.summary}` : '';
+
+    vectorGateInstruction = `\n\n---\n[HASIL AUDIT GERBANG VEKTOR ADOBE STOCK (DETERMINISTIC GATE & CRAFTSMANSHIP)]:\n\`\`\`json\n${JSON.stringify(vectorGate, null, 2)}\n\`\`\`\nPERHATIAN KURATOR:\n- Status Artboard: ${vectorGate.artboard?.status} (${vectorGate.artboard?.megapixels} MP) - ${vectorGate.artboard?.note}\n- Status Raster Tertanam: ${vectorGate.embeddedRaster?.status} - ${vectorGate.embeddedRaster?.note}\n- Status Teks/Font: ${vectorGate.liveText?.status} - ${vectorGate.liveText?.note}\n- Status Ukuran File: ${vectorGate.fileSize?.status} (${vectorGate.fileSize?.mb} MB) - ${vectorGate.fileSize?.note}${craftDetail}\nJika salah satu gerbang teknis di atas gagal (FAIL), file WAJIB DITOLAK (FAIL) sesuai pedoman resmi Adobe Stock.`;
+  }
+
   let metadataInstruction = "";
   if (imageMetadata) {
     metadataInstruction = `\n\n---\n[DATA PENGUKURAN TEKNIS OBJEKTIF & PIXEL FORENSIK]\nHasil analisis OpenCV / BRISQUE / NIQE pada file asli:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nPETUNJUK ANALISIS PIKSEL & TEKNIKAL:\n1. Skor BRISQUE > 52 atau NIQE > 6.2: Indikasi kuat degradasi spasial / blur ekstrem / over-smoothing AI sintetis. Skor di bawah 45 adalah rentang normal fotografi komersial.\n2. has_local_blur_anomaly = true: Hanya jika seluruh gambar tidak memiliki fokus tajam. Jika subjek utama tajam dan latar belakang blur karena bokeh optik, nilai PASS.\n3. Pantulan kilau (specular highlights pada saus/cairan/gelas/logam) dan bayangan alami adalah pencahayaan normal komersial dan BUKAN cacat.\n4. Gunakan data numerik bersama inspeksi visual crop 100% untuk menetapkan penilaian akurat dan proporsional.`;
   }
 
-  const systemInstruction = `Anda adalah "Adobe Stock Senior Content Moderator & Forensic Quality Inspector" resmi. Tugas Anda adalah mengaudit gambar komersial secara mendalam berdasarkan standar moderasi resmi Adobe Stock Contributor.
+  const systemInstruction = isVectorAsset ? `Anda adalah "Adobe Stock Senior Vector Content Moderator & Forensic Quality Inspector" resmi. Tugas Anda adalah mengaudit aset ilustrasi vektor (.EPS, .SVG, .AI) komersial secara mendalam berdasarkan standar dan peraturan resmi Adobe Stock Vector Contributor Guidelines (https://helpx.adobe.com/stock/contributor/content-policies-guidelines/vector-requirements.html).
+
+STANDAR MODERASI KHUSUS VEKTOR ADOBE STOCK:
+1. GERBANG TEKNIS RESMI VEKTOR ADOBE STOCK:
+   - ARTBOARD & RESOLUSI: Wajib antara 4.0 MP (4.000.000 px) hingga 25.0 MP (25.000.000 px). Contoh: 2000x2000 px s/d 5000x5000 px. Di bawah 4 MP atau di atas 25 MP langsung DITOLAK.
+   - PURE VECTOR (ZERO EMBEDDED BITMAPS): Seluruh gambar harus 100% vektor murni. DILARANG KERAS menyematkan foto/bitmap/raster (<image>, %AI5_BeginRaster, data:image, /image). Terdeteksi 1 bitmap saja langsung DITOLAK.
+   - OUTLINE FONTS (CREATE OUTLINES): Seluruh teks, font, dan tipografi wajib di-convert to outlines / expanded. Dilarang menyisakan live text / font aktif.
+   - UKURAN FILE: Maksimal 45 MB.
+
+2. KUALITAS PEMBUATAN VEKTOR & BEZIER CRAFTSMANSHIP:
+   - Kehalusan Kurva Bezier: Kurva harus halus dan terstruktur rapi. Dilarang keras hasil AI autotrace kasar/berantakan dengan ribuan anchor point liar (stray anchor points), garis bergerigi (jagged edges), atau celah terbuka tidak tertutup (unclosed paths).
+   - Detail & Komposisi: Garis vektor harus terhubung rapi, layering teratur, dan bentuk ilustrasi memiliki nilai komersial tinggi.
+
+3. KEBIJAKAN HAK CIPTA & MEREK DAGANG:
+   - Dilarang mengandung logo komersial, ikon merek berhak cipta, karakter berlisensi, atau materi tanpa izin.
+
+4. PERALATAN DETEKSI YANG DIGUNAKAN:
+   - Adobe Stock Vector Artboard Validator (4MP - 25MP Gateway)
+   - Vector Raster-Free Forensic Scanner (0 Embedded Bitmaps Gate)
+   - Typography Outline Verifier (Live Text Detector)
+   - Bezier Curve & AI Autotrace Craftsmanship Inspector
+   - Adobe Stock Known Restrictions & Trademark Scanner
+
+FORMAT LAPORAN:
+Kembalikan keterangan naratif terpadu yang jelas, terstruktur, dan elegan untuk:
+- detection_tools_used: Daftar nama alat forensik vektor yang digunakan.
+- ip_audit_summary: Narasi lengkap audit hak cipta, merek dagang, dan orisinalitas vektor.
+- quality_issues_summary: Narasi lengkap kehalusan kurva bezier, estetika vektor, dan deteksi artefak autotrace AI.
+- technical_issues_summary: Narasi lengkap kesesuaian gerbang teknis vektor Adobe Stock (Artboard MP, Raster-Free, Outlined Text, Ukuran File).
+- detailed_feedback: Kesimpulan kurator dan panduan teknis perbaikan di Adobe Illustrator / software vektor.` + metadataInstruction + vectorGateInstruction : `Anda adalah "Adobe Stock Senior Content Moderator & Forensic Quality Inspector" resmi. Tugas Anda adalah mengaudit gambar komersial secara mendalam berdasarkan standar moderasi resmi Adobe Stock Contributor.
 
 STANDAR MODERASI & PEDOMAN RESMI ADOBE STOCK:
 1. KEBIJAKAN HAK CIPTA & RESTRIKSI HUKUM (Known Restrictions & Common Refusal Reasons - https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html & https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
@@ -6859,7 +6903,31 @@ Kembalikan keterangan naratif terpadu yang jelas, terstruktur, dan elegan (TIDAK
   let responseText = "";
   let lastError;
 
-  const promptText = `Sebagai Kurator & Moderator Konten Senior Adobe Stock, lakukan review kurasi forensik menyeluruh pada gambar ini sesuai pedoman Adobe Stock:
+  const promptText = isVectorAsset ? `Sebagai Kurator & Moderator Konten Vektor Senior Adobe Stock, lakukan review kurasi teknis dan artistik menyeluruh pada aset ilustrasi vektor ini sesuai aturan resmi Adobe Stock Vector (https://helpx.adobe.com/stock/contributor/content-policies-guidelines/vector-requirements.html):
+
+1. AUDIT GERBANG TEKNIS VEKTOR (Adobe Stock Vector Technical Requirements):
+   - Periksa dimensi artboard (rentang 4 MP - 25 MP).
+   - Pastikan bebas dari gambar raster/bitmap yang tertanam (100% pure vector).
+   - Pastikan seluruh teks telah di-convert to outlines (tidak ada live font).
+   - Periksa ukuran file (maksimal 45 MB).
+   - Buat narasi lengkap pada "technical_issues_summary".
+
+2. AUDIT CRAFTSMANSHIP & BEZIER PATHS (Vector Quality Issues):
+   - Evaluasi kehalusan kurva bezier, kerapian titik jangkar (anchor points), dan ketiadaan artefak AI autotrace kasar/pecah.
+   - Periksa apakah kurva terlihat mulus dan terstruktur, atau apakah terlihat bergerigi (jagged edges) akibat autotrace otomatis dengan ribuan node berlebih.
+   - Berikan rekomendasi perbaikan Adobe Illustrator (misal: Object > Path > Simplify) jika kurva perlu dioptimalkan.
+   - Tetapkan status pada ai_vision_checks.proportion_defects (PASS/FAIL beserta catatannya).
+   - Buat narasi lengkap pada "quality_issues_summary".
+
+3. AUDIT HAK CIPTA & RESTRIKSI (Known Restrictions & Trademark Audit):
+   - Evaluasi keberadaan logo, merek komersial, desain produk berhak cipta, simbol terlindungi.
+   - Buat narasi lengkap pada "ip_audit_summary".
+
+4. ALAT DETEKSI (detection_tools_used):
+   - Cantumkan: ["Adobe Stock Vector Artboard Validator (4MP - 25MP Gateway)", "Vector Raster-Free Forensic Scanner (0 Embedded Bitmaps Gate)", "Typography Outline Verifier (Live Text Detector)", "Bezier Curve & AI Autotrace Craftsmanship Inspector", "Adobe Stock Known Restrictions & Trademark Scanner"].
+
+Tingkat toleransi yang diminta: ${tolerance}.
+Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.` : `Sebagai Kurator & Moderator Konten Senior Adobe Stock, lakukan review kurasi forensik menyeluruh pada gambar ini sesuai pedoman Adobe Stock:
 
 1. AUDIT HAK CIPTA & RESTRIKSI (Known Restrictions & Common Refusal Reasons):
    - Evaluasi keberadaan logo, merek komersial, desain produk berhak cipta, landmark/arsitektur yang dilindungi, karya seni/patung publik, serta logo/aset NASA.
@@ -6923,14 +6991,22 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
     const parsedResult = JSON.parse(extractJSON(responseText));
     
     // Pastikan daftar detection_tools_used selalu lengkap
+    const defaultTools = isVectorAsset ? [
+      "Adobe Stock Vector Artboard Validator (4MP - 25MP Gateway)",
+      "Vector Raster-Free Forensic Scanner (0 Embedded Bitmaps Gate)",
+      "Typography Outline Verifier (Live Text Detector)",
+      "Bezier Curve & AI Autotrace Craftsmanship Inspector",
+      "Adobe Stock Known Restrictions & Trademark Scanner"
+    ] : [
+      "AI Multimodal Vision Inspector",
+      "OpenCV Pixel Forensic Engine (100% Zoom Crop)",
+      "BRISQUE & NIQE Spatial Quality Analyzer",
+      "YOLO Neural Object Grounding",
+      "Luma Histogram Analyzer"
+    ];
+
     if (!Array.isArray(parsedResult.detection_tools_used) || parsedResult.detection_tools_used.length === 0) {
-      parsedResult.detection_tools_used = [
-        "AI Multimodal Vision Inspector",
-        "OpenCV Pixel Forensic Engine (100% Zoom Crop)",
-        "BRISQUE & NIQE Spatial Quality Analyzer",
-        "YOLO Neural Object Grounding",
-        "Luma Histogram Analyzer"
-      ];
+      parsedResult.detection_tools_used = defaultTools;
     }
 
     if (parsedResult.ai_vision_checks) {
@@ -6969,6 +7045,30 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
       }
     }
 
+    // Gerbang Deterministik Vektor Adobe Stock (Hard Reject jika gerbang teknis gagal)
+    if (vectorGate) {
+      parsedResult.vector_gate = vectorGate;
+      if (vectorGate.passed === false) {
+        parsedResult.recommendation = "FAIL";
+        parsedResult.overall_score = Math.min(parsedResult.overall_score || 45, 42);
+        if (!Array.isArray(parsedResult.technical_issues)) {
+          parsedResult.technical_issues = [];
+        }
+        for (const failure of (vectorGate.failures || [])) {
+          if (!parsedResult.technical_issues.includes(failure)) {
+            parsedResult.technical_issues.unshift(failure);
+          }
+        }
+        if (Array.isArray(vectorGate.adobeRefusalReasons)) {
+          for (const reason of vectorGate.adobeRefusalReasons) {
+            if (!parsedResult.technical_issues.includes(reason)) {
+              parsedResult.technical_issues.push(reason);
+            }
+          }
+        }
+      }
+    }
+
     // Fallback narratives jika properti narasi kosong
     if (!parsedResult.ip_audit_summary) {
       parsedResult.ip_audit_summary = parsedResult.legal_status === 'VIOLATION'
@@ -6979,14 +7079,20 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
     if (!parsedResult.quality_issues_summary) {
       const propNote = parsedResult.ai_vision_checks?.proportion_defects?.note;
       parsedResult.quality_issues_summary = propNote || (parsedResult.recommendation === 'PASS'
-        ? (isIndonesian ? 'Proporsi subjek dan elemen seimbang secara alami. Struktur anatomi dan perspektif gambar bebas dari distorsi atau kecacatan skala.' : 'Subject and element proportions are naturally balanced. Anatomy and perspective are clean of distortions or scale defects.')
-        : (isIndonesian ? 'Terdeteksi anomali proporsi atau distorsi visual yang tidak memenuhi standar kualitas komersial Adobe Stock.' : 'Proportion anomalies or visual distortions detected that do not meet Adobe Stock commercial quality standards.'));
+        ? (isIndonesian ? 'Proporsi subjek dan elemen seimbang secara alami. Struktur anatomi dan kurva vektor bebas dari distorsi atau kecacatan skala.' : 'Subject and element proportions are naturally balanced. Anatomy and vector curves are clean of distortions or scale defects.')
+        : (isIndonesian ? 'Terdeteksi anomali proporsi, distorsi visual, atau kurva bezier kasar yang tidak memenuhi standar kualitas komersial Adobe Stock.' : 'Proportion anomalies, visual distortions, or rough bezier curves detected that do not meet Adobe Stock commercial quality standards.'));
     }
 
     if (!parsedResult.technical_issues_summary) {
-      parsedResult.technical_issues_summary = parsedResult.recommendation === 'PASS'
-        ? (isIndonesian ? 'Fokus tajam pada subjek utama (tack-sharp pada inspeksi crop 100%), pencahayaan dan kontras seimbang, serta bebas dari noise sensor dan artefak kompresi.' : 'Sharp focus on primary subject (tack-sharp at 100% crop inspection), balanced lighting and contrast, clean of sensor noise and compression artifacts.')
-        : (isIndonesian ? 'Pemeriksaan teknis mendeteksi ketidaksesuaian pada ketajaman fokus, pencahayaan, atau integritas piksel.' : 'Technical check detected issues in focus sharpness, lighting balance, or pixel integrity.');
+      if (isVectorAsset) {
+        parsedResult.technical_issues_summary = parsedResult.recommendation === 'PASS'
+          ? (isIndonesian ? 'Memenuhi seluruh gerbang teknis vektor Adobe Stock: Artboard dalam batas 4 MP - 25 MP, 100% pure vector tanpa raster tertanam, semua teks telah di-convert to outlines, dan ukuran file aman.' : 'Meets all Adobe Stock vector technical gates: Artboard between 4 MP - 25 MP, 100% pure vector with zero embedded rasters, all text converted to outlines, and file size within limits.')
+          : (isIndonesian ? 'Gagal memenuhi gerbang teknis vektor Adobe Stock. Periksa ukuran artboard (min 4 MP), pastikan tidak ada foto/bitmap tertanam, dan lakukan Create Outlines pada semua font.' : 'Failed Adobe Stock vector technical gate requirements. Check artboard size (min 4 MP), verify zero embedded rasters, and expand all fonts.');
+      } else {
+        parsedResult.technical_issues_summary = parsedResult.recommendation === 'PASS'
+          ? (isIndonesian ? 'Fokus tajam pada subjek utama (tack-sharp pada inspeksi crop 100%), pencahayaan dan kontras seimbang, serta bebas dari noise sensor dan artefak kompresi.' : 'Sharp focus on primary subject (tack-sharp at 100% crop inspection), balanced lighting and contrast, clean of sensor noise and compression artifacts.')
+          : (isIndonesian ? 'Pemeriksaan teknis mendeteksi ketidaksesuaian pada ketajaman fokus, pencahayaan, atau integritas piksel.' : 'Technical check detected issues in focus sharpness, lighting balance, or pixel integrity.');
+      }
     }
 
     return parsedResult;
@@ -6995,6 +7101,7 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
     throw e;
   }
 }
+
 
 export async function generateCalendarEvents(month: string, model?: string) {
   const store = apiKeyStorage.getStore();
