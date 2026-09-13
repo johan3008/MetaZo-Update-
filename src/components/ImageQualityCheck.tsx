@@ -1790,23 +1790,25 @@ export const ImageQualityCheck: React.FC<{
                           )}
                         </AnimatePresence>
 
-                        <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                           <button 
-                             onClick={() => toggleHeatmap(fileName)}
-                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[1.5rem] text-[9px] font-black uppercase tracking-tighter transition-all ${showHeatmaps.has(fileName) ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border border-white/10'}`}
-                           >
-                             {showHeatmaps.has(fileName) ? <EyeOff size={13} /> : <Eye size={13} />}
-                             <span>{showHeatmaps.has(fileName) ? 'Sembunyikan YOLO Overlay' : '🎯 YOLO Segmentation Overlay'}</span>
-                           </button>
-                           
-                           <div className="flex items-center gap-2">
-                             <div className="flex flex-col items-end">
-                               <p className="text-[7px] font-black text-white/50 uppercase tracking-widest">YOLOv11 &amp; Pixel Engine</p>
-                               <p className="text-[9px] font-black text-emerald-400 leading-none">Realtime Seg</p>
+                        {!r.vector_gate && (
+                          <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                             <button 
+                               onClick={() => toggleHeatmap(fileName)}
+                               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[1.5rem] text-[9px] font-black uppercase tracking-tighter transition-all ${showHeatmaps.has(fileName) ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border border-white/10'}`}
+                             >
+                               {showHeatmaps.has(fileName) ? <EyeOff size={13} /> : <Eye size={13} />}
+                               <span>{showHeatmaps.has(fileName) ? 'Sembunyikan YOLO Overlay' : '🎯 YOLO Segmentation Overlay'}</span>
+                             </button>
+                             
+                             <div className="flex items-center gap-2">
+                               <div className="flex flex-col items-end">
+                                 <p className="text-[7px] font-black text-white/50 uppercase tracking-widest">YOLOv11 &amp; Pixel Engine</p>
+                                 <p className="text-[9px] font-black text-emerald-400 leading-none">Realtime Seg</p>
+                               </div>
+                               <Zap size={14} className="text-emerald-500" />
                              </div>
-                             <Zap size={14} className="text-emerald-500" />
-                           </div>
-                        </div>
+                          </div>
+                        )}
 
                         <div className={`absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-md border text-[9px] font-black uppercase tracking-widest shadow-xl transition-opacity duration-300 ${showHeatmaps.has(fileName) ? 'opacity-0' : 'opacity-100'} ${isPassed ? 'bg-emerald-500/80 border-emerald-400 text-white' : 'bg-rose-500/80 border-rose-400 text-white'}`}>
                           {isPassed ? <CheckCircle size={12} /> : <XCircle size={12} />}
@@ -1845,8 +1847,8 @@ export const ImageQualityCheck: React.FC<{
                         <p className="text-[11px] font-bold">{r.legal_status}</p>
                       </div>
 
-                      {/* YOLO Vision Object Grounding Badge Display */}
-                      {Array.isArray(r.yolo_detected_objects) && r.yolo_detected_objects.length > 0 && (
+                      {/* YOLO Vision Object Grounding Badge Display (Khusus Foto/Raster) */}
+                      {!r.vector_gate && Array.isArray(r.yolo_detected_objects) && r.yolo_detected_objects.length > 0 && (
                         <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-500/5 via-violet-500/5 to-purple-500/5 border border-indigo-500/20 shadow-xs">
                           <div className="flex items-center justify-between mb-2.5">
                             <div className="flex items-center gap-2">
@@ -1917,53 +1919,119 @@ export const ImageQualityCheck: React.FC<{
                               <div className="space-y-4 pt-3">
                                 {/* Workflow Stepper Diagram */}
                                 <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-white/5 shadow-inner">
-                                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-2">
-                                    <div className="flex items-center gap-2.5">
-                                      <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold text-xs shrink-0">
-                                        1
+                                  {r.vector_gate ? (
+                                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-2">
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold text-xs shrink-0">
+                                          1
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">
+                                            {t.language === 'Bahasa' ? 'Asset Vektor Dimuat' : 'Vector Asset Loaded'}
+                                          </p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">
+                                            {r.vector_gate.format.toUpperCase()} · Stream Parsed
+                                          </p>
+                                        </div>
                                       </div>
-                                      <div>
-                                        <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">Asset Loaded</p>
-                                        <p className="text-[8px] text-slate-400 font-bold uppercase">Image Data Source</p>
+
+                                      <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
+
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-full bg-violet-500/10 text-violet-500 flex items-center justify-center font-bold text-xs shrink-0">
+                                          2
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">
+                                            {t.language === 'Bahasa' ? 'Geometri & Header' : 'Geometry & Header'}
+                                          </p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">
+                                            15-65 MP · (0,0) · RGB · 0 Raster
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
+
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold text-xs shrink-0">
+                                          3
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">
+                                            {t.language === 'Bahasa' ? 'Kurva & Shape Paths' : 'Curves & Shape Paths'}
+                                          </p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">
+                                            {t.language === 'Bahasa' ? 'Closed Paths · Bebas Auto-Trace' : 'Closed Shapes · Auto-Trace Check'}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
+
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-xs shrink-0">
+                                          4
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">
+                                            {t.language === 'Bahasa' ? 'Laporan Kurator Vektor' : 'Vector Curation Report'}
+                                          </p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">
+                                            {t.language === 'Bahasa' ? 'Standar Resmi Adobe Stock' : 'Official Adobe Stock Standards'}
+                                          </p>
+                                        </div>
                                       </div>
                                     </div>
-                                    
-                                    <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
-
-                                    <div className="flex items-center gap-2.5">
-                                      <div className="w-8 h-8 rounded-full bg-violet-500/10 text-violet-500 flex items-center justify-center font-bold text-xs shrink-0">
-                                        2
+                                  ) : (
+                                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-2">
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold text-xs shrink-0">
+                                          1
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">Asset Loaded</p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">Image Data Source</p>
+                                        </div>
                                       </div>
-                                      <div>
-                                        <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">FFmpeg Analysis</p>
-                                        <p className="text-[8px] text-slate-400 font-bold uppercase">Resolution, Color, Histogram</p>
+                                      
+                                      <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
+
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-full bg-violet-500/10 text-violet-500 flex items-center justify-center font-bold text-xs shrink-0">
+                                          2
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">FFmpeg Analysis</p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">Resolution, Color, Histogram</p>
+                                        </div>
+                                      </div>
+
+                                      <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
+
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-xs shrink-0">
+                                          3
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">AI Vision Scan</p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">Blur, IP, Composition</p>
+                                        </div>
+                                      </div>
+
+                                      <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
+
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-full bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold text-xs shrink-0">
+                                          4
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">Quality Report</p>
+                                          <p className="text-[8px] text-slate-400 font-bold uppercase">Passed Curator Standards</p>
+                                        </div>
                                       </div>
                                     </div>
-
-                                    <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
-
-                                    <div className="flex items-center gap-2.5">
-                                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-xs shrink-0">
-                                        3
-                                      </div>
-                                      <div>
-                                        <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">AI Vision Scan</p>
-                                        <p className="text-[8px] text-slate-400 font-bold uppercase">Blur, IP, Composition</p>
-                                      </div>
-                                    </div>
-
-                                    <div className="hidden md:block text-slate-300 dark:text-slate-700 font-mono text-xs">──▶</div>
-
-                                    <div className="flex items-center gap-2.5">
-                                      <div className="w-8 h-8 rounded-full bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold text-xs shrink-0">
-                                        4
-                                      </div>
-                                      <div>
-                                        <p className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider">Quality Report</p>
-                                        <p className="text-[8px] text-slate-400 font-bold uppercase">Passed Curator Standards</p>
-                                      </div>
-                                    </div>
-                                  </div>
+                                  )}
                                 </div>
 
                                 {/* Curation Cockpit: Circular Quality Gauge & Summary */}
@@ -2059,12 +2127,17 @@ export const ImageQualityCheck: React.FC<{
                                             <span className="text-[9px] font-mono text-slate-400">
                                               Tolerance: {tolerance}
                                             </span>
-                                            {r.inspection_pipeline && (
+                                            {r.vector_gate ? (
+                                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
+                                                <PenTool className="w-2.5 h-2.5" />
+                                                {t.language === 'Bahasa' ? 'Inspeksi Vektor Terpadu Adobe Stock' : 'Adobe Stock Vector Inspection'}
+                                              </span>
+                                            ) : r.inspection_pipeline ? (
                                               <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
                                                 <Layers className="w-2.5 h-2.5" />
                                                 2-Layer: Full Scene + {r.inspection_pipeline.crops_inspected || 0} Detail Crops (100% Zoom)
                                               </span>
-                                            )}
+                                            ) : null}
                                           </div>
                                           <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
                                             {isPass 
@@ -2107,13 +2180,21 @@ export const ImageQualityCheck: React.FC<{
                                         );
 
                                         const technicalSummary = r.technical_issues_summary || r.ai_vision?.technical_issues_summary || (
-                                          isPass
-                                            ? (t.language === 'Bahasa' 
-                                                ? 'Fokus tajam pada subjek utama (tack-sharp pada inspeksi crop 100%), pencahayaan dan kontras seimbang, serta bebas dari noise sensor dan artefak kompresi.' 
-                                                : 'Sharp focus on primary subject (tack-sharp at 100% crop inspection), balanced lighting and contrast, clean of sensor noise and compression artifacts.')
-                                            : (t.language === 'Bahasa' 
-                                                ? 'Pemeriksaan teknis mendeteksi ketidaksesuaian pada ketajaman fokus, pencahayaan, atau integritas piksel.' 
-                                                : 'Technical check detected issues in focus sharpness, lighting balance, or pixel integrity.')
+                                          r.vector_gate
+                                            ? (isPass
+                                                ? (t.language === 'Bahasa'
+                                                    ? 'Format vektor memenuhi seluruh standar teknis Adobe Stock: dimensi artboard 15–65 MP, offset (0,0), mode warna RGB, shape tertutup rapat, kurva halus tanpa auto-tracing berlebih, serta bebas dari elemen raster tertanam.'
+                                                    : 'Vector format satisfies all Adobe Stock technical standards: 15–65 MP artboard, (0,0) offset, RGB color mode, fully closed shape paths, smooth curves without jagged auto-trace artifacts, and zero embedded raster images.')
+                                                : (t.language === 'Bahasa'
+                                                    ? 'Pemeriksaan mendeteksi ketidaksesuaian standar vektor Adobe Stock pada dimensi artboard, offset, mode warna, celah path terbuka, atau kurva bergerigi.'
+                                                    : 'Vector audit detected discrepancies with Adobe Stock vector standards regarding artboard size, offset, color mode, open path gaps, or jagged auto-trace paths.'))
+                                            : (isPass
+                                                ? (t.language === 'Bahasa' 
+                                                    ? 'Fokus tajam pada subjek utama (tack-sharp pada inspeksi crop 100%), pencahayaan dan kontras seimbang, serta bebas dari noise sensor dan artefak kompresi.' 
+                                                    : 'Sharp focus on primary subject (tack-sharp at 100% crop inspection), balanced lighting and contrast, clean of sensor noise and compression artifacts.')
+                                                : (t.language === 'Bahasa' 
+                                                    ? 'Pemeriksaan teknis mendeteksi ketidaksesuaian pada ketajaman fokus, pencahayaan, atau integritas piksel.' 
+                                                    : 'Technical check detected issues in focus sharpness, lighting balance, or pixel integrity.'))
                                         );
 
                                         return (
@@ -2144,96 +2225,220 @@ export const ImageQualityCheck: React.FC<{
                                                   </div>
                                                 </div>
 
-                                                {/* 4 Checkpoint Kartu Adobe Stock */}
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                                  {/* 1. Dimensi Artboard */}
-                                                  <div className={`p-3 rounded-xl border ${
-                                                    r.vector_gate.artboard.status === 'PASS' 
-                                                      ? 'bg-white dark:bg-slate-800 border-emerald-500/20' 
-                                                      : 'bg-rose-500/10 border-rose-500/30'
-                                                  }`}>
-                                                    <div className="flex items-center justify-between mb-1">
-                                                      <span className="text-[9px] font-bold uppercase text-slate-400">1. Dimensi Artboard</span>
-                                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
-                                                        r.vector_gate.artboard.status === 'PASS' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500 text-white'
-                                                      }`}>
-                                                        {r.vector_gate.artboard.status} ({r.vector_gate.artboard.megapixels} MP)
-                                                      </span>
-                                                    </div>
-                                                    <p className="text-[10px] font-black text-slate-800 dark:text-slate-200">
-                                                      {Math.round(r.vector_gate.artboard.width)} × {Math.round(r.vector_gate.artboard.height)} px
-                                                    </p>
-                                                    <p className="text-[8.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
-                                                      {r.vector_gate.artboard.note}
-                                                    </p>
-                                                  </div>
+                                                {/* 8 Checkpoint Kartu Adobe Stock Vector */}
+                                                {(() => {
+                                                  const offset = r.vector_gate.offset || {
+                                                    x: 0,
+                                                    y: 0,
+                                                    isOriginZero: true,
+                                                    status: 'PASS' as const,
+                                                    note: 'Koordinat origin artboard (0,0) sudut kiri atas valid.'
+                                                  };
+                                                  const colorMode = r.vector_gate.colorMode || {
+                                                    mode: 'RGB' as const,
+                                                    isRgb: true,
+                                                    status: 'PASS' as const,
+                                                    note: 'Dokumen menggunakan mode warna RGB sesuai standar Adobe Stock.'
+                                                  };
+                                                  const closedPaths = r.vector_gate.closedPaths || {
+                                                    totalPaths: r.vector_gate.craftsmanship?.pathCount || 0,
+                                                    closedPaths: r.vector_gate.craftsmanship?.pathCount || 0,
+                                                    openPaths: 0,
+                                                    isFullyClosed: true,
+                                                    status: 'PASS' as const,
+                                                    note: 'Semua shape path tertutup rapat tanpa celah.'
+                                                  };
 
-                                                  {/* 2. Embedded Raster */}
-                                                  <div className={`p-3 rounded-xl border ${
-                                                    r.vector_gate.embeddedRaster.status === 'PASS' 
-                                                      ? 'bg-white dark:bg-slate-800 border-emerald-500/20' 
-                                                      : 'bg-rose-500/10 border-rose-500/30'
-                                                  }`}>
-                                                    <div className="flex items-center justify-between mb-1">
-                                                      <span className="text-[9px] font-bold uppercase text-slate-400">2. Pure Vector (0 Bitmaps)</span>
-                                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
-                                                        r.vector_gate.embeddedRaster.status === 'PASS' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500 text-white'
+                                                  return (
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                                                      {/* 1. Dimensi Artboard */}
+                                                      <div className={`p-3 rounded-xl border ${
+                                                        r.vector_gate.artboard.status === 'PASS' 
+                                                          ? 'bg-white dark:bg-slate-800 border-emerald-500/20' 
+                                                          : 'bg-rose-500/10 border-rose-500/30'
                                                       }`}>
-                                                        {r.vector_gate.embeddedRaster.status}
-                                                      </span>
-                                                    </div>
-                                                    <p className="text-[10px] font-black text-slate-800 dark:text-slate-200">
-                                                      {r.vector_gate.embeddedRaster.detected ? 'Terdeteksi Raster Tertanam' : '100% Pure Vector (0 Bitmaps)'}
-                                                    </p>
-                                                    <p className="text-[8.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
-                                                      {r.vector_gate.embeddedRaster.note}
-                                                    </p>
-                                                  </div>
+                                                        <div className="flex items-center justify-between mb-1">
+                                                          <span className="text-[9px] font-bold uppercase text-slate-400">1. Artboard (15–65 MP)</span>
+                                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
+                                                            r.vector_gate.artboard.status === 'PASS' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500 text-white'
+                                                          }`}>
+                                                            {r.vector_gate.artboard.status}
+                                                          </span>
+                                                        </div>
+                                                        <p className="text-[10px] font-black text-slate-800 dark:text-slate-200">
+                                                          {Math.round(r.vector_gate.artboard.width)} × {Math.round(r.vector_gate.artboard.height)} px ({r.vector_gate.artboard.megapixels} MP)
+                                                        </p>
+                                                        <p className="text-[8.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                          {r.vector_gate.artboard.note}
+                                                        </p>
+                                                      </div>
 
-                                                  {/* 3. Text Outlines */}
-                                                  <div className={`p-3 rounded-xl border ${
-                                                    r.vector_gate.liveText.status === 'PASS' 
-                                                      ? 'bg-white dark:bg-slate-800 border-emerald-500/20' 
-                                                      : 'bg-rose-500/10 border-rose-500/30'
-                                                  }`}>
-                                                    <div className="flex items-center justify-between mb-1">
-                                                      <span className="text-[9px] font-bold uppercase text-slate-400">3. Convert to Outlines</span>
-                                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
-                                                        r.vector_gate.liveText.status === 'PASS' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500 text-white'
+                                                      {/* 2. Artboard Offset */}
+                                                      <div className={`p-3 rounded-xl border ${
+                                                        offset.status === 'PASS' 
+                                                          ? 'bg-white dark:bg-slate-800 border-emerald-500/20' 
+                                                          : 'bg-rose-500/10 border-rose-500/30'
                                                       }`}>
-                                                        {r.vector_gate.liveText.status}
-                                                      </span>
-                                                    </div>
-                                                    <p className="text-[10px] font-black text-slate-800 dark:text-slate-200">
-                                                      {r.vector_gate.liveText.detected ? 'Terdeteksi Font Aktif' : 'Semua Teks Di-Outline'}
-                                                    </p>
-                                                    <p className="text-[8.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
-                                                      {r.vector_gate.liveText.note}
-                                                    </p>
-                                                  </div>
+                                                        <div className="flex items-center justify-between mb-1">
+                                                          <span className="text-[9px] font-bold uppercase text-slate-400">2. Offset Artboard</span>
+                                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
+                                                            offset.status === 'PASS' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500 text-white'
+                                                          }`}>
+                                                            {offset.status}
+                                                          </span>
+                                                        </div>
+                                                        <p className="text-[10px] font-black text-slate-800 dark:text-slate-200">
+                                                          ({Math.round(offset.x)}, {Math.round(offset.y)}) Upper-Left
+                                                        </p>
+                                                        <p className="text-[8.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                          {offset.note}
+                                                        </p>
+                                                      </div>
 
-                                                  {/* 4. File Size */}
-                                                  <div className={`p-3 rounded-xl border ${
-                                                    r.vector_gate.fileSize.status === 'PASS' 
-                                                      ? 'bg-white dark:bg-slate-800 border-emerald-500/20' 
-                                                      : 'bg-rose-500/10 border-rose-500/30'
-                                                  }`}>
-                                                    <div className="flex items-center justify-between mb-1">
-                                                      <span className="text-[9px] font-bold uppercase text-slate-400">4. Ukuran File (Maks. 45 MB)</span>
-                                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
-                                                        r.vector_gate.fileSize.status === 'PASS' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500 text-white'
+                                                      {/* 3. Mode Warna RGB */}
+                                                      <div className={`p-3 rounded-xl border ${
+                                                        colorMode.status === 'PASS' 
+                                                          ? 'bg-white dark:bg-slate-800 border-emerald-500/20' 
+                                                          : 'bg-rose-500/10 border-rose-500/30'
                                                       }`}>
-                                                        {r.vector_gate.fileSize.status}
-                                                      </span>
+                                                        <div className="flex items-center justify-between mb-1">
+                                                          <span className="text-[9px] font-bold uppercase text-slate-400">3. Mode Warna</span>
+                                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
+                                                            colorMode.status === 'PASS' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500 text-white'
+                                                          }`}>
+                                                            {colorMode.status}
+                                                          </span>
+                                                        </div>
+                                                        <p className="text-[10px] font-black text-slate-800 dark:text-slate-200">
+                                                          {colorMode.mode} {colorMode.isRgb ? '(RGB Valid)' : '(CMYK Ditolak)'}
+                                                        </p>
+                                                        <p className="text-[8.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                          {colorMode.note}
+                                                        </p>
+                                                      </div>
+
+                                                      {/* 4. Embedded Raster */}
+                                                      <div className={`p-3 rounded-xl border ${
+                                                        r.vector_gate.embeddedRaster.status === 'PASS' 
+                                                          ? 'bg-white dark:bg-slate-800 border-emerald-500/20' 
+                                                          : 'bg-rose-500/10 border-rose-500/30'
+                                                      }`}>
+                                                        <div className="flex items-center justify-between mb-1">
+                                                          <span className="text-[9px] font-bold uppercase text-slate-400">4. Pure Vector</span>
+                                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
+                                                            r.vector_gate.embeddedRaster.status === 'PASS' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500 text-white'
+                                                          }`}>
+                                                            {r.vector_gate.embeddedRaster.status}
+                                                          </span>
+                                                        </div>
+                                                        <p className="text-[10px] font-black text-slate-800 dark:text-slate-200">
+                                                          {r.vector_gate.embeddedRaster.detected ? 'Terdeteksi Raster Tertanam' : '100% Pure Vector (0 Bitmaps)'}
+                                                        </p>
+                                                        <p className="text-[8.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                          {r.vector_gate.embeddedRaster.note}
+                                                        </p>
+                                                      </div>
+
+                                                      {/* 5. Closed Shape Paths */}
+                                                      <div className={`p-3 rounded-xl border ${
+                                                        closedPaths.status === 'PASS' 
+                                                          ? 'bg-white dark:bg-slate-800 border-emerald-500/20' 
+                                                          : closedPaths.status === 'WARNING'
+                                                          ? 'bg-amber-500/10 border-amber-500/30'
+                                                          : 'bg-rose-500/10 border-rose-500/30'
+                                                      }`}>
+                                                        <div className="flex items-center justify-between mb-1">
+                                                          <span className="text-[9px] font-bold uppercase text-slate-400">5. Integritas Path</span>
+                                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
+                                                            closedPaths.status === 'PASS' 
+                                                              ? 'bg-emerald-500/15 text-emerald-600' 
+                                                              : closedPaths.status === 'WARNING'
+                                                              ? 'bg-amber-500/15 text-amber-600'
+                                                              : 'bg-rose-500 text-white'
+                                                          }`}>
+                                                            {closedPaths.status}
+                                                          </span>
+                                                        </div>
+                                                        <p className="text-[10px] font-black text-slate-800 dark:text-slate-200">
+                                                          {closedPaths.closedPaths.toLocaleString()} / {closedPaths.totalPaths.toLocaleString()} ({closedPaths.isFullyClosed ? 'Rapat' : `${closedPaths.openPaths} Terbuka`})
+                                                        </p>
+                                                        <p className="text-[8.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                          {closedPaths.note}
+                                                        </p>
+                                                      </div>
+
+                                                      {/* 6. Craftsmanship & Kurva */}
+                                                      <div className={`p-3 rounded-xl border ${
+                                                        !r.vector_gate.craftsmanship || r.vector_gate.craftsmanship.autotraceRisk !== 'HIGH'
+                                                          ? 'bg-white dark:bg-slate-800 border-emerald-500/20' 
+                                                          : 'bg-rose-500/10 border-rose-500/30'
+                                                      }`}>
+                                                        <div className="flex items-center justify-between mb-1">
+                                                          <span className="text-[9px] font-bold uppercase text-slate-400">6. Craftsmanship</span>
+                                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
+                                                            !r.vector_gate.craftsmanship || r.vector_gate.craftsmanship.autotraceRisk === 'LOW' 
+                                                              ? 'bg-emerald-500/15 text-emerald-600' 
+                                                              : r.vector_gate.craftsmanship?.autotraceRisk === 'MEDIUM'
+                                                              ? 'bg-amber-500/15 text-amber-600'
+                                                              : 'bg-rose-500 text-white'
+                                                          }`}>
+                                                            {r.vector_gate.craftsmanship?.qualityRating || 'PASS'}
+                                                          </span>
+                                                        </div>
+                                                        <p className="text-[10px] font-black text-slate-800 dark:text-slate-200">
+                                                          {r.vector_gate.craftsmanship ? `${r.vector_gate.craftsmanship.curveRatioPercent}% Kurva · Autotrace: ${r.vector_gate.craftsmanship.autotraceRisk}` : 'Kurva Mulus Terstruktur'}
+                                                        </p>
+                                                        <p className="text-[8.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                          {r.vector_gate.craftsmanship?.summary || 'Bebas auto-tracing kasar & artefak bergerigi.'}
+                                                        </p>
+                                                      </div>
+
+                                                      {/* 7. Text Outlines */}
+                                                      <div className={`p-3 rounded-xl border ${
+                                                        r.vector_gate.liveText.status === 'PASS' 
+                                                          ? 'bg-white dark:bg-slate-800 border-emerald-500/20' 
+                                                          : 'bg-rose-500/10 border-rose-500/30'
+                                                      }`}>
+                                                        <div className="flex items-center justify-between mb-1">
+                                                          <span className="text-[9px] font-bold uppercase text-slate-400">7. Convert Outlines</span>
+                                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
+                                                            r.vector_gate.liveText.status === 'PASS' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500 text-white'
+                                                          }`}>
+                                                            {r.vector_gate.liveText.status}
+                                                          </span>
+                                                        </div>
+                                                        <p className="text-[10px] font-black text-slate-800 dark:text-slate-200">
+                                                          {r.vector_gate.liveText.detected ? 'Terdeteksi Font Aktif' : 'Semua Teks Di-Outline'}
+                                                        </p>
+                                                        <p className="text-[8.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                          {r.vector_gate.liveText.note}
+                                                        </p>
+                                                      </div>
+
+                                                      {/* 8. File Size */}
+                                                      <div className={`p-3 rounded-xl border ${
+                                                        r.vector_gate.fileSize.status === 'PASS' 
+                                                          ? 'bg-white dark:bg-slate-800 border-emerald-500/20' 
+                                                          : 'bg-rose-500/10 border-rose-500/30'
+                                                      }`}>
+                                                        <div className="flex items-center justify-between mb-1">
+                                                          <span className="text-[9px] font-bold uppercase text-slate-400">8. Ukuran File (Maks 45 MB)</span>
+                                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
+                                                            r.vector_gate.fileSize.status === 'PASS' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500 text-white'
+                                                          }`}>
+                                                            {r.vector_gate.fileSize.status}
+                                                          </span>
+                                                        </div>
+                                                        <p className="text-[10px] font-black text-slate-800 dark:text-slate-200">
+                                                          {r.vector_gate.fileSize.mb} MB
+                                                        </p>
+                                                        <p className="text-[8.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                          {r.vector_gate.fileSize.note}
+                                                        </p>
+                                                      </div>
                                                     </div>
-                                                    <p className="text-[10px] font-black text-slate-800 dark:text-slate-200">
-                                                      {r.vector_gate.fileSize.mb} MB
-                                                    </p>
-                                                    <p className="text-[8.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
-                                                      {r.vector_gate.fileSize.note}
-                                                    </p>
-                                                  </div>
-                                                </div>
+                                                  );
+                                                })()}
 
                                                   {/* 5. Kartu Analisis Kualitas & Craftsmanship Vektor (Bezier Curve & Autotrace Risk) */}
                                                   {r.vector_gate.craftsmanship && (
@@ -2379,10 +2584,15 @@ export const ImageQualityCheck: React.FC<{
                                                       ))}
                                                     </ul>
                                                     <div className="pt-1.5 border-t border-rose-500/20 text-[8.5px] font-medium text-slate-600 dark:text-slate-300 space-y-0.5">
-                                                      <p className="font-bold text-rose-600 dark:text-rose-400">💡 Panduan Perbaikan di Adobe Illustrator:</p>
-                                                      <p>• Artboard &lt; 4 MP: Tekan <code className="px-1 py-0.5 bg-white/60 dark:bg-black/30 rounded font-mono">Shift + O</code>, set dimensi minimal <code className="font-mono">2000 × 2000 px</code> atau <code className="font-mono">4000 × 4000 px</code>.</p>
-                                                      <p>• Pure Vector: Buka menu <code className="font-mono">Window &gt; Links</code>, pastikan tidak ada file gambar raster/bitmap tertanam.</p>
-                                                      <p>• Live Text: Pilih semua objek (<code className="font-mono">Ctrl + A</code>), lalu klik menu <code className="font-mono">Type &gt; Create Outlines (Ctrl + Shift + O)</code>.</p>
+                                                      <p className="font-bold text-rose-600 dark:text-rose-400">💡 Panduan Perbaikan di Adobe Illustrator (Standar Resmi Adobe Stock):</p>
+                                                      <p>• <b>Artboard 15–65 MP</b>: Tekan <code className="px-1 py-0.5 bg-white/60 dark:bg-black/30 rounded font-mono">Shift + O</code>, ubah ukuran artboard minimal <code className="font-mono">4000 × 4000 px (16 MP)</code> atau <code className="font-mono">5000 × 5000 px (25 MP)</code> hingga maksimal 65 MP.</p>
+                                                      <p>• <b>Offset Artboard (0,0)</b>: Pastikan posisi koordinat X dan Y artboard bernilai <code className="font-mono">0 px</code> di sudut kiri atas artboard.</p>
+                                                      <p>• <b>Mode Warna RGB</b>: Buka menu <code className="font-mono">File &gt; Document Color Mode &gt; RGB Color</code> (Adobe Stock menolak file CMYK).</p>
+                                                      <p>• <b>Pure Vector (0 Bitmaps)</b>: Buka panel <code className="font-mono">Window &gt; Links</code>, pastikan tidak ada file gambar raster/bitmap tertanam.</p>
+                                                      <p>• <b>Path Tertutup Rapat</b>: Sambungkan ujung shape terbuka menggunakan <code className="font-mono">Ctrl + J (Join)</code> agar bentuk tertutup rapat tanpa celah bocor.</p>
+                                                      <p>• <b>Kurva Bezier Mulus</b>: Pilih objek, klik <code className="font-mono">Object &gt; Path &gt; Simplify</code> untuk merapikan kurva dan mengurangi ribuan anchor point berlebih dari auto-trace kasar.</p>
+                                                      <p>• <b>Convert Outlines</b>: Pilih semua objek (<code className="font-mono">Ctrl + A</code>), lalu klik menu <code className="font-mono">Type &gt; Create Outlines (Ctrl + Shift + O)</code>.</p>
+                                                      <p>• <b>Ukuran File Maks. 45 MB</b>: Kurangi titik path kompleks atau simpan ulang dengan opsi kompresi jika file melebihi 45 MB.</p>
                                                     </div>
                                                   </div>
                                                 )}
@@ -2471,12 +2681,18 @@ export const ImageQualityCheck: React.FC<{
                                                   </h5>
                                                 </div>
                                                 {r.vector_gate ? (
-                                                  <div className="flex items-center gap-2 text-[8px] font-mono text-slate-500 dark:text-slate-400">
+                                                  <div className="flex flex-wrap items-center gap-1.5 text-[8px] font-mono text-slate-500 dark:text-slate-400">
                                                     <span className="bg-white/80 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-white/5 uppercase font-bold text-indigo-500">
                                                       {r.vector_gate.format} Vector
                                                     </span>
                                                     <span className="bg-white/80 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-white/5">
                                                       {r.vector_gate.artboard.megapixels} MP
+                                                    </span>
+                                                    <span className="bg-white/80 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-white/5 font-bold text-emerald-600">
+                                                      {r.vector_gate.colorMode?.mode || 'RGB'}
+                                                    </span>
+                                                    <span className="bg-white/80 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-white/5">
+                                                      Offset: ({Math.round(r.vector_gate.offset?.x || 0)}, {Math.round(r.vector_gate.offset?.y || 0)})
                                                     </span>
                                                     <span className="bg-white/80 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-white/5">
                                                       {r.vector_gate.fileSize.mb} MB

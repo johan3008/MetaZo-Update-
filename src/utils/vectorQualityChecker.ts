@@ -1,19 +1,42 @@
 /**
  * Adobe Stock Official Vector Quality Checker
- * Comprehensive validator for .EPS, .SVG, and .AI files based on
- * official Adobe Stock Contributor Guidelines:
- * 1. Artboard Dimensions: Minimum 4.0 MP (4,000,000 px), Maximum 25.0 MP (25,000,000 px)
- * 2. Embedded Raster: Strictly 0 embedded bitmaps / linked raster images (100% pure vector)
- * 3. Text Outlines: All text must be converted to outlines (no live unexpanded fonts)
- * 4. File Size: Maximum 45 MB
- * 5. Format Standards: Illustrator 10 EPS / SVG / AI
+ * Strictly implements the official Adobe Stock Vector Guidelines & Quality Standards from:
+ * 1. Technical Requirements for Vector Submissions:
+ *    https://helpx.adobe.com/id_id/stock/contributor/submit-your-content/submit-vectors/technical-requirements-for-vector-submissions.html
+ *    - Maximum file size: 45 MB
+ *    - Minimum artboard size: 15 MP (megapixels)
+ *    - Maximum artboard size: 65 MP (megapixels)
+ *    - Document color mode: RGB
+ *    - Artboard offset: (0,0) upper-left corner
+ * 2. Quality and Technical Standards - Reasons for Content Refusal (Maintain Vector Quality):
+ *    https://helpx.adobe.com/id_id/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html
+ *    - Close all shape paths fully to prevent gaps.
+ *    - Avoid embedding raster images to maintain scalability.
+ *    - Use clean, simple hand-drawn paths. Avoid auto-tracing complex graphics.
+ *    - Convert all text to outlines (Create Outlines) so customers without fonts can edit the file.
+ *    - Artboard must meet the upload requirements (15 MP - 65 MP, (0,0) offset, RGB).
  */
 
 export interface VectorArtboardInfo {
   width: number;
   height: number;
   megapixels: number;
-  isWithinRange: boolean;
+  isWithinRange: boolean; // Minimum 15.0 MP, Maximum 65.0 MP
+  status: 'PASS' | 'FAIL';
+  note: string;
+}
+
+export interface VectorOffsetInfo {
+  x: number;
+  y: number;
+  isOriginZero: boolean;
+  status: 'PASS' | 'FAIL';
+  note: string;
+}
+
+export interface VectorColorModeInfo {
+  mode: 'RGB' | 'CMYK' | 'GRAYSCALE' | 'UNKNOWN';
+  isRgb: boolean;
   status: 'PASS' | 'FAIL';
   note: string;
 }
@@ -23,6 +46,15 @@ export interface VectorCheckItem {
   detected: boolean;
   note: string;
   details?: string[];
+}
+
+export interface VectorClosedPathsInfo {
+  totalPaths: number;
+  closedPaths: number;
+  openPaths: number;
+  isFullyClosed: boolean;
+  status: 'PASS' | 'FAIL' | 'WARNING';
+  note: string;
 }
 
 export interface VectorCraftsmanshipInfo {
@@ -39,11 +71,14 @@ export interface VectorCraftsmanshipInfo {
 export interface VectorGateReport {
   isVector: boolean;
   format: 'eps' | 'svg' | 'ai' | 'unknown';
-  artboard: VectorArtboardInfo;
-  embeddedRaster: VectorCheckItem;
-  liveText: VectorCheckItem;
-  craftsmanship: VectorCraftsmanshipInfo;
-  fileSize: {
+  artboard: VectorArtboardInfo;          // 15 MP - 65 MP (Official Technical Requirement)
+  offset: VectorOffsetInfo;               // (0,0) upper-left corner (Official Technical Requirement)
+  colorMode: VectorColorModeInfo;         // RGB (Official Technical Requirement)
+  embeddedRaster: VectorCheckItem;        // Avoid embedding raster images (Official Quality Standard)
+  closedPaths: VectorClosedPathsInfo;     // Close all shape paths fully to prevent gaps (Official Quality Standard)
+  craftsmanship: VectorCraftsmanshipInfo; // Use clean, simple paths. Avoid auto-tracing complex graphics (Official Quality Standard)
+  liveText: VectorCheckItem;              // Text must be outlined (Official Technical & Design Requirement)
+  fileSize: {                             // Maximum 45 MB (Official Technical Requirement)
     bytes: number;
     mb: number;
     status: 'PASS' | 'FAIL';
@@ -55,7 +90,7 @@ export interface VectorGateReport {
   adobeRefusalReasons: string[];
 }
 
-export function analyzeSvgCraftsmanship(svgText: string): VectorCraftsmanshipInfo {
+export function analyzeSvgCraftsmanship(svgText: string): { craftsmanship: VectorCraftsmanshipInfo; closedPaths: VectorClosedPathsInfo } {
   // Count vector elements
   const paths = svgText.match(/<path\b[^>]*>/gi) || [];
   const polygons = svgText.match(/<polygon\b[^>]*>/gi) || [];
@@ -75,6 +110,41 @@ export function analyzeSvgCraftsmanship(svgText: string): VectorCraftsmanshipInf
   
   const curveRatioPercent = totalCommands > 0 ? Math.round((curveCount / totalCommands) * 100) : (circles.length > 0 ? 100 : 50);
   
+  // Check closed paths: polylines, polygons, rects, circles, ellipses are inherently closed shapes unless stroke-only.
+  // For <path>, check if path data ends with 'Z' or 'z' (closepath)
+  let closedPathCount = polygons.length + circles.length + rects.length + ellipses.length;
+  let openPathCount = polylines.length; // polylines are typically open unless closed with polygon
+
+  for (const p of paths) {
+    const dMatch = p.match(/\bd=["']([^"']+)["']/i);
+    if (dMatch) {
+      const d = dMatch[1].trim();
+      if (/[Zz]\s*$/.test(d) || /[Zz]/.test(d)) {
+        closedPathCount++;
+      } else {
+        openPathCount++;
+      }
+    } else {
+      closedPathCount++;
+    }
+  }
+
+  const totalPathElements = closedPathCount + openPathCount;
+  const isFullyClosed = openPathCount === 0 || (openPathCount / Math.max(1, totalPathElements)) < 0.05;
+  const closedStatus: 'PASS' | 'FAIL' | 'WARNING' = isFullyClosed ? 'PASS' : (openPathCount > 20 ? 'WARNING' : 'PASS');
+  const closedNote = isFullyClosed
+    ? `Semua shape path tertutup rapat (${closedPathCount} path tertutup, 0 celah terbuka). Memenuhi standar "Close all shape paths fully to prevent gaps".`
+    : `Terdeteksi ${openPathCount} path terbuka tanpa perintah closepath (Z). Pastikan bentuk/shape tertutup rapat agar tidak ada celah visual saat diedit pembeli.`;
+
+  const closedPaths: VectorClosedPathsInfo = {
+    totalPaths: totalPathElements,
+    closedPaths: closedPathCount,
+    openPaths: openPathCount,
+    isFullyClosed,
+    status: closedStatus,
+    note: closedNote
+  };
+
   // Check for stray / empty objects
   const emptyPaths = (svgText.match(/<path\b[^>]*d=["']\s*(?:M\s*0\s*0\s*Z?)?\s*["']/gi) || []).length;
   const strayPoints = emptyPaths > 0 || /d=["']\s*M\s*[0-9.-]+\s*[0-9.-]+\s*Z?\s*["']/i.test(svgText);
@@ -91,38 +161,44 @@ export function analyzeSvgCraftsmanship(svgText: string): VectorCraftsmanshipInf
   
   if (autotraceRisk === 'HIGH') {
     qualityRating = 'NEEDS_CLEANUP';
-    summary = `Terdeteksi ${totalShapes.toLocaleString()} elemen bentuk dengan rasio kurva bezier rendah (${curveRatioPercent}%). Pola menyerupai AI autotrace kasar/bergerigi dengan ribuan node. Disarankan melakukan Object > Path > Simplify di Adobe Illustrator untuk merapikan kurva.`;
+    summary = `Terdeteksi ${totalShapes.toLocaleString()} elemen bentuk dengan rasio kurva bezier rendah (${curveRatioPercent}%). Terindikasi auto-tracing grafis kompleks dengan node bergerigi kasar. Adobe Stock mewajibkan "Avoid auto-tracing complex graphics". Disarankan merapikan dengan Object > Path > Simplify di Adobe Illustrator.`;
   } else if (autotraceRisk === 'MEDIUM') {
     qualityRating = 'FAIR';
-    summary = `Terdapat ${totalShapes.toLocaleString()} elemen bentuk (${curveRatioPercent}% kurva bezier). Kerapian cukup baik, namun beberapa bagian memiliki kepadatan titik jangkar tinggi.`;
+    summary = `Terdapat ${totalShapes.toLocaleString()} elemen bentuk (${curveRatioPercent}% kurva bezier). Kerapian path cukup baik, namun disarankan menyederhanakan titik jangkar agar kurva lebih bersih.`;
   } else if (curveRatioPercent >= 35 || circles.length > 0 || totalShapes < 1000) {
     qualityRating = 'EXCELLENT';
-    summary = `Kualitas kurva Bezier sangat halus dan bersih (${curveRatioPercent}% kurva bezier terdistribusi rapi, ${totalShapes.toLocaleString()} elemen bentuk). Bebas dari artefak autotrace kasar dan siap untuk komersial stock.`;
+    summary = `Kualitas kurva Bezier sangat halus, bersih, dan dibuat rapi (${curveRatioPercent}% kurva bezier terdistribusi seimbang, ${totalShapes.toLocaleString()} elemen bentuk). Bebas auto-tracing kasar dan memenuhi standar kualitas Adobe Stock.`;
   } else {
     qualityRating = 'GOOD';
-    summary = `Struktur kurva vektor rapi dan seimbang (${totalShapes.toLocaleString()} elemen bentuk, ${curveRatioPercent}% kurva). Memenuhi standar ilustrasi vektor komersial.`;
+    summary = `Struktur kurva vektor rapi dan proporsional (${totalShapes.toLocaleString()} elemen bentuk, ${curveRatioPercent}% kurva). Memenuhi standar teknis kurasi vektor komersial.`;
   }
   
   return {
-    pathCount: totalShapes,
-    curveCount,
-    lineCount,
-    curveRatioPercent,
-    strayPointsDetected: strayPoints,
-    autotraceRisk,
-    qualityRating,
-    summary
+    craftsmanship: {
+      pathCount: totalShapes,
+      curveCount,
+      lineCount,
+      curveRatioPercent,
+      strayPointsDetected: strayPoints,
+      autotraceRisk,
+      qualityRating,
+      summary
+    },
+    closedPaths
   };
 }
 
-export function analyzeEpsCraftsmanship(postScriptStr: string): VectorCraftsmanshipInfo {
+export function analyzeEpsCraftsmanship(postScriptStr: string): { craftsmanship: VectorCraftsmanshipInfo; closedPaths: VectorClosedPathsInfo } {
   const curveMatches = postScriptStr.match(/(?:\bcurveto\b|[\s\r\n][cvy][\s\r\n])/gi) || [];
   const lineMatches = postScriptStr.match(/(?:\blineto\b|[\s\r\n][l][\s\r\n])/gi) || [];
   const moveMatches = postScriptStr.match(/(?:\bmoveto\b|[\s\r\n][m][\s\r\n])/gi) || [];
+  const closeMatches = postScriptStr.match(/(?:\bclosepath\b|[\s\r\n][h|b|B|s|S][\s\r\n])/gi) || [];
   
   const curveCount = curveMatches.length;
   const lineCount = lineMatches.length;
   const pathCount = moveMatches.length || 1;
+  const closeCount = closeMatches.length;
+  const openCount = Math.max(0, pathCount - closeCount);
   const totalCommands = curveCount + lineCount;
   
   const curveRatioPercent = totalCommands > 0 ? Math.round((curveCount / totalCommands) * 100) : 50;
@@ -139,27 +215,43 @@ export function analyzeEpsCraftsmanship(postScriptStr: string): VectorCraftsmans
   
   if (autotraceRisk === 'HIGH') {
     qualityRating = 'NEEDS_CLEANUP';
-    summary = `Terdeteksi kepadatan node garis lurus sangat tinggi (${lineCount.toLocaleString()} lineto, kurva bezier hanya ${curveRatioPercent}%). Mengindikasikan hasil autotrace otomatis dengan banyak titik jangkar bergerigi. Disarankan menggunakan Object > Path > Simplify di Adobe Illustrator.`;
+    summary = `Terdeteksi kepadatan node garis lurus sangat masif (${lineCount.toLocaleString()} lineto, kurva bezier hanya ${curveRatioPercent}%). Mengindikasikan hasil auto-tracing otomatis dengan node bergerigi. Adobe Stock mewajibkan "Avoid auto-tracing complex graphics". Gunakan Object > Path > Simplify di Illustrator.`;
   } else if (autotraceRisk === 'MEDIUM') {
     qualityRating = 'FAIR';
-    summary = `Terdapat ${pathCount.toLocaleString()} segmen path dengan ${curveRatioPercent}% kurva bezier. Struktur cukup baik, disarankan optimasi node berlebih.`;
+    summary = `Terdapat ${pathCount.toLocaleString()} segmen path dengan ${curveRatioPercent}% kurva bezier. Konstruksi cukup baik, namun optimasi node tetap disarankan.`;
   } else if (curveRatioPercent >= 35 || pathCount < 2000) {
     qualityRating = 'EXCELLENT';
-    summary = `Kurva Bezier PostScript sangat mulus (${curveRatioPercent}% kurva terstruktur, ${pathCount.toLocaleString()} subpath). Konstruksi vektor rapi berstandar kurator profesional.`;
+    summary = `Kurva Bezier PostScript sangat mulus dan proporsional (${curveRatioPercent}% kurva terstruktur, ${pathCount.toLocaleString()} subpath). Konstruksi vektor rapi berstandar kurator profesional Adobe Stock.`;
   } else {
     qualityRating = 'GOOD';
-    summary = `Konstruksi vektor proporsional (${pathCount.toLocaleString()} subpath, ${curveRatioPercent}% kurva). Memenuhi standar kurasi Adobe Stock.`;
+    summary = `Konstruksi vektor proporsional (${pathCount.toLocaleString()} subpath, ${curveRatioPercent}% kurva). Memenuhi standar teknis kurasi Adobe Stock.`;
   }
   
+  const isFullyClosed = openCount === 0 || (openCount / Math.max(1, pathCount)) < 0.1;
+  const closedStatus: 'PASS' | 'FAIL' | 'WARNING' = isFullyClosed ? 'PASS' : 'WARNING';
+  const closedNote = isFullyClosed
+    ? `Semua shape path tertutup rapat (${closeCount} closepath terdeteksi). Bebas dari celah terbuka.`
+    : `Terdeteksi ${openCount} segmen path tanpa closepath eksplisit. Pastikan shape tertutup rapat sesuai aturan "Close all shape paths fully to prevent gaps".`;
+
   return {
-    pathCount,
-    curveCount,
-    lineCount,
-    curveRatioPercent,
-    strayPointsDetected: false,
-    autotraceRisk,
-    qualityRating,
-    summary
+    craftsmanship: {
+      pathCount,
+      curveCount,
+      lineCount,
+      curveRatioPercent,
+      strayPointsDetected: false,
+      autotraceRisk,
+      qualityRating,
+      summary
+    },
+    closedPaths: {
+      totalPaths: pathCount,
+      closedPaths: closeCount,
+      openPaths: openCount,
+      isFullyClosed,
+      status: closedStatus,
+      note: closedNote
+    }
   };
 }
 
@@ -171,14 +263,18 @@ export function auditSvgContent(svgText: string, fileSizeBytes: number = 0): Vec
   const warnings: string[] = [];
   const adobeRefusalReasons: string[] = [];
 
-  // A. Parse dimensions & viewBox
+  // A. Parse dimensions & viewBox & Offset
   let width = 0;
   let height = 0;
+  let minX = 0;
+  let minY = 0;
 
   const vbMatch = svgText.match(/viewBox=["']([^"']+)["']/i);
   if (vbMatch) {
     const parts = vbMatch[1].trim().split(/[\s,]+/).map(Number);
     if (parts.length === 4 && !parts.some(isNaN)) {
+      minX = parts[0];
+      minY = parts[1];
       width = Math.abs(parts[2]);
       height = Math.abs(parts[3]);
     }
@@ -196,71 +292,110 @@ export function auditSvgContent(svgText: string, fileSizeBytes: number = 0): Vec
     warnings.push('Dimensi SVG tidak ditemukan secara eksplisit; diasumsikan 4000x4000 px.');
   }
 
+  // Artboard 15 MP - 65 MP (Official Adobe Stock Technical Requirement)
   const pixels = width * height;
   const megapixels = Number((pixels / 1_000_000).toFixed(2));
-  const isArtboardPass = megapixels >= 4.0 && megapixels <= 25.0;
+  const isArtboardPass = megapixels >= 15.0 && megapixels <= 65.0;
 
   let artboardNote = `${Math.round(width)} × ${Math.round(height)} px (${megapixels} MP). `;
-  if (megapixels < 4.0) {
-    artboardNote += `DITOLAK Adobe Stock: Artboard di bawah batas minimal 4 MP (hanya ${megapixels} MP).`;
-    failures.push(`Artboard size too small: ${megapixels} MP (< 4.0 MP)`);
-    adobeRefusalReasons.push('Artboard size is too small (Minimum 4 MP required by Adobe Stock)');
-  } else if (megapixels > 25.0) {
-    artboardNote += `DITOLAK Adobe Stock: Artboard melebihi batas maksimal 25 MP (${megapixels} MP).`;
-    failures.push(`Artboard size too large: ${megapixels} MP (> 25.0 MP)`);
-    adobeRefusalReasons.push('Artboard size exceeds maximum 25 MP allowed by Adobe Stock');
+  if (megapixels < 15.0) {
+    artboardNote += `DITOLAK Adobe Stock: Artboard di bawah batas minimal 15 MP (hanya ${megapixels} MP). Standar resmi Adobe Stock adalah 15 MP - 65 MP. Disarankan ukuran 4000x4000 px (16 MP) atau 5000x5000 px (25 MP).`;
+    failures.push(`Artboard size too small: ${megapixels} MP (< 15.0 MP required by Adobe Stock)`);
+    adobeRefusalReasons.push('Artboard size is too small (Minimum 15 MP required for vector submissions)');
+  } else if (megapixels > 65.0) {
+    artboardNote += `DITOLAK Adobe Stock: Artboard melebihi batas maksimal 65 MP (${megapixels} MP). Batas maksimal resmi Adobe Stock adalah 65 MP.`;
+    failures.push(`Artboard size too large: ${megapixels} MP (> 65.0 MP allowed by Adobe Stock)`);
+    adobeRefusalReasons.push('Artboard size exceeds maximum 65 MP allowed by Adobe Stock');
   } else {
-    artboardNote += `Memenuhi standar Adobe Stock (${megapixels} MP dalam rentang 4 MP - 25 MP).`;
+    artboardNote += `Sesuai standar resmi Adobe Stock (${megapixels} MP dalam rentang wajib 15 MP - 65 MP).`;
   }
 
-  // B. Detect embedded raster images
-  // Tag <image ...>, href="data:image/...", xlink:href="data:image/..."
+  // B. Artboard Offset Check: (0,0) upper-left corner
+  const isOffsetZero = minX === 0 && minY === 0;
+  let offsetNote = `Offset artboard koordinat (${minX}, ${minY}). `;
+  if (!isOffsetZero) {
+    offsetNote += `PERINGATAN: Artboard offset bukan (0,0). Adobe Stock mewajibkan "Artboard offset: (0,0) upper-left corner".`;
+    warnings.push(`Artboard offset is (${minX}, ${minY}). Official requirement is (0,0) upper-left corner.`);
+  } else {
+    offsetNote += `Sesuai standar resmi Adobe Stock (koordinat sudut kiri atas tepat di 0,0).`;
+  }
+  const offset: VectorOffsetInfo = {
+    x: minX,
+    y: minY,
+    isOriginZero: isOffsetZero,
+    status: isOffsetZero ? 'PASS' : 'FAIL',
+    note: offsetNote
+  };
+
+  // C. Document Color Mode Check: RGB
+  // Check for CMYK indicators in SVG (cmyk(), icc-color, device-cmyk)
+  const hasCmyk = /cmyk\s*\(|device-cmyk|icc-color\([^)]*cmyk/i.test(svgText);
+  let colorMode: 'RGB' | 'CMYK' | 'GRAYSCALE' | 'UNKNOWN' = hasCmyk ? 'CMYK' : 'RGB';
+  let colorNote = '';
+  if (hasCmyk) {
+    colorNote = 'DITOLAK Adobe Stock: Dokumen menggunakan mode warna CMYK. Adobe Stock secara tegas mewajibkan: "Document color mode: RGB".';
+    failures.push('Document color mode is CMYK. Adobe Stock requires RGB color mode.');
+    adobeRefusalReasons.push('Document color mode must be RGB (CMYK submissions are refused)');
+  } else {
+    colorNote = 'Mode warna RGB. Sesuai ketentuan resmi Adobe Stock: "Document color mode: RGB".';
+  }
+  const colorModeInfo: VectorColorModeInfo = {
+    mode: colorMode,
+    isRgb: !hasCmyk,
+    status: hasCmyk ? 'FAIL' : 'PASS',
+    note: colorNote
+  };
+
+  // D. Detect embedded raster images ("Avoid embedding raster images to maintain scalability")
   const rasterTags = svgText.match(/<image\b[^>]*>/gi) || [];
   const base64Raster = svgText.match(/data:image\/(?:png|jpeg|jpg|webp|gif)/gi) || [];
   const hasEmbeddedRaster = rasterTags.length > 0 || base64Raster.length > 0;
   const rasterCount = Math.max(rasterTags.length, base64Raster.length);
 
   let rasterNote = hasEmbeddedRaster
-    ? `DITOLAK Adobe Stock: Terdeteksi ${rasterCount} elemen raster/bitmap tertanam (<image> / base64). Adobe Stock mewajibkan 100% vektor murni tanpa gambar piksel.`
-    : 'Bebas dari raster bitmap tertanam (100% pure vector paths).';
+    ? `DITOLAK Adobe Stock: Terdeteksi ${rasterCount} elemen raster/bitmap tertanam (<image> / base64). Alasan penolakan Adobe Stock: "Avoid embedding raster images to maintain scalability". Seluruh aset harus 100% vektor murni.`
+    : 'Bebas dari raster bitmap tertanam (100% pure vector paths sesuai standar skalabilitas Adobe Stock).';
 
   if (hasEmbeddedRaster) {
     failures.push(`Embedded raster image detected (${rasterCount} bitmap elements)`);
-    adobeRefusalReasons.push('Contains embedded raster images (Vector files must be 100% vector)');
+    adobeRefusalReasons.push('Contains embedded raster images (Refusal standard: Avoid embedding raster images to maintain scalability)');
   }
 
-  // C. Detect live text / unoutlined fonts
-  // Tag <text ...> or <tspan ...>
+  // E. Detect live text / unoutlined fonts ("Convert all text to outlines")
   const textTags = svgText.match(/<text\b[^>]*>/gi) || [];
   const tspanTags = svgText.match(/<tspan\b[^>]*>/gi) || [];
   const hasLiveText = textTags.length > 0 || tspanTags.length > 0;
   const textCount = textTags.length + tspanTags.length;
 
   let textNote = hasLiveText
-    ? `DITOLAK Adobe Stock: Terdeteksi ${textCount} elemen teks aktif/live font (<text>/<tspan>). Semua font wajib di-convert to outlines (Create Outlines) agar tidak ditolak pembeli.`
-    : 'Semua teks telah di-outline menjadi kurva vektor (tidak ada live font aktif).';
+    ? `DITOLAK Adobe Stock: Terdeteksi ${textCount} elemen live font (<text>/<tspan>). Adobe Stock mewajibkan: "Convert all text to outlines so that anyone who opens your file and doesn't have the fonts you used can still open it".`
+    : 'Semua teks telah di-outline (Create Outlines) menjadi kurva vektor bebas font eksternal.';
 
   if (hasLiveText) {
-    failures.push(`Live text detected (${textCount} font nodes). Text must be outlined.`);
-    adobeRefusalReasons.push('Text must be outlined (All fonts must be converted to vector paths)');
+    failures.push(`Live text detected (${textCount} font nodes). All fonts must be converted to outlines.`);
+    adobeRefusalReasons.push('Convert all text to outlines (Customers without your fonts cannot edit the file)');
   }
 
-  // D. Vector Craftsmanship & Quality
-  const craftsmanship = analyzeSvgCraftsmanship(svgText);
+  // F. Vector Craftsmanship & Closed Paths ("Close all shape paths fully to prevent gaps" & "Avoid auto-tracing")
+  const { craftsmanship, closedPaths } = analyzeSvgCraftsmanship(svgText);
   if (craftsmanship.autotraceRisk === 'HIGH') {
-    warnings.push('Risiko AI Autotrace Tinggi: Banyak titik jangkar garis lurus berfragmen kasar. Disarankan menggunakan Path > Simplify.');
+    warnings.push('Risiko Auto-Tracing Tinggi: Node garis berfragmen padat. Adobe Stock menganjurkan: "Use clean, simple hand-drawn paths. Avoid auto-tracing complex graphics."');
+    adobeRefusalReasons.push('Path craftsmanship issue (Avoid auto-tracing complex graphics; simplify anchor points)');
+  }
+  if (closedPaths.status === 'WARNING') {
+    warnings.push(closedPaths.note);
   }
 
-  // E. File Size Check (Max 45 MB)
+  // G. File Size Check (Max 45 MB)
   const sizeMb = Number((fileSizeBytes / (1024 * 1024)).toFixed(2));
   const isSizePass = fileSizeBytes <= 0 || sizeMb <= 45.0;
   let sizeNote = `${sizeMb} MB. `;
   if (!isSizePass) {
-    sizeNote += 'DITOLAK Adobe Stock: Ukuran file melebihi batas maksimal 45 MB.';
+    sizeNote += 'DITOLAK Adobe Stock: Ukuran file melebihi batas maksimal 45 MB (Technical Requirements).';
     failures.push(`File size exceeds 45 MB: ${sizeMb} MB`);
-    adobeRefusalReasons.push('File size exceeds 45 MB limit');
+    adobeRefusalReasons.push('Maximum file size exceeded (Max 45 MB allowed by Adobe Stock)');
   } else {
-    sizeNote += 'Ukuran file aman (di bawah batas maksimal 45 MB).';
+    sizeNote += 'Ukuran file memenuhi syarat (di bawah batas maksimal 45 MB).';
   }
 
   const passed = failures.length === 0;
@@ -276,18 +411,21 @@ export function auditSvgContent(svgText: string, fileSizeBytes: number = 0): Vec
       status: isArtboardPass ? 'PASS' : 'FAIL',
       note: artboardNote
     },
+    offset,
+    colorMode: colorModeInfo,
     embeddedRaster: {
       status: hasEmbeddedRaster ? 'FAIL' : 'PASS',
       detected: hasEmbeddedRaster,
       note: rasterNote,
       details: rasterTags.slice(0, 3)
     },
+    closedPaths,
+    craftsmanship,
     liveText: {
       status: hasLiveText ? 'FAIL' : 'PASS',
       detected: hasLiveText,
       note: textNote
     },
-    craftsmanship,
     fileSize: {
       bytes: fileSizeBytes,
       mb: sizeMb,
@@ -316,15 +454,17 @@ export function auditEpsOrAiBytes(bytes: Uint8Array, filename: string = ''): Vec
   const headerLen = Math.min(bytes.length, 65536);
   const headerStr = new TextDecoder('latin1').decode(bytes.subarray(0, headerLen));
 
-  // A. Parse Artboard / BoundingBox
+  // A. Parse Artboard / BoundingBox & Offset
   let width = 0;
   let height = 0;
+  let x1 = 0;
+  let y1 = 0;
 
   // HiResBoundingBox: 0.0000 0.0000 5000.0000 5000.0000
   const hiResMatch = headerStr.match(/%%HiResBoundingBox:\s*([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)/i);
   if (hiResMatch) {
-    const x1 = parseFloat(hiResMatch[1]);
-    const y1 = parseFloat(hiResMatch[2]);
+    x1 = parseFloat(hiResMatch[1]);
+    y1 = parseFloat(hiResMatch[2]);
     const x2 = parseFloat(hiResMatch[3]);
     const y2 = parseFloat(hiResMatch[4]);
     width = Math.abs(x2 - x1);
@@ -333,8 +473,8 @@ export function auditEpsOrAiBytes(bytes: Uint8Array, filename: string = ''): Vec
     // BoundingBox: 0 0 5000 5000
     const bbMatch = headerStr.match(/%%BoundingBox:\s*([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)/i);
     if (bbMatch) {
-      const x1 = parseFloat(bbMatch[1]);
-      const y1 = parseFloat(bbMatch[2]);
+      x1 = parseFloat(bbMatch[1]);
+      y1 = parseFloat(bbMatch[2]);
       const x2 = parseFloat(bbMatch[3]);
       const y2 = parseFloat(bbMatch[4]);
       width = Math.abs(x2 - x1);
@@ -346,8 +486,8 @@ export function auditEpsOrAiBytes(bytes: Uint8Array, filename: string = ''): Vec
   if ((width <= 0 || height <= 0) && isAi) {
     const mediaBoxMatch = headerStr.match(/\/MediaBox\s*\[\s*([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s*\]/i);
     if (mediaBoxMatch) {
-      const x1 = parseFloat(mediaBoxMatch[1]);
-      const y1 = parseFloat(mediaBoxMatch[2]);
+      x1 = parseFloat(mediaBoxMatch[1]);
+      y1 = parseFloat(mediaBoxMatch[2]);
       const x2 = parseFloat(mediaBoxMatch[3]);
       const y2 = parseFloat(mediaBoxMatch[4]);
       width = Math.abs(x2 - x1);
@@ -366,59 +506,90 @@ export function auditEpsOrAiBytes(bytes: Uint8Array, filename: string = ''): Vec
   }
 
   if (width <= 0 || height <= 0) {
-    // Fallback standard assumption
     width = 4000;
     height = 4000;
     warnings.push('Dimensi BoundingBox tidak terbaca secara eksplisit; diasumsikan 4000x4000 px.');
   }
 
+  // 15 MP - 65 MP (Adobe Stock Vector Technical Requirement)
   const pixels = width * height;
   const megapixels = Number((pixels / 1_000_000).toFixed(2));
-  const isArtboardPass = megapixels >= 4.0 && megapixels <= 25.0;
+  const isArtboardPass = megapixels >= 15.0 && megapixels <= 65.0;
 
   let artboardNote = `${Math.round(width)} × ${Math.round(height)} px (${megapixels} MP). `;
-  if (megapixels < 4.0) {
-    artboardNote += `DITOLAK Adobe Stock: Artboard di bawah batas minimal 4 MP (hanya ${megapixels} MP). Harap perbesar ke 4000x4000 px atau 5000x5000 px.`;
-    failures.push(`Artboard size too small: ${megapixels} MP (< 4.0 MP)`);
-    adobeRefusalReasons.push('Artboard size is too small (Minimum 4 MP required by Adobe Stock)');
-  } else if (megapixels > 25.0) {
-    artboardNote += `DITOLAK Adobe Stock: Artboard melebihi batas maksimal 25 MP (${megapixels} MP). Harap turunkan ke 5000x5000 px.`;
-    failures.push(`Artboard size too large: ${megapixels} MP (> 25.0 MP)`);
-    adobeRefusalReasons.push('Artboard size exceeds maximum 25 MP allowed by Adobe Stock');
+  if (megapixels < 15.0) {
+    artboardNote += `DITOLAK Adobe Stock: Artboard di bawah batas minimal 15 MP (hanya ${megapixels} MP). Aturan resmi Adobe Stock mewajibkan minimal 15 MP hingga 65 MP. Harap perbesar ke 4000x4000 px (16 MP) atau 5000x5000 px (25 MP).`;
+    failures.push(`Artboard size too small: ${megapixels} MP (< 15.0 MP required by Adobe Stock)`);
+    adobeRefusalReasons.push('Artboard size is too small (Minimum 15 MP required for vector submissions)');
+  } else if (megapixels > 65.0) {
+    artboardNote += `DITOLAK Adobe Stock: Artboard melebihi batas maksimal 65 MP (${megapixels} MP). Batas resmi adalah maksimal 65 MP.`;
+    failures.push(`Artboard size too large: ${megapixels} MP (> 65.0 MP allowed by Adobe Stock)`);
+    adobeRefusalReasons.push('Artboard size exceeds maximum 65 MP allowed by Adobe Stock');
   } else {
-    artboardNote += `Memenuhi standar Adobe Stock (${megapixels} MP dalam rentang 4 MP - 25 MP).`;
+    artboardNote += `Sesuai standar resmi Adobe Stock (${megapixels} MP dalam rentang wajib 15 MP - 65 MP).`;
   }
 
-  // B. Detect Embedded Raster in EPS/AI
-  // Note: DOS EPS header (0xC5D0D3C6) has a TIFF/WMF thumbnail preview pointer.
-  // The TIFF preview for thumbnails is ALLOWED by Adobe Stock. What is FORBIDDEN is
-  // raster images placed in the vector drawing body (%AI5_BeginRaster /colorimage /image inside AI stream).
+  // Artboard Offset (0,0) upper-left corner
+  const isOffsetZero = Math.abs(x1) < 1 && Math.abs(y1) < 1;
+  let offsetNote = `Offset artboard koordinat (${x1}, ${y1}). `;
+  if (!isOffsetZero) {
+    offsetNote += `PERINGATAN: Artboard offset bukan (0,0). Adobe Stock mewajibkan: "Artboard offset: (0,0) upper-left corner".`;
+    warnings.push(`Artboard offset is (${x1}, ${y1}). Official requirement is (0,0) upper-left corner.`);
+  } else {
+    offsetNote += `Sesuai standar resmi Adobe Stock (koordinat sudut kiri atas tepat di 0,0).`;
+  }
+  const offset: VectorOffsetInfo = {
+    x: x1,
+    y: y1,
+    isOriginZero: isOffsetZero,
+    status: isOffsetZero ? 'PASS' : 'FAIL',
+    note: offsetNote
+  };
+
+  // Color Mode Check: RGB (reject CMYK)
+  // PostScript headers specify color model: %%DocumentProcessColors: Cyan Magenta Yellow Black vs RGB
+  // In Illustrator EPS, look for %AI5_File: or %%DocumentProcessColors:
   let fullPostScript = headerStr;
   if (bytes.length < 2_000_000) {
     fullPostScript = new TextDecoder('latin1').decode(bytes);
   }
 
-  // In Illustrator EPS: %AI5_BeginRaster: x y w h indicates embedded bitmap image
-  const hasAiRaster = /%AI5_BeginRaster(?!\s*:\s*0\s+0\s+0\s+0)/i.test(fullPostScript);
-  // PostScript image operators in content stream (excluding thumbnails)
-  const hasPsImage = /(?:^|\n)\s*(?:\/image|\/colorimage)\b/i.test(fullPostScript);
-  // PDF XObject image in AI container
-  const hasPdfImage = /\/Subtype\s*\/Image\b/i.test(fullPostScript);
+  const isCmykProcess = /%%DocumentProcessColors:\s*(?:Cyan|Magenta|Yellow|Black)/i.test(headerStr) ||
+    /%%CMYKCustomColor/i.test(headerStr) ||
+    /%AI5_File:\s*Color\s*CMYK/i.test(fullPostScript);
 
+  let colorMode: 'RGB' | 'CMYK' | 'GRAYSCALE' | 'UNKNOWN' = isCmykProcess ? 'CMYK' : 'RGB';
+  let colorNote = '';
+  if (isCmykProcess) {
+    colorNote = 'DITOLAK Adobe Stock: File menggunakan mode warna CMYK. Ketentuan resmi Adobe Stock mewajibkan: "Document color mode: RGB".';
+    failures.push('Document color mode is CMYK. Adobe Stock requires RGB color mode.');
+    adobeRefusalReasons.push('Document color mode must be RGB (CMYK submissions are refused)');
+  } else {
+    colorNote = 'Mode warna dokumen RGB. Sesuai ketentuan resmi Adobe Stock: "Document color mode: RGB".';
+  }
+  const colorModeInfo: VectorColorModeInfo = {
+    mode: colorMode,
+    isRgb: !isCmykProcess,
+    status: isCmykProcess ? 'FAIL' : 'PASS',
+    note: colorNote
+  };
+
+  // B. Detect Embedded Raster in EPS/AI ("Avoid embedding raster images to maintain scalability")
+  const hasAiRaster = /%AI5_BeginRaster(?!\s*:\s*0\s+0\s+0\s+0)/i.test(fullPostScript);
+  const hasPsImage = /(?:^|\n)\s*(?:\/image|\/colorimage)\b/i.test(fullPostScript);
+  const hasPdfImage = /\/Subtype\s*\/Image\b/i.test(fullPostScript);
   const hasEmbeddedRaster = hasAiRaster || hasPsImage || hasPdfImage;
 
   let rasterNote = hasEmbeddedRaster
-    ? 'DITOLAK Adobe Stock: Terdeteksi gambar raster/bitmap tertanam di dalam file vektor. Adobe Stock mewajibkan 100% vektor murni tanpa foto/bitmap.'
-    : 'Bebas dari raster bitmap tertanam (100% pure vector paths).';
+    ? 'DITOLAK Adobe Stock: Terdeteksi gambar raster/bitmap tertanam di dalam file vektor. Alasan penolakan Adobe Stock: "Avoid embedding raster images to maintain scalability".'
+    : 'Bebas dari raster bitmap tertanam (100% pure vector paths sesuai standar skalabilitas Adobe Stock).';
 
   if (hasEmbeddedRaster) {
     failures.push('Embedded raster image detected in vector content stream');
-    adobeRefusalReasons.push('Contains embedded raster images (Vector files must be 100% vector)');
+    adobeRefusalReasons.push('Contains embedded raster images (Refusal standard: Avoid embedding raster images to maintain scalability)');
   }
 
-  // C. Detect Live Text / Unoutlined Fonts
-  // In Illustrator EPS: %%DocumentNeededFonts: FontName (when fonts are not outlined)
-  // If all fonts are outlined, DocumentNeededFonts is either absent, (none), or empty.
+  // C. Detect Live Text / Unoutlined Fonts ("Convert all text to outlines")
   const neededFontsMatch = headerStr.match(/%%DocumentNeededFonts:\s*([^\r\n]+)/i);
   let hasLiveFonts = false;
   let fontDetails = '';
@@ -431,7 +602,6 @@ export function auditEpsOrAiBytes(bytes: Uint8Array, filename: string = ''): Vec
     }
   }
 
-  // Also check %%DocumentSuppliedFonts or active font resources
   const suppliedFontsMatch = headerStr.match(/%%DocumentSuppliedFonts:\s*([^\r\n]+)/i);
   if (suppliedFontsMatch && !hasLiveFonts) {
     const sFontVal = suppliedFontsMatch[1].trim().toLowerCase();
@@ -442,18 +612,22 @@ export function auditEpsOrAiBytes(bytes: Uint8Array, filename: string = ''): Vec
   }
 
   let textNote = hasLiveFonts
-    ? `DITOLAK Adobe Stock: Terdeteksi font aktif/live text (${fontDetails}). Seluruh teks wajib di-convert to outlines (Create Outlines) sebelum disubmit.`
-    : 'Semua teks telah di-outline menjadi kurva vektor (bebas dari font aktif).';
+    ? `DITOLAK Adobe Stock: Terdeteksi font aktif/live text (${fontDetails}). Adobe Stock mewajibkan: "Convert all text to outlines so that anyone who opens your file and doesn't have the fonts you used can still open it".`
+    : 'Semua teks telah di-outline (Create Outlines) menjadi kurva vektor bebas font eksternal.';
 
   if (hasLiveFonts) {
     failures.push(`Unoutlined font detected: ${fontDetails}`);
-    adobeRefusalReasons.push('Text must be outlined (All fonts must be converted to vector paths)');
+    adobeRefusalReasons.push('Convert all text to outlines (Customers without your fonts cannot edit the file)');
   }
 
-  // D. Vector Craftsmanship & Quality
-  const craftsmanship = analyzeEpsCraftsmanship(fullPostScript);
+  // D. Vector Craftsmanship & Closed Paths ("Close all shape paths fully to prevent gaps" & "Avoid auto-tracing")
+  const { craftsmanship, closedPaths } = analyzeEpsCraftsmanship(fullPostScript);
   if (craftsmanship.autotraceRisk === 'HIGH') {
-    warnings.push('Risiko AI Autotrace Tinggi: Kepadatan node lineto sangat tinggi. Disarankan merapikan dengan Path > Simplify.');
+    warnings.push('Risiko AI Autotrace Tinggi: Kepadatan node lineto sangat tinggi. Adobe Stock menganjurkan: "Use clean, simple hand-drawn paths. Avoid auto-tracing complex graphics."');
+    adobeRefusalReasons.push('Path craftsmanship issue (Avoid auto-tracing complex graphics; simplify anchor points)');
+  }
+  if (closedPaths.status === 'WARNING') {
+    warnings.push(closedPaths.note);
   }
 
   // E. File Size Check (Max 45 MB)
@@ -461,11 +635,11 @@ export function auditEpsOrAiBytes(bytes: Uint8Array, filename: string = ''): Vec
   const isSizePass = sizeMb <= 45.0;
   let sizeNote = `${sizeMb} MB. `;
   if (!isSizePass) {
-    sizeNote += 'DITOLAK Adobe Stock: Ukuran file melebihi batas maksimal 45 MB.';
+    sizeNote += 'DITOLAK Adobe Stock: Ukuran file melebihi batas maksimal 45 MB (Technical Requirements).';
     failures.push(`File size exceeds 45 MB: ${sizeMb} MB`);
-    adobeRefusalReasons.push('File size exceeds 45 MB limit');
+    adobeRefusalReasons.push('Maximum file size exceeded (Max 45 MB allowed by Adobe Stock)');
   } else {
-    sizeNote += 'Ukuran file aman (di bawah batas maksimal 45 MB).';
+    sizeNote += 'Ukuran file memenuhi syarat (di bawah batas maksimal 45 MB).';
   }
 
   const passed = failures.length === 0;
@@ -481,17 +655,20 @@ export function auditEpsOrAiBytes(bytes: Uint8Array, filename: string = ''): Vec
       status: isArtboardPass ? 'PASS' : 'FAIL',
       note: artboardNote
     },
+    offset,
+    colorMode: colorModeInfo,
     embeddedRaster: {
       status: hasEmbeddedRaster ? 'FAIL' : 'PASS',
       detected: hasEmbeddedRaster,
       note: rasterNote
     },
+    closedPaths,
+    craftsmanship,
     liveText: {
       status: hasLiveFonts ? 'FAIL' : 'PASS',
       detected: hasLiveFonts,
       note: textNote
     },
-    craftsmanship,
     fileSize: {
       bytes: bytes.length,
       mb: sizeMb,
@@ -504,6 +681,7 @@ export function auditEpsOrAiBytes(bytes: Uint8Array, filename: string = ''): Vec
     adobeRefusalReasons
   };
 }
+
 
 // ─────────────────────────────────────────────────────────────
 // 3. UNIVERSAL BROWSER / NODE DISPATCHER

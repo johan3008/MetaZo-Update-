@@ -6737,36 +6737,29 @@ export async function checkImageQuality(
     metadataInstruction = `\n\n---\n[DATA PENGUKURAN TEKNIS OBJEKTIF & PIXEL FORENSIK]\nHasil analisis OpenCV / BRISQUE / NIQE pada file asli:\n\`\`\`json\n${JSON.stringify(imageMetadata, null, 2)}\n\`\`\`\nPETUNJUK ANALISIS PIKSEL & TEKNIKAL:\n1. Skor BRISQUE > 52 atau NIQE > 6.2: Indikasi kuat degradasi spasial / blur ekstrem / over-smoothing AI sintetis. Skor di bawah 45 adalah rentang normal fotografi komersial.\n2. has_local_blur_anomaly = true: Hanya jika seluruh gambar tidak memiliki fokus tajam. Jika subjek utama tajam dan latar belakang blur karena bokeh optik, nilai PASS.\n3. Pantulan kilau (specular highlights pada saus/cairan/gelas/logam) dan bayangan alami adalah pencahayaan normal komersial dan BUKAN cacat.\n4. Gunakan data numerik bersama inspeksi visual crop 100% untuk menetapkan penilaian akurat dan proporsional.`;
   }
 
-  const systemInstruction = isVectorAsset ? `Anda adalah "Adobe Stock Senior Vector Content Moderator & Forensic Quality Inspector" resmi. Tugas Anda adalah mengaudit aset ilustrasi vektor (.EPS, .SVG, .AI) komersial secara mendalam berdasarkan standar dan peraturan resmi Adobe Stock Vector Contributor Guidelines (https://helpx.adobe.com/stock/contributor/content-policies-guidelines/vector-requirements.html).
+  const systemInstruction = isVectorAsset ? `Anda adalah "Adobe Stock Senior Vector Quality Auditor & Content Moderator" resmi. Tugas Anda adalah mengaudit aset ilustrasi vektor (.EPS, .SVG, .AI) secara ketat dan profesional berdasarkan 2 standar resmi Adobe Stock Contributor:
+1. Technical Requirements for Vector Submissions (https://helpx.adobe.com/id_id/stock/contributor/submit-your-content/submit-vectors/technical-requirements-for-vector-submissions.html):
+   - Artboard Dimension: Wajib minimal 15 MP (15.000.000 px) hingga maksimal 65 MP (65.000.000 px). Contoh ukuran ideal: 4000x4000 px (16 MP) atau 5000x5000 px (25 MP). Di bawah 15 MP atau di atas 65 MP DITOLAK.
+   - Artboard Offset: Wajib di titik sudut kiri atas (0,0).
+   - Document Color Mode: Wajib mode warna RGB. Mode warna CMYK DITOLAK.
+   - File Format & Max Size: AI, EPS, atau SVG. Ukuran file maksimal 45 MB.
 
-STANDAR MODERASI KHUSUS VEKTOR ADOBE STOCK:
-1. GERBANG TEKNIS RESMI VEKTOR ADOBE STOCK:
-   - ARTBOARD & RESOLUSI: Wajib antara 4.0 MP (4.000.000 px) hingga 25.0 MP (25.000.000 px). Contoh: 2000x2000 px s/d 5000x5000 px. Di bawah 4 MP atau di atas 25 MP langsung DITOLAK.
-   - PURE VECTOR (ZERO EMBEDDED BITMAPS): Seluruh gambar harus 100% vektor murni. DILARANG KERAS menyematkan foto/bitmap/raster (<image>, %AI5_BeginRaster, data:image, /image). Terdeteksi 1 bitmap saja langsung DITOLAK.
-   - OUTLINE FONTS (CREATE OUTLINES): Seluruh teks, font, dan tipografi wajib di-convert to outlines / expanded. Dilarang menyisakan live text / font aktif.
-   - UKURAN FILE: Maksimal 45 MB.
+2. Quality and Technical Standards - Reasons for Content Refusal (https://helpx.adobe.com/id_id/stock/contributor/content-moderation/quality-technical-standards-reasons-content-refusal.html):
+   - Zero Embedded Bitmaps: "Avoid embedding raster images to maintain scalability". Vektor harus 100% kurva murni tanpa bitmap piksel tertanam.
+   - Closed Shape Paths: "Close all shape paths fully to prevent gaps". Semua shape path wajib tertutup rapat untuk menghindari celah visual saat diedit pembeli.
+   - Vector Craftsmanship: "Use clean, simple hand-drawn paths. Avoid auto-tracing complex graphics". Dilarang keras autotrace kasar/berantakan dengan ribuan node bergerigi. Kurva bezier harus bersih dan efisien.
+   - Convert All Text to Outlines: Seluruh teks dan tipografi wajib di-convert to outlines (Create Outlines) agar pembeli yang tidak memiliki font tersebut tetap dapat membukanya.
+   - Metadata & IP: Bebas dari logo komersial dan hak cipta merek dagang.
 
-2. KUALITAS PEMBUATAN VEKTOR & BEZIER CRAFTSMANSHIP:
-   - Kehalusan Kurva Bezier: Kurva harus halus dan terstruktur rapi. Dilarang keras hasil AI autotrace kasar/berantakan dengan ribuan anchor point liar (stray anchor points), garis bergerigi (jagged edges), atau celah terbuka tidak tertutup (unclosed paths).
-   - Detail & Komposisi: Garis vektor harus terhubung rapi, layering teratur, dan bentuk ilustrasi memiliki nilai komersial tinggi.
-
-3. KEBIJAKAN HAK CIPTA & MEREK DAGANG:
-   - Dilarang mengandung logo komersial, ikon merek berhak cipta, karakter berlisensi, atau materi tanpa izin.
-
-4. PERALATAN DETEKSI YANG DIGUNAKAN:
-   - Adobe Stock Vector Artboard Validator (4MP - 25MP Gateway)
-   - Vector Raster-Free Forensic Scanner (0 Embedded Bitmaps Gate)
-   - Typography Outline Verifier (Live Text Detector)
-   - Bezier Curve & AI Autotrace Craftsmanship Inspector
-   - Adobe Stock Known Restrictions & Trademark Scanner
+CATATAN PENTING: Untuk aset vektor, HAPUS dan JANGAN evaluasi metrik fotografi/raster seperti sensor noise, kamera blur, lensa aperture, ISO, shutter speed, BRISQUE/NIQE blur foto, dan Laplacian focus kamera. Fokus 100% hanya pada kriteria vektor resmi di atas.
 
 FORMAT LAPORAN:
 Kembalikan keterangan naratif terpadu yang jelas, terstruktur, dan elegan untuk:
-- detection_tools_used: Daftar nama alat forensik vektor yang digunakan.
+- detection_tools_used: ["Adobe Stock Vector Artboard Validator (15 MP - 65 MP)", "Vector Artboard (0,0) Offset Verifier", "Document RGB Color Mode Gate", "Vector Raster-Free Scanner (Zero Bitmaps)", "Closed Shape Path Integrity Inspector", "Bezier Craftsmanship & Auto-Trace Refusal Analyzer", "Typography Outline Verifier", "Adobe Stock Known Restrictions Scanner"]
 - ip_audit_summary: Narasi lengkap audit hak cipta, merek dagang, dan orisinalitas vektor.
-- quality_issues_summary: Narasi lengkap kehalusan kurva bezier, estetika vektor, dan deteksi artefak autotrace AI.
-- technical_issues_summary: Narasi lengkap kesesuaian gerbang teknis vektor Adobe Stock (Artboard MP, Raster-Free, Outlined Text, Ukuran File).
-- detailed_feedback: Kesimpulan kurator dan panduan teknis perbaikan di Adobe Illustrator / software vektor.` + metadataInstruction + vectorGateInstruction : `Anda adalah "Adobe Stock Senior Content Moderator & Forensic Quality Inspector" resmi. Tugas Anda adalah mengaudit gambar komersial secara mendalam berdasarkan standar moderasi resmi Adobe Stock Contributor.
+- quality_issues_summary: Narasi lengkap kehalusan kurva bezier, penutupan shape path rapat (closed paths), dan bebas dari auto-tracing kompleks bergerigi.
+- technical_issues_summary: Narasi lengkap kesesuaian gerbang teknis vektor Adobe Stock (Artboard 15 MP - 65 MP, Offset (0,0), Color Mode RGB, Raster-Free, Outlines, File Size <= 45 MB).
+- detailed_feedback: Kesimpulan kurator resmi Adobe Stock dan langkah perbaikan di Adobe Illustrator.` + metadataInstruction + vectorGateInstruction : `Anda adalah "Adobe Stock Senior Content Moderator & Forensic Quality Inspector" resmi. Tugas Anda adalah mengaudit gambar komersial secara mendalam berdasarkan standar moderasi resmi Adobe Stock Contributor.
 
 STANDAR MODERASI & PEDOMAN RESMI ADOBE STOCK:
 1. KEBIJAKAN HAK CIPTA & RESTRIKSI HUKUM (Known Restrictions & Common Refusal Reasons - https://helpx.adobe.com/stock/contributor/content-policies-guidelines/content-policies/known-restrictions.html & https://helpx.adobe.com/stock/contributor/content-moderation/common-reasons-content-refusal.html):
@@ -6903,28 +6896,31 @@ Kembalikan keterangan naratif terpadu yang jelas, terstruktur, dan elegan (TIDAK
   let responseText = "";
   let lastError;
 
-  const promptText = isVectorAsset ? `Sebagai Kurator & Moderator Konten Vektor Senior Adobe Stock, lakukan review kurasi teknis dan artistik menyeluruh pada aset ilustrasi vektor ini sesuai aturan resmi Adobe Stock Vector (https://helpx.adobe.com/stock/contributor/content-policies-guidelines/vector-requirements.html):
+  const promptText = isVectorAsset ? `Sebagai Kurator & Auditor Kualitas Vektor Senior Adobe Stock, lakukan review kurasi teknis dan artistik menyeluruh pada aset ilustrasi vektor ini berdasarkan 2 standar resmi Adobe Stock (Technical Requirements & Reasons for Refusal):
 
-1. AUDIT GERBANG TEKNIS VEKTOR (Adobe Stock Vector Technical Requirements):
-   - Periksa dimensi artboard (rentang 4 MP - 25 MP).
-   - Pastikan bebas dari gambar raster/bitmap yang tertanam (100% pure vector).
-   - Pastikan seluruh teks telah di-convert to outlines (tidak ada live font).
+1. AUDIT GERBANG TEKNIS RESMI VEKTOR (Official Adobe Stock Technical Requirements):
+   - Periksa dimensi artboard (rentang WAJIB: 15 MP hingga 65 MP).
+   - Periksa offset artboard (wajib koordinat sudut kiri atas di 0,0).
+   - Periksa mode warna dokumen (wajib RGB, tolak jika CMYK).
+   - Pastikan bebas dari gambar raster/bitmap tertanam ("Avoid embedding raster images to maintain scalability").
+   - Pastikan seluruh teks telah di-convert to outlines (Create Outlines) bebas font aktif.
    - Periksa ukuran file (maksimal 45 MB).
    - Buat narasi lengkap pada "technical_issues_summary".
 
-2. AUDIT CRAFTSMANSHIP & BEZIER PATHS (Vector Quality Issues):
-   - Evaluasi kehalusan kurva bezier, kerapian titik jangkar (anchor points), dan ketiadaan artefak AI autotrace kasar/pecah.
-   - Periksa apakah kurva terlihat mulus dan terstruktur, atau apakah terlihat bergerigi (jagged edges) akibat autotrace otomatis dengan ribuan node berlebih.
-   - Berikan rekomendasi perbaikan Adobe Illustrator (misal: Object > Path > Simplify) jika kurva perlu dioptimalkan.
+2. AUDIT CRAFTSMANSHIP & PATH INTEGRITY (Reasons for Content Refusal):
+   - Pastikan seluruh shape path tertutup rapat ("Close all shape paths fully to prevent gaps").
+   - Evaluasi kehalusan kurva bezier ("Use clean, simple hand-drawn paths. Avoid auto-tracing complex graphics").
+   - Periksa apakah kurva mulus atau bergerigi akibat autotrace berlebihan dengan ribuan node.
+   - Berikan rekomendasi perbaikan Adobe Illustrator (Object > Path > Simplify).
    - Tetapkan status pada ai_vision_checks.proportion_defects (PASS/FAIL beserta catatannya).
    - Buat narasi lengkap pada "quality_issues_summary".
 
-3. AUDIT HAK CIPTA & RESTRIKSI (Known Restrictions & Trademark Audit):
-   - Evaluasi keberadaan logo, merek komersial, desain produk berhak cipta, simbol terlindungi.
+3. AUDIT HAK CIPTA & RESTRIKSI:
+   - Evaluasi logo, merek dagang komersial, desain produk berhak cipta.
    - Buat narasi lengkap pada "ip_audit_summary".
 
 4. ALAT DETEKSI (detection_tools_used):
-   - Cantumkan: ["Adobe Stock Vector Artboard Validator (4MP - 25MP Gateway)", "Vector Raster-Free Forensic Scanner (0 Embedded Bitmaps Gate)", "Typography Outline Verifier (Live Text Detector)", "Bezier Curve & AI Autotrace Craftsmanship Inspector", "Adobe Stock Known Restrictions & Trademark Scanner"].
+   - Cantumkan: ["Adobe Stock Vector Artboard Validator (15 MP - 65 MP)", "Vector Artboard (0,0) Offset Verifier", "Document RGB Color Mode Gate", "Vector Raster-Free Scanner (Zero Bitmaps)", "Closed Shape Path Integrity Inspector", "Bezier Craftsmanship & Auto-Trace Refusal Analyzer", "Typography Outline Verifier", "Adobe Stock Known Restrictions Scanner"].
 
 Tingkat toleransi yang diminta: ${tolerance}.
 Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.` : `Sebagai Kurator & Moderator Konten Senior Adobe Stock, lakukan review kurasi forensik menyeluruh pada gambar ini sesuai pedoman Adobe Stock:
@@ -6992,11 +6988,14 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
     
     // Pastikan daftar detection_tools_used selalu lengkap
     const defaultTools = isVectorAsset ? [
-      "Adobe Stock Vector Artboard Validator (4MP - 25MP Gateway)",
-      "Vector Raster-Free Forensic Scanner (0 Embedded Bitmaps Gate)",
-      "Typography Outline Verifier (Live Text Detector)",
-      "Bezier Curve & AI Autotrace Craftsmanship Inspector",
-      "Adobe Stock Known Restrictions & Trademark Scanner"
+      "Adobe Stock Vector Artboard Validator (15 MP - 65 MP)",
+      "Vector Artboard (0,0) Offset Verifier",
+      "Document RGB Color Mode Gate",
+      "Vector Raster-Free Scanner (Zero Bitmaps)",
+      "Closed Shape Path Integrity Inspector",
+      "Bezier Craftsmanship & Auto-Trace Refusal Analyzer",
+      "Typography Outline Verifier",
+      "Adobe Stock Known Restrictions Scanner"
     ] : [
       "AI Multimodal Vision Inspector",
       "OpenCV Pixel Forensic Engine (100% Zoom Crop)",
@@ -7086,8 +7085,8 @@ Tulis seluruh teks hasil analisis dalam bahasa: ${targetLanguageName}.`;
     if (!parsedResult.technical_issues_summary) {
       if (isVectorAsset) {
         parsedResult.technical_issues_summary = parsedResult.recommendation === 'PASS'
-          ? (isIndonesian ? 'Memenuhi seluruh gerbang teknis vektor Adobe Stock: Artboard dalam batas 4 MP - 25 MP, 100% pure vector tanpa raster tertanam, semua teks telah di-convert to outlines, dan ukuran file aman.' : 'Meets all Adobe Stock vector technical gates: Artboard between 4 MP - 25 MP, 100% pure vector with zero embedded rasters, all text converted to outlines, and file size within limits.')
-          : (isIndonesian ? 'Gagal memenuhi gerbang teknis vektor Adobe Stock. Periksa ukuran artboard (min 4 MP), pastikan tidak ada foto/bitmap tertanam, dan lakukan Create Outlines pada semua font.' : 'Failed Adobe Stock vector technical gate requirements. Check artboard size (min 4 MP), verify zero embedded rasters, and expand all fonts.');
+          ? (isIndonesian ? 'Memenuhi seluruh gerbang teknis vektor Adobe Stock: Artboard dalam rentang wajib 15 MP - 65 MP, offset artboard (0,0), mode warna RGB, 100% pure vector tanpa raster tertanam, semua shape path tertutup rapat, semua teks telah di-convert to outlines, dan ukuran file <= 45 MB.' : 'Meets all Adobe Stock vector technical requirements: Artboard between 15 MP - 65 MP, (0,0) offset, RGB color mode, 100% pure vector with zero embedded rasters, closed shape paths, all text converted to outlines, and file size <= 45 MB.')
+          : (isIndonesian ? 'Gagal memenuhi gerbang teknis vektor resmi Adobe Stock. Pastikan ukuran artboard minimal 15 MP hingga 65 MP, offset (0,0), mode warna dokumen RGB, bebas gambar bitmap/raster tertanam, shape tertutup rapat, dan lakukan Create Outlines pada semua font.' : 'Failed official Adobe Stock vector technical requirements. Verify artboard size (15 MP - 65 MP), (0,0) offset, RGB color mode, zero embedded rasters, closed shape paths, and expand all fonts.');
       } else {
         parsedResult.technical_issues_summary = parsedResult.recommendation === 'PASS'
           ? (isIndonesian ? 'Fokus tajam pada subjek utama (tack-sharp pada inspeksi crop 100%), pencahayaan dan kontras seimbang, serta bebas dari noise sensor dan artefak kompresi.' : 'Sharp focus on primary subject (tack-sharp at 100% crop inspection), balanced lighting and contrast, clean of sensor noise and compression artifacts.')
