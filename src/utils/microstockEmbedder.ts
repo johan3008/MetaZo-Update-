@@ -155,7 +155,7 @@ export function buildXmpPacket(metadata: MicrostockMetadataInput, mimeType: stri
   const title = String(metadata.title || '').trim();
   const description = String(metadata.description || metadata.comment || title).trim();
   const subject = String(metadata.subject || title).trim();
-  const keywords = cleanKeywordArray(metadata.keywords).slice(0, 49);
+  const keywords = cleanKeywordArray(metadata.keywords);
   const creator = metadata.creator || 'MetaZo Contributor';
   const copyright = metadata.copyright || 'All rights reserved';
   const software = metadata.software || 'MetaZo Microstock AI Assistant';
@@ -651,8 +651,7 @@ export function embedPngMetadata(pngBytes: Uint8Array, metadata: MicrostockMetad
   const description = String(metadata.description || metadata.comment || title).trim();
   const subject = String(metadata.subject || title).trim();
   const comment = String(metadata.comment || description).trim();
-  // Ensure keywords are strictly capped to 49 for 100% Adobe Stock compliance
-  const keywords = cleanKeywordArray(metadata.keywords).slice(0, 49);
+  const keywords = cleanKeywordArray(metadata.keywords);
   const creator = metadata.creator || 'MetaZo Contributor';
   const copyright = metadata.copyright || 'All rights reserved';
   const software = metadata.software || 'MetaZo Microstock AI Assistant';
@@ -978,7 +977,7 @@ function updateExistingEpsXmp(
 
   const title = String(metadata.title || '').trim();
   const desc = String(metadata.description || metadata.comment || title).trim();
-  const keywords = cleanKeywordArray(metadata.keywords).slice(0, 49);
+  const keywords = cleanKeywordArray(metadata.keywords);
   const creator = String(metadata.creator || 'MetaZo Contributor').trim();
   const dateObj = resolveDateTaken(metadata.dateTaken);
   const isoDate = formatIsoDate(dateObj);
@@ -1019,6 +1018,12 @@ function updateExistingEpsXmp(
   // 4. pdf:Keywords
   const pdfKw = `<pdf:Keywords>${escapeXml(keywords.join(', '))}</pdf:Keywords>`;
   replaceOrInsert(/<pdf:Keywords\b[\s\S]*?(?:<\/pdf:Keywords>|\/>)/, pdfKw);
+
+  // 4b. lr:hierarchicalSubject (sync if present in original vector file)
+  if (/<lr:hierarchicalSubject\b/.test(xml)) {
+    const lrSubjXml = `<lr:hierarchicalSubject>\n            <rdf:Bag>\n${kwItems}\n            </rdf:Bag>\n         </lr:hierarchicalSubject>`;
+    xml = xml.replace(/<lr:hierarchicalSubject\b[\s\S]*?(?:<\/lr:hierarchicalSubject>|\/>)/, lrSubjXml);
+  }
 
   // 5. photoshop:Headline
   const headline = `<photoshop:Headline>${escapeXml(title)}</photoshop:Headline>`;
@@ -1158,23 +1163,6 @@ export function embedEpsMetadataBytes(
         const endTrailerBytes = new TextEncoder().encode(endTrailer);
         let requiredLen = coreBytes.length + endTrailerBytes.length;
 
-        // If metadata exceeds existing space, trim keywords count to fit within original padding
-        if (requiredLen > existingLen && closeMetaIdx !== -1) {
-          let kwSlice = keywords.slice(0, 30);
-          while (kwSlice.length >= 5) {
-            kwSlice = kwSlice.slice(0, kwSlice.length - 5);
-            xmpCore = updateExistingEpsXmp(existingXmpStr.substring(0, closeMetaIdx + 12), {
-              ...metadata,
-              keywords: kwSlice
-            });
-            coreBytes = new TextEncoder().encode(xmpCore);
-            if (coreBytes.length + endTrailerBytes.length <= existingLen) {
-              break;
-            }
-          }
-          requiredLen = coreBytes.length + endTrailerBytes.length;
-        }
-
         // In-place replacement with whitespace padding (EXACT ORIGINAL FILE SIZE MAINTAINED 100%!)
         if (requiredLen <= existingLen) {
           const result = new Uint8Array(workingBytes.length);
@@ -1188,7 +1176,7 @@ export function embedEpsMetadataBytes(
           return result;
         }
 
-        // Rare case: metadata exceeds existing padding -> splice in-place at packetStart
+        // When metadata with all keywords exceeds existing padding -> splice in-place at packetStart
         const spliceTrailer = '\n<?xpacket end="w"?>';
         const spliceTrailerBytes = new TextEncoder().encode(spliceTrailer);
         const totalSpliceLen = coreBytes.length + spliceTrailerBytes.length;
